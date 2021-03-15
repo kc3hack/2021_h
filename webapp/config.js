@@ -1,9 +1,9 @@
 module.exports = {
 
 	GitHub: {
-		clientID: '$GITHUB_CLIENT_ID',
-		clientSecret: '$GITHUB_CLIENT_SECRET',
-		callbackURL: 'http://localhost:8000/auth/github/callback'
+		clientID: process.env.GITHUB_CLIENT_ID || '$GITHUB_CLIENT_ID',
+		clientSecret: process.env.GITHUB_CLIENT_SECRET || '$GITHUB_CLIENT_SECRET',
+		callbackURL: process.env.HEROKU_URL ? `process.env.HEROKU_URL/auth/github/callback` : 'http://localhost:8000/auth/github/callback'
 	},
 
 	session: {
