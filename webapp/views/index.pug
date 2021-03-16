@@ -3,3 +3,12 @@ extends layout
 block content
   h1= title
   p Welcome to #{title}
+
+  div
+    if user
+      dev
+        a(href="/logout") #{user.username} をログアウト
+
+    else
+      dev
+        a(href="/login") ログイン
