@@ -26,6 +26,10 @@ const Card = loader.database.define(
 		updatedAt: {
 			type: Sequelize.DATE,
 			allowNull: false
+		},
+		likes: {
+			type: Sequelize.INTEGER,
+			allowNull: false
 		}
 	},
 	{
