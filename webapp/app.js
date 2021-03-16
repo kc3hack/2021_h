@@ -14,6 +14,8 @@ var indexRouter = require('./routes/index');
 var usersRouter = require('./routes/users');
 var loginRouter = require('./routes/login');
 var logoutRouter = require('./routes/logout');
+var profileRouter = require('./routes/profile');
+var chatRouter = require('./routes/chat');
 
 passport.serializeUser((user, cb) => { cb(null, user); });
 passport.deserializeUser((obj, cb) => { cb(null, obj); });
@@ -50,6 +52,8 @@ app.use('/', indexRouter);
 app.use('/users', usersRouter);
 app.use('/login', loginRouter);
 app.use('/logout', logoutRouter);
+app.use('/profile',profileRouter);
+app.use('/chat',chatRouter);
 
 app.get('/auth/github',
   passport.authenticate('github', { scope: ['user:email'] }),
