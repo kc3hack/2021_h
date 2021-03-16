@@ -12,14 +12,18 @@ var config = require('./config');
 
 var indexRouter = require('./routes/index');
 var usersRouter = require('./routes/users');
+var loginRouter = require('./routes/login');
+var logoutRouter = require('./routes/logout');
+var profileRouter = require('./routes/profile');
+var chatRouter = require('./routes/chat');
 
 passport.serializeUser((user, cb) => { cb(null, user); });
 passport.deserializeUser((obj, cb) => { cb(null, obj); });
 passport.use(new GitHubStrategy(
   {
-    clientID: config.GitHub.clientID,
-    clientSecret: config.GitHub.clientSecret,
-    callbackURL: config.GitHub.callbackURL
+    clientID: process.env.GITHUB_CLIENT_ID || config.GitHub.clientID,
+    clientSecret: process.env.GITHUB_CLIENT_SECRET || config.GitHub.clientSecret,
+    callbackURL: process.env.HEROKU_URL ? `process.env.HEROKU_URL/auth/github/callback` : config.GitHub.callbackURL
   },
 
   function (accessToken, refreshToken, profile, done) {
@@ -47,6 +51,11 @@ app.use(passport.session());
 
 app.use('/', indexRouter);
 app.use('/users', usersRouter);
+app.use('/login', loginRouter);
+app.use('/logout', logoutRouter);
+app.use('/profile',profileRouter);
+app.use('/chat',chatRouter);
+
 app.get('/auth/github',
   passport.authenticate('github', { scope: ['user:email'] }),
   (req, res) => { }
@@ -58,7 +67,7 @@ app.get('/auth/github/callback',
 app.get('/login', (req, res) => res.render('login'));
 app.get('/logout', (req, res) => {
   req.logout();
-  res.redirect('/')
+  res.redirect('/');
 });
 
 // catch 404 and forward to error handler
