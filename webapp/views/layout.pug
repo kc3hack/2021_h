@@ -3,5 +3,8 @@ html
   head
     title= title
     link(rel='stylesheet', href='/stylesheets/style.css')
+    link(rel="stylesheet", href="/stylesheets/uikit.min.css")
   body
-    block content
+    section.uk-section
+      block content
+    script(src="/javascripts/bundle.js")
