@@ -8,6 +8,15 @@ var session = require('express-session');
 var GitHubStrategy = require('passport-github2').Strategy;
 var passport = require('passport');
 
+// モデルの読み込み
+var User = require('./models/user');
+var Card = require('./models/card');
+
+User.sync().then(() => {
+  Card.belongsTo(User, { foreignKey: 'createdBy' });
+  Card.sync();
+});
+
 var config = require('./config');
 
 var indexRouter = require('./routes/index');
@@ -27,7 +36,16 @@ passport.use(new GitHubStrategy(
 
   function (accessToken, refreshToken, profile, done) {
 
-    process.nextTick(() => done(null, profile));
+    process.nextTick(() => {
+
+      User.upsert(
+        {
+        userId: profile.id,
+        username: profile.username,
+        displayName: profile.displayName
+        }
+      ).then(() => done(null, profile));
+    });
   }
 ));
 

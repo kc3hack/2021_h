@@ -100,8 +100,7 @@ __webpack_require__.r(__webpack_exports__);
  // loads the Icon plugin
 
 uikit__WEBPACK_IMPORTED_MODULE_0___default.a.use(uikit_dist_js_uikit_icons__WEBPACK_IMPORTED_MODULE_1___default.a); // components can be called from the imported UIkit reference
-
-uikit__WEBPACK_IMPORTED_MODULE_0___default.a.notification('Hello world.');
+// UIkit.notification('Hello world.');
 
 /***/ }),
 /* 1 */
