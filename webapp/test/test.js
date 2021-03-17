@@ -2,6 +2,8 @@
 const request = require('supertest');
 const app = require('../app');
 const passportStub = require('passport-stub');
+const User = require('../models/user');
+const Card = require('../models/card');
 
 describe('/login', () => {
 	beforeAll(() => {
@@ -31,5 +33,16 @@ describe('/login', () => {
 			.get('/login')
 			.expect(/testuser/)
 			.expect(200);
+	});
+});
+
+describe('/logout', () => {
+
+	test('リダイレクトされる', () => {
+
+		return request(app)
+			.get('/logout')
+			.expect('Location', '/')
+			.expect(302);
 	});
 });

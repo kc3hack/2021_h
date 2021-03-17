@@ -1,10 +1,9 @@
 extends layout
 
 block content
-  h1= title
-  p Welcome to #{title}
-
-  div
+  div.uk-background-muted
+    h1= title
+    p Welcome to #{title}
     if user
       dev
         a(href="/logout") #{user.username} をログアウト
@@ -12,3 +11,4 @@ block content
     else
       dev
         a(href="/login") ログイン
+      

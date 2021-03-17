@@ -11,9 +11,9 @@ const Card = loader.database.define(
 			primaryKey: true,
 			allowNull: false
 		},
-		cardName: {
-			type: Sequelize.STRING,
-			allowNull: false
+		sendTo: {
+			type: Sequelize.UUID,
+			allowNull: true
 		},
 		content: {
 			type: Sequelize.TEXT,
@@ -42,3 +42,5 @@ const Card = loader.database.define(
 		]
 	}
 );
+
+module.exports = Card;
