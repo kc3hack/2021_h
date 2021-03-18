@@ -1,0 +1,19 @@
+extends layout
+
+block content
+    div.uk-position-top-left.uk-text-large.uk-position-large
+        p アイコン画像変更 
+            br
+            |
+            br
+            |ID変更
+            br
+            |
+            br
+            |
+            a(href="/logout") ログアウト
+    div.uk-position-center.uk-text-large
+        img(src = "./test_ico.png")
+        p ID　：　#{user.userId}
+        p ユーザー名　： #{user.username}
+        p 表示名　：　#{user.displayName}
