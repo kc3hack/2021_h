@@ -69,7 +69,7 @@ app.use('/', indexRouter);
 app.use('/login', loginRouter);
 app.use('/logout', logoutRouter);
 app.use('/profile',profileRouter);
-app.use('/chat',chatRouter);
+app.use('/chat', chatRouter);
 
 app.get('/auth/github',
   passport.authenticate('github', { scope: ['user:email'] }),

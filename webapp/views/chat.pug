@@ -6,4 +6,8 @@ html
   body
     block content
     h1="this is chat"
-    canvas(width="800", height="800", background="background-color")
+    h1 #{user.username}
+    h1 #{card}
+    form(method="post" action="chat")
+      input(type="text" name="content")
+      button(type="submit") post
