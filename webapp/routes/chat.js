@@ -1,15 +1,15 @@
 'use strict';
 const express = require('express');
-const Card = require('../models/card');
 const router = express.Router();
+const database = require('../models/sequelize-loader')
 const authenticationEnsurer = require('./authentication-ensurer');
 
 router.get('/', authenticationEnsurer, (req, res, next) => {
-	res.render('chat', { user: req.user, card: Card });
+	res.render('chat', { user: req.user });
 });
 
 router.post('/', authenticationEnsurer, (req, res, next) => {
-	console.log(req.body['content']);
+	console.log(database)
 	res.render('chat', { user: req.user, card: req.body['content'] });
 })
 
