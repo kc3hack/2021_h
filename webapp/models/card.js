@@ -30,6 +30,11 @@ const Card = loader.database.define(
 		likes: {
 			type: Sequelize.INTEGER,
 			allowNull: false
+		},
+		isDeleted: {
+			type: Sequelize.INTEGER,
+			default: 0,
+			allowNull: false
 		}
 	},
 	{
