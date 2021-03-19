@@ -101,13 +101,12 @@ __webpack_require__.r(__webpack_exports__);
 
 
 
-mermaid__WEBPACK_IMPORTED_MODULE_2___default.a.initialize({
-  theme: 'forest',
-  gantt: {
-    axisFormatter: [['%Y-%m-%d', function (d) {
-      return d.getDay() === 1;
-    }]]
-  }
+$(document).ready(function () {
+  mermaid__WEBPACK_IMPORTED_MODULE_2___default.a.initialize({
+    theme: 'forest',
+    startOnLoad: true,
+    securityLevel: 'antiscript'
+  });
 }); // loads the Icon plugin
 
 uikit__WEBPACK_IMPORTED_MODULE_0___default.a.use(uikit_dist_js_uikit_icons__WEBPACK_IMPORTED_MODULE_1___default.a); // components can be called from the imported UIkit reference
