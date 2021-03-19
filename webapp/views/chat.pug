@@ -1,11 +1,30 @@
 extends layout.pug
 
 block content
-	div.uk-position-bottom-center.uk-position-z-index.uk-margin-top
-		form(action="", method="post")
-			input(type="hidden" name="_csrf" value=csrfToken)
-			input(type="text" name="sendTo" readonly)
-			input(type="text" name="content")
-			input(type="hidden" name="createdBy" value=user.id)
+  div.uk-container.uk-container-expand
+    div.uk-grid.uk-child-width-1-4
+      div
+        div.uk-navbar-left.uk-position-z-index.uk-margin-top
+          button.uk-navbar-toggle(type='button' uk-navbar-toggle-icon='' uk-toggle='target: .menu-bar; animation: uk-animation-slide-left, uk-animation-slide-bottom')
+        ul.menu-bar.uk-text-large.uk-nav
+          li 
+            a(href="/profile").uk-link-text プロフィール
+            br
+          li 
+            a(href="/logout").uk-link-text ログアウト
+            br
 
-			button(type="submit") Send
+      div.mermaid.uk-position-center
+        |graph LR
+        | B-->C[fa:fa-ban forbidden]
+        | A --- B
+        | B-->D(fa:fa-spinner);
+    
+    div.uk-position-bottom-center.uk-position-z-index.uk-margin-top
+      form(action="", method="post")
+        input(type="hidden" name="_csrf" value=csrfToken)
+        input(type="text" name="sendTo" readonly)
+        input(type="text" name="content")
+        input(type="hidden" name="createdBy" value=user.id)
+
+        button(type="submit") Send
