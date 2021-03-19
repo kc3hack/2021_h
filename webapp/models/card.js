@@ -7,12 +7,13 @@ const Card = loader.database.define(
 	'cards',
 	{
 		cardId: {
-			type: Sequelize.UUID,
-			primaryKey: true,
-			allowNull: false
+			type: Sequelize.INTEGER,
+			allowNull: false,
+			autoIncrement: true,
+			primaryKey: true
 		},
 		sendTo: {
-			type: Sequelize.UUID,
+			type: Sequelize.INTEGER,
 			allowNull: true
 		},
 		content: {
@@ -29,12 +30,13 @@ const Card = loader.database.define(
 		},
 		likes: {
 			type: Sequelize.INTEGER,
-			allowNull: false
+			allowNull: false,
+			defaultValue: 0
 		},
 		isDeleted: {
 			type: Sequelize.INTEGER,
-			default: 0,
-			allowNull: false
+			allowNull: false,
+			defaultValue: 0
 		}
 	},
 	{

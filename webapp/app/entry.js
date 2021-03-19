@@ -5,16 +5,16 @@ import Icons from 'uikit/dist/js/uikit-icons';
 
 import mermaid from 'mermaid';
 
-mermaid.initialize({
-  theme: 'forest',
-  gantt: {
-    axisFormatter: [
-      ['%Y-%m-%d', (d) => {
-        return d.getDay() === 1
-      }]
-    ]
-  }
+$(document).ready(() => {
+  mermaid.initialize(
+    {
+      theme: 'forest',
+      startOnLoad: true,
+      securityLevel: 'antiscript'
+    }
+  );
 });
+
 
 // loads the Icon plugin
 UIkit.use(Icons);
