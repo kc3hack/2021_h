@@ -9,7 +9,6 @@ router.get('/', authenticationEnsurer, (req, res, next) => {
 });
 
 router.post('/', authenticationEnsurer, (req, res, next) => {
-	console.log(database)
 	res.render('chat', { user: req.user, card: req.body['content'] });
 })
 

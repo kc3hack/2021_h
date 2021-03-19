@@ -1,14 +1,14 @@
-doctype html
-html
-  head
-    title= title
-    link(rel='stylesheet', href='/stylesheets/style.css')
-  body
-    block content
-    h1="this is chat"
-    h1 #{user.username}
-    h1 #{card}
-    form(method="post" action="chat")
-      input(type="text" name="content")
-      button(type="submit") post
-      
+extends layout
+
+block content
+  h1="this is chat"
+  h1 #{user.username}
+  h1 #{card}
+  form(method="post" action="chat")
+    input(type="text" name="content")
+    button(type="submit") post
+  div.mermaid
+    |graph LR
+    |   B-->C[fa:fa-ban forbidden]
+    |   A --- B
+    |   B-->D(fa:fa-spinner);

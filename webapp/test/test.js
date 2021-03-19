@@ -46,3 +46,15 @@ describe('/logout', () => {
 			.expect(302);
 	});
 });
+
+describe('/profile', () => {
+	
+	test('ログイン時にユーザー名が表示できる', () => {
+
+		return request(app)
+			.get('/login')
+			.expect(/testuser/)
+			.expect(200);
+	});
+
+});

@@ -2,13 +2,14 @@ extends layout
 
 block content
   div.uk-background-muted
-    h1= title
-    p Welcome to #{title}
-    if user
-      dev
-        a(href="/logout") #{user.username} をログアウト
+    h1(style="color:black; text-align:center;")= title
+    //p Welcome to #{title}
+    
+    div
+      if user
+        dev
+          a(href="/logout") #{user.username} をログアウト
 
-    else
-      dev
-        a(href="/login") ログイン
-      
+      else
+        dev
+          a(href="/login").uk-button.uk-button-primary.uk-border-pill.uk-position-center LOGIN
