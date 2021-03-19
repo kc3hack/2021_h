@@ -1,19 +1,20 @@
 extends layout
 
 block content
-    div.uk-position-top-left.uk-text-large.uk-position-large
-        p アイコン画像変更 
-            br
-            |
-            br
-            |ID変更
-            br
-            |
-            br
-            |
+  if user            
+    div.uk-flex.uk-text-large
+      div.uk-width-1-4.uk-margin-large-left
+        ul.uk-nav.uk-nav-default.uk-text-large
+          li.uk-nav-header.uk-text-large メニュー
+          li
+            a(href='#') アイコン画像変更(実装予定)
+          li
             a(href="/logout") ログアウト
-    div.uk-position-center.uk-text-large
-        img(src = "./test_ico.png")
+          
+      hr.uk-divider-vertical.uk-width-1-4
+          
+      div.uk-width-1-2
+        img(src=`https://avatars.githubusercontent.com/u/${user.id}`, style="border-radius: 64px; width: 128px;")
         p ID　：　#{user.userId}
         p ユーザー名　： #{user.username}
         p 表示名　：　#{user.displayName}
