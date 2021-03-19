@@ -15,6 +15,7 @@
     "helmet": "1.1.0",
     "http-errors": "~1.6.2",
     "mermaid": "^8.9.2",
+    "moment-timezone": "0.5.0",
     "morgan": "~1.9.0",
     "passport": "0.4.0",
     "passport-github2": "0.1.9",
