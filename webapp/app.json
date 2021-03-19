@@ -1,0 +1,9 @@
+{
+	"name": "chatapp",
+	"description": "a really cool app",
+	"logo": "",
+	"version": "1.0.0",
+	"engines": {
+		"node": "~10"
+	}
+}

@@ -1,14 +1,11 @@
-extends layout
+extends layout.pug
 
 block content
-  h1="this is chat"
-  h1 #{user.username}
-  h1 #{card}
-  form(method="post" action="chat")
-    input(type="text" name="content")
-    button(type="submit") post
-  div.mermaid
-    |graph LR
-    |   B-->C[fa:fa-ban forbidden]
-    |   A --- B
-    |   B-->D(fa:fa-spinner);
+	div.uk-position-bottom-center.uk-position-z-index.uk-margin-top
+		form(action="", method="post")
+			input(type="hidden" name="_csrf" value=csrfToken)
+			input(type="text" name="sendTo" readonly)
+			input(type="text" name="content")
+			input(type="hidden" name="createdBy" value=user.id)
+
+			button(type="submit") Send

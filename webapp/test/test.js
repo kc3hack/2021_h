@@ -9,7 +9,7 @@ describe('/login', () => {
 	beforeAll(() => {
 
 		passportStub.install(app);
-		passportStub.login({ username: 'testuser' });
+		passportStub.login({ id: 0, username: 'testuser' });
 	});
 
 	afterAll(() => {
