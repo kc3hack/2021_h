@@ -4,7 +4,8 @@ block content
 	div.uk-position-bottom-center.uk-position-z-index.uk-margin-top
 		form(action="", method="post")
 			input(type="hidden" name="_csrf" value=csrfToken)
-			input(type="text" name="sendTo" readonly)
+			//- input(type="text" name="sendTo" readonly)
+			input(type="text" name="sendTo")
 			input(type="text" name="content")
 			input(type="hidden" name="createdBy" value=user.id)
 
