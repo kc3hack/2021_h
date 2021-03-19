@@ -14,8 +14,16 @@ router.get('/', authenticationEnsurer, csrfProtection, (req, res, next) => {
 
 router.post('/', authenticationEnsurer, csrfProtection, (req, res, next) => {
 
-	console.log(req.body); //TODO: 予定と候補を保存する実装をする
-	res.redirect('/chat');
+	const updatedAt = new Date();
+	// console.log(req.body);
+	Card.create(
+		{
+			sendTo: parseInt(req.body.sendTo) || null,
+			content: req.body.content.slice(0, 255),
+			createdBy: req.user.id,
+			updatedAt: updatedAt,
+		}
+	).then(() => res.redirect('/chat'));
 })
 
 module.exports = router;
