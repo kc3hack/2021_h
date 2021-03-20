@@ -6,7 +6,7 @@
 		var rect = two.makeRectangle(70, 0, 100, 100);
 		rect.fill = 'white';
 		rect.stroke = '#1C75BC';
-		
+
 		two.update();
 	}
 })();*/
@@ -38,7 +38,6 @@ class Chatree {
     }
 
     drawTree() {
-        
     }
 
     update() {

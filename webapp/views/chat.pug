@@ -7,15 +7,13 @@ block content
   div#myCanvas
     - var hasCard = cards.length > 0;
     if hasCard
+      script
+        include ../public/javascripts/chatree.js
+        | chatree = new Chatree();
       each card in cards
         script
-          include ../public/javascripts/chatree.js
-        script
-        | chatree = new Chatree();
-        script
-        | chatree.setCard("#{card.content}", "#{card.sendTo}", "#{card.cardId}", "#{card.formattedUpdatedAt}", "#{card.createBy}");
-        script
-        | chatree.update();
+          |  chatree.setCard("#{card.content}", "#{card.sendTo}", "#{card.cardId}", "#{card.formattedUpdatedAt}", "#{card.createBy}");
+          |  chatree.update();
 
   //- div#myCanvas
     //- - var hasCard = cards.length > 0
