@@ -2,8 +2,8 @@
 
 import UIkit from 'uikit';
 import Icons from 'uikit/dist/js/uikit-icons';
-import Two from 'two.js';
-import $ from 'jquery';
+// import Two from 'two.js';
+// import $ from 'jquery';
 
 // loads the Icon plugin
 UIkit.use(Icons);
@@ -11,7 +11,7 @@ UIkit.use(Icons);
 // components can be called from the imported UIkit reference
 // UIkit.notification('Hello world.');
 
-$(function () {
+/* $(function () {
 
   var canvas = document.getElementById('myCanvas');
   var two = new Two({ autostart: true }).appendTo(canvas);
@@ -38,4 +38,4 @@ $(function () {
       + Math.floor(Math.random() * 255) + ','
       + Math.floor(Math.random() * 255) + ')';
   }
-});
+}); */

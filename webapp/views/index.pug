@@ -14,9 +14,6 @@ block content
           img(src=`https://avatars.githubusercontent.com/u/${user.id}` width="128px" data-src=`https://avatars.githubusercontent.com/u/${user.id}`)
           h2
             a(href='/chat').uk-button.uk-button-primary.uk-border-pill #{user.username} で参加
-        div
-          a(href="/logout").uk-link-text ログアウト
-            span(uk-icon="sign-out")
 
       else
         div
@@ -30,8 +27,8 @@ block content
             a(href="/login") ログイン
             | してください。
 
-        footer.uk-position-bottom-center.uk-position-small.uk-position-z-index.uk-margin-top
-          span.uk-text-small.uk-text-muted
-            p
-            | Copylights 2021
-            |  | Provided by 5番人気 ケイバネタワカラン 15.0倍
+      footer.uk-position-bottom-center.uk-position-small.uk-position-z-index.uk-margin-top
+        span.uk-text-small.uk-text-muted
+          p
+          | Copylights 2021
+          |  | Provided by 5番人気 ケイバネタワカラン 15.0倍
