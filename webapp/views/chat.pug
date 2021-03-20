@@ -2,33 +2,34 @@ extends layout.pug
 
 block content
   div.uk-container.uk-container-expand
-    div.uk-grid.uk-child-width-1-3
-      div
-        div.uk-navbar-left.uk-position-z-index.uk-margin-top
-          button.uk-navbar-toggle(type='button' uk-navbar-toggle-icon='' uk-toggle='target: .menu-bar; animation: uk-animation-slide-left, uk-animation-slide-bottom')
-        ul.menu-bar.uk-text-large.uk-nav
-          li 
-            a(href="/profile").uk-link-text プロフィール
-            br
-          li 
-            a(href="/logout").uk-link-text ログアウト
-            br
+    //- div.uk-position-top-left.uk-position-z-index.uk-margin-top
+    //-   div.uk-navbar-left.uk-position-z-index.uk-margin-top
+    //-     button.uk-navbar-toggle(type='button' uk-navbar-toggle-icon='' uk-toggle='target: .menu-bar; animation: uk-animation-slide-left, uk-animation-slide-bottom')
+    //-   ul.menu-bar.uk-text-large.uk-nav
+    //-     li 
+    //-       a(href="/profile").uk-link-text プロフィール
+    //-       br
+    //-     li 
+    //-       a(href="/logout").uk-link-text ログアウト
+    //-       br
 
-      div
-        - var hasCard = cards.length > 0
-        if hasCard
-          each card in cards
-            div.uk-card.uk-card-default
-              div.uk-card-header
-                div(uk-grid).uk-grid-small.uk-flex-middle
-                  div.uk-width-auto
-                    img(src=`https://avatars.githubusercontent.com/u/${card.createdBy}` alt="" width="40px").uk-border-circle
-                  div.uk-width-expand
-                    p.uk-text-meta
-                      time(datetime=card.updatedAt) #{card.formattedUpdatedAt}
-                  div.uk-card-badge.uk-label ID: #{card.cardId}
-              div.uk-card-body
-                p #{card.content}
+    div.draw-group
+
+    //- div
+    //-   - var hasCard = cards.length > 0
+    //-   if hasCard
+    //-     each card in cards
+    //-       div.uk-card.uk-card-default
+    //-         div.uk-card-header
+    //-           div(uk-grid).uk-grid-small.uk-flex-middle
+    //-             div.uk-width-auto
+    //-               img(src=`https://avatars.githubusercontent.com/u/${card.createdBy}` alt="" width="40px").uk-border-circle
+    //-             div.uk-width-expand
+    //-               p.uk-text-meta
+    //-                 time(datetime=card.updatedAt) #{card.formattedUpdatedAt}
+    //-             div.uk-card-badge.uk-label ID: #{card.cardId}
+    //-         div.uk-card-body
+    //-           p #{card.content}
 
     div.uk-position-bottom-center.uk-position-z-index.uk-margin-top
       form(action="", method="post")
