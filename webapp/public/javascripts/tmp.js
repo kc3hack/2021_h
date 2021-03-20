@@ -1,34 +1,25 @@
-(function() {
-	function drawLine() {
-	  var canvas = document.getElementById("myCanvas");
+var elem = document.getElementById('draw-animation');
+var two = new Two({ width: 285, height: 200 }).appendTo(elem);
 
-	  if (!canvas || !canvas.getContext) {
-		return false;
-	  }
+var circle = two.makeCircle(-70, 0, 50);
+var rect = two.makeRectangle(70, 0, 100, 100);
+circle.fill = '#FF8000';
+rect.fill = 'rgba(0, 200, 255, 0.75)';
 
-	  var ctx = canvas.getContext("2d");
+var group = two.makeGroup(circle, rect);
+group.translation.set(two.width / 2, two.height / 2);
+group.scale = 0;
+group.noStroke();
 
-	  var a = document.getElementById("doko").getBoundingClientRect();
-	  var b = (a.bottom - a.top) /2;
-	  var c = (a.right - a.left) /2;
-	  var d = a.top+b;
-	  var e = a.left+c;
-
-	  var kokoda = document.getElementById("koko").getBoundingClientRect();
-	  var tate = (kokoda.bottom - kokoda.top)/2;
-	  var yoko = (kokoda.right - kokoda.left)/2;
-	  var tatehalf =kokoda.top+tate;
-	  var yokohalf =kokoda.left+yoko;
-
-	  ctx.strokeStyle = "#ffba00";
-	  ctx.lineWidth = 5;
-	  ctx.beginPath();
-	  ctx.moveTo(d,e);
-	  ctx.lineTo(yokohalf,tatehalf);
-	  ctx.setLineDash([5, 10]);
-	  ctx.closePath();
-	  ctx.stroke();
-	}
-
-	onload = drawLine;
-  })();
+// Bind a function to scale and rotate the group
+// to the animation loop.
+two.bind('update', function(frameCount) {
+  // This code is called everytime two.update() is called.
+  // Effectively 60 times per second.
+  if (group.scale > 0.9999) {
+    group.scale = group.rotation = 0;
+  }
+  var t = (1 - group.scale) * 0.125;
+  group.scale += t;
+  group.rotation += t * 4 * Math.PI;
+}).play();  // Finally, start the animation loop
