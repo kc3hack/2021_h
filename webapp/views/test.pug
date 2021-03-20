@@ -1,4 +1,32 @@
 extends layout
 
 block content
-    div#chat
+  div.mermaid
+    |graph LR
+    | 今回はLifewithHackをテーマにしたプロトタイプの作成だっけ --> KC3が終了しました;
+    | 大変だったが楽しかった --> KC3が終了しました;
+    | それな --> 大変だったが楽しかった;
+    | 知識も増えたよね --> それな;
+    | 適当な返事だなぁ --> それな;
+    | そうだな --> それな;
+    |  通信系は上手くいってた--> 今回はLifewithHackをテーマにしたプロトタイプの作成だっけ;
+    |  コメントは打ち込めるようになったんだけどなぁ--> 今回はLifewithHackをテーマにしたプロトタイプの作成だっけ;
+    |  表示は後もう少し時間が必要だったよな　--> コメントは打ち込めるようになったんだけどなぁ;
+    |  それは悔しいな　--> 表示は後もう少し時間が必要だったよな;
+    |  残念だったね　--> 表示は後もう少し時間が必要だったよな;
+    |  ドンマイ次があるよ　--> 表示は後もう少し時間が必要だったよな;
+    
+  div.uk-position-bottom-center.uk-position-z-index.uk-margin-top
+      form(action="", method="post")
+        input(type="hidden" name="_csrf" value=csrfToken)
+        //- input(type="text" name="sendTo" readonly)
+
+        div(uk-grid)
+          div.uk-width-2-5
+            input(type="number" name="sendTo" placeholder="Number to Reply").uk-input.uk-border-pill
+
+          div.uk-width-2-5
+            input(type="text" name="content" placeholder="Comment (Up to 255 chars)").uk-input.uk-border-pill
+
+          div.uk-width-1-5
+            button(type="submit").uk-button.uk-button-primary.uk-border-pill Send
