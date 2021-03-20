@@ -1,7 +1,7 @@
 extends layout.pug
 
 block content
-	div
+	//- div
 		- var hasCard = cards.length > 0
 		if hasCard
 			each card in cards
@@ -16,6 +16,8 @@ block content
 							div.uk-card-badge.uk-label ID: #{card.cardId}
 					div.uk-card-body
 						p #{card.content}
+	
+	div#chat 
 
 	div.uk-position-bottom-center.uk-position-z-index.uk-margin-top
 		form(action="", method="post")
