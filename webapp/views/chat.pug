@@ -1,5 +1,9 @@
 extends layout.pug
 
+block js
+  script(src="javascripts/two.min.js")
+  script(src="javascripts/chat.js")
+
 block content
   div.uk-container.uk-container-expand
     //- div.uk-position-top-left.uk-position-z-index.uk-margin-top
@@ -13,23 +17,30 @@ block content
     //-       a(href="/logout").uk-link-text ログアウト
     //-       br
 
-    div.draw-group
+    div#myCanvas
 
-    //- div
-    //-   - var hasCard = cards.length > 0
-    //-   if hasCard
-    //-     each card in cards
-    //-       div.uk-card.uk-card-default
-    //-         div.uk-card-header
-    //-           div(uk-grid).uk-grid-small.uk-flex-middle
-    //-             div.uk-width-auto
-    //-               img(src=`https://avatars.githubusercontent.com/u/${card.createdBy}` alt="" width="40px").uk-border-circle
-    //-             div.uk-width-expand
-    //-               p.uk-text-meta
-    //-                 time(datetime=card.updatedAt) #{card.formattedUpdatedAt}
-    //-             div.uk-card-badge.uk-label ID: #{card.cardId}
-    //-         div.uk-card-body
-    //-           p #{card.content}
+    div
+      - var hasCard = cards.length > 0;
+      script 
+        | chatree = new Chatree();
+      if hasCard
+        each card in cards
+          script
+            | chatree.setCard("#{card.content}", "#{card.sendTo}", "#{card.cardId}", "#{card.updatedAt}", "#{card.createBy}");
+        script
+          | chatree.update();
+      //-   each card in cards
+      //-     div.uk-card.uk-card-default
+      //-       div.uk-card-header
+      //-         div(uk-grid).uk-grid-small.uk-flex-middle
+      //-           div.uk-width-auto
+      //-             img(src=`https://avatars.githubusercontent.com/u/${card.createdBy}` alt="" width="40px").uk-border-circle
+      //-           div.uk-width-expand
+      //-             p.uk-text-meta
+      //-               time(datetime=card.updatedAt) #{card.formattedUpdatedAt}
+      //-           div.uk-card-badge.uk-label ID: #{card.cardId}
+      //-       div.uk-card-body
+      //-         p #{card.content}d
 
     div.uk-position-bottom-center.uk-position-z-index.uk-margin-top
       form(action="", method="post")

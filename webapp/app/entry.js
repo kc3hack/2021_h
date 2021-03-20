@@ -4,7 +4,6 @@ import UIkit from 'uikit';
 import Icons from 'uikit/dist/js/uikit-icons';
 
 import mermaid from 'mermaid';
-import Two from 'two.js'
 
 $(document).ready(() => {
   mermaid.initialize(

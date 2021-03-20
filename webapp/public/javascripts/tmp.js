@@ -1,33 +1,27 @@
 (function () {
 	function drawLine() {
-		var canvas = document.getElementById("myCanvas");
+		var elem = document.getElementById('myCanvas');
+		var two = new Two({ type: Two.Types.svg, width: 285, height: 200 }).appendTo(elem);
 
-		if (!canvas || !canvas.getContext) {
-			return false;
-		}
+		var circle = two.makeCircle(70, 0, 50);
+		var rect = two.makeRectangle(70, 0, 100, 100);
+		circle.fill = '#FF8000';
+		circle.stroke = 'orangered';
+		rect.fill = 'rgba(0, 200, 255, 0.75)';
+		rect.stroke = '#1C75BC';
 
-		var ctx = canvas.getContext("2d");
+		// Groups can take an array of shapes and/or groups.
+		var group = two.makeGroup(circle, rect);
 
-		var a = document.getElementById("doko").getBoundingClientRect();
-		var b = (a.bottom - a.top) / 2;
-		var c = (a.right - a.left) / 2;
-		var d = a.top + b;
-		var e = a.left + c;
+		// And have translation, rotation, scale like all shapes.
+		group.translation.set(two.width / 2, two.height / 2);
+		group.rotation = Math.PI;
+		group.scale = 0.75;
 
-		var kokoda = document.getElementById("koko").getBoundingClientRect();
-		var tate = (kokoda.bottom - kokoda.top) / 2;
-		var yoko = (kokoda.right - kokoda.left) / 2;
-		var tatehalf = kokoda.top + tate;
-		var yokohalf = kokoda.left + yoko;
-
-		ctx.strokeStyle = "#ffba00";
-		ctx.lineWidth = 10;
-		ctx.beginPath();
-		ctx.moveTo(d, e);
-		ctx.lineTo(yokohalf, tatehalf);
-		ctx.setLineDash([5, 10]);
-		ctx.closePath();
-		ctx.stroke();
+		// You can also set the same properties a shape have.
+		group.linewidth = 7;
+		
+		two.update();
 	}
 
 	onload = drawLine;
