@@ -2,9 +2,63 @@ doctype html
 html
   head
     title= title
-    link(rel='stylesheet', href='/stylesheets/style.css')
+
+    meta(charset="UTF-8")
+    meta(http-equiv="X-UA-Compatible", content="ie=edge")
+    meta(name="viewport", content="width=device-width, initial-scale=1.0")
+
+    meta(name="description", content="チェーン型チャットサービス")
+    meta(name="keywords", content="chain, chat, チェーン型, チャット, kc3, kc3hack, KC3, 2021")
+    meta(name="author", content="5番人気 ケイバネタワカラン 15.0倍")
+
+    //- Twitter Card
+    meta(property="twitter:card", content="summary")
+    meta(property="twitter:site", content="@")
+    meta(property="twitter:title", content="チェーン型チャットサービス")
+    meta(property="twitter:description", content="チャットサービス")
+    meta(property="twitter:image", content="/images/logo.png")
+    //- \Twitter Card
+
+    //- OGP
+    meta(property="og:type", content="website")
+    meta(property="og:site_name", content="5番人気 ケイバネタワカラン 15.0倍")
+    meta(property="og:title", content="")
+    meta(property="og:description", content="")
+    meta(property="og:image", content="/images/logo.png")
+    meta(property="og:url" content="")
+    //- \OGP
+
+    //- icon
+    link(rel="icon", href="")
+    link(rel="shortcut icon", href="/favicon.ico", type="image/x-icon")
+    link(rel="apple-touch-icon", href="/favicon.png")
+    //- \icon
+
+    //- CSS Files
     link(rel="stylesheet", href="/stylesheets/uikit.min.css")
+    block css
+    //- \CSS Files
+
   body
-    section.uk-section
-      block content
+    div
+      div.uk-position-relative.uk-background-primary.uk-light
+        div.nav.uk-sticky
+          div.uk-container
+            nav(uk-navbar).uk-navbar-container.uk-navbar-transparent
+
+              div.uk-navbar-left
+                div.uk-navbar-item.uk-padding-remove-horizontal
+                  a(href="/").uk-navbar-item.uk-logo
+                    img(src="/images/logo_transparent.png" alt="" width="60px").uk-margin-small-right
+
+              div.uk-navbar-right
+                ul(class="uk-visible@m").uk-navbar-nav
+                  li
+                    a(href="/profile")
+                      span(uk-icon="icon: user" data-uk-icon="icon: user")
+                      | Profile
+
+      section(uk-height-viewport="offset-top: true").uk-section.uk-section-muted
+        block content
+
     script(src="/javascripts/bundle.js")

@@ -94,14 +94,46 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var uikit__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(uikit__WEBPACK_IMPORTED_MODULE_0__);
 /* harmony import */ var uikit_dist_js_uikit_icons__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(2);
 /* harmony import */ var uikit_dist_js_uikit_icons__WEBPACK_IMPORTED_MODULE_1___default = /*#__PURE__*/__webpack_require__.n(uikit_dist_js_uikit_icons__WEBPACK_IMPORTED_MODULE_1__);
+/* harmony import */ var two_js__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(3);
+/* harmony import */ var jquery__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(5);
+/* harmony import */ var jquery__WEBPACK_IMPORTED_MODULE_3___default = /*#__PURE__*/__webpack_require__.n(jquery__WEBPACK_IMPORTED_MODULE_3__);
+
+
 
 
 
  // loads the Icon plugin
 
 uikit__WEBPACK_IMPORTED_MODULE_0___default.a.use(uikit_dist_js_uikit_icons__WEBPACK_IMPORTED_MODULE_1___default.a); // components can be called from the imported UIkit reference
+// UIkit.notification('Hello world.');
 
-uikit__WEBPACK_IMPORTED_MODULE_0___default.a.notification('Hello world.');
+/* $(function () {
+
+  var two = new Two( { autostart: true } ).appendTo(document.body);
+
+  var rect = two.makeRectangle(two.width / 2, two.height / 2, 250, 250);
+  rect.noStroke().fill = getRandomColor();
+
+  // Update the renderer in order to generate corresponding DOM Elements.
+  two.update();
+
+  $(rect._renderer.elem)
+    .css('cursor', 'pointer')
+    .click(function (e) {
+      rect.fill = getRandomColor();
+    });
+
+  two.bind('update', function (frameCount, timeDelta) {
+    rect.rotation = frameCount / 60;
+  });
+
+  function getRandomColor() {
+    return 'rgb('
+      + Math.floor(Math.random() * 255) + ','
+      + Math.floor(Math.random() * 255) + ','
+      + Math.floor(Math.random() * 255) + ')';
+  }
+}); */
 
 /***/ }),
 /* 1 */
@@ -12618,6 +12650,26196 @@ uikit__WEBPACK_IMPORTED_MODULE_0___default.a.notification('Hello world.');
     return plugin;
 
 })));
+
+
+/***/ }),
+/* 3 */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* WEBPACK VAR INJECTION */(function(global) {/*
+MIT License
+
+Copyright (c) 2012 - 2020 jonobr1 / http://jonobr1.com
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+*/
+/**
+ * @name Two.Commands
+ * @property {Object} - Map of possible path commands. Taken from the SVG specification.
+ */
+var Commands = {
+  move: 'M',
+  line: 'L',
+  curve: 'C',
+  arc: 'A',
+  close: 'Z'
+};
+
+var root;
+if (typeof window !== 'undefined') {
+  root = window;
+} else if (typeof global !== 'undefined') {
+  root = global;
+} else if (typeof self !== 'undefined') {
+  root = self;
+}
+
+var root$1 = root;
+
+var Matrix;
+
+/**
+ * @name Utils.decomposeMatrix
+ * @function
+ * @param {Two.Matrix} matrix - The matrix to decompose.
+ * @returns {Object} An object containing relevant skew values.
+ * @description Decompose a 2D 3x3 Matrix to find the skew.
+ */
+var decomposeMatrix = function(matrix) {
+
+  // TODO: Include skewX, skewY
+  // https://math.stackexchange.com/questions/237369/given-this-transformation-matrix-how-do-i-decompose-it-into-translation-rotati/417813
+  // https://stackoverflow.com/questions/45159314/decompose-2d-transformation-matrix
+
+  return {
+      translateX: matrix.e,
+      translateY: matrix.f,
+      scaleX: Math.sqrt(matrix.a * matrix.a + matrix.b * matrix.b),
+      scaleY: Math.sqrt(matrix.c * matrix.c + matrix.d * matrix.d),
+      rotation: 180 * Math.atan2(matrix.b, matrix.a) / Math.PI
+  };
+
+};
+
+var setMatrix = function(M) {
+  Matrix = M;
+};
+
+/**
+ * @name Utils.getComputedMatrix
+ * @function
+ * @param {Two.Shape} object - The Two.js object that has a matrix property to calculate from.
+ * @param {Two.Matrix} [matrix] - The matrix to apply calculated transformations to if available.
+ * @returns {Two.Matrix} The computed matrix of a nested object. If no `matrix` was passed in arguments then a `new Two.Matrix` is returned.
+ * @description Method to get the world space transformation of a given object in a Two.js scene.
+ */
+var getComputedMatrix = function(object, matrix) {
+
+  matrix = (matrix && matrix.identity()) || new Matrix();
+  var parent = object, matrices = [];
+
+  while (parent && parent._matrix) {
+    matrices.push(parent._matrix);
+    parent = parent.parent;
+  }
+
+  matrices.reverse();
+
+  for (var i = 0; i < matrices.length; i++) {
+
+    var m = matrices[i];
+    var e = m.elements;
+    matrix.multiply(
+      e[0], e[1], e[2], e[3], e[4], e[5], e[6], e[7], e[8], e[9]);
+
+  }
+
+  return matrix;
+
+};
+
+/**
+ * @name Utils.lerp
+ * @function
+ * @param {Number} a - Start value.
+ * @param {Number} b - End value.
+ * @param {Number} t - Zero-to-one value describing percentage between a and b.
+ * @returns {Number}
+ * @description Linear interpolation between two values `a` and `b` by an amount `t`.
+ */
+var lerp = function(a, b, t) {
+  return t * (b - a) + a;
+};
+
+/**
+ * @name Utils.mod
+ * @param {Number} v - The value to modulo
+ * @param {Number} l - The value to modulo by
+ * @returns {Number}
+ * @description Modulo with added functionality to handle negative values in a positive manner.
+ */
+var mod = function(v, l) {
+
+  while (v < 0) {
+    v += l;
+  }
+
+  return v % l;
+
+};
+
+var NumArray = root$1.Float32Array || Array;
+
+/**
+* @name Utils.toFixed
+* @function
+* @param {Number} v - Any float
+* @returns {Number} That float trimmed to the third decimal place.
+* @description A pretty fast toFixed(3) alternative.
+* @see {@link http://jsperf.com/parsefloat-tofixed-vs-math-round/18}
+*/
+var toFixed = function(v) {
+  return Math.floor(v * 1000000) / 1000000;
+};
+
+var math = /*#__PURE__*/Object.freeze({
+  __proto__: null,
+  decomposeMatrix: decomposeMatrix,
+  getComputedMatrix: getComputedMatrix,
+  setMatrix: setMatrix,
+  lerp: lerp,
+  mod: mod,
+  NumArray: NumArray,
+  toFixed: toFixed
+});
+
+var slice = Array.prototype.slice;
+
+var isArrayLike = function(collection) {
+  if (collection === null || collection === undefined) return false;
+  var length = collection.length;
+  // Arrays cannot hold more than 2^32 - 1 items
+  return (typeof length == 'number' && length >= 0 && length < 4294967296);
+};
+
+var _ = {
+  isNaN: function(obj) {
+    return typeof obj === 'number' && obj !== +obj;
+  },
+  isElement: function(obj) {
+    return !!(obj && obj.nodeType === 1);
+  },
+  isObject: function(obj) {
+    var type = typeof obj;
+    return type === 'function' || type === 'object' && !!obj;
+  },
+  extend: function(base) {
+    var sources = slice.call(arguments, 1);
+    for (var i = 0; i < sources.length; i++) {
+      var obj = sources[i];
+      for (var k in obj) {
+        base[k] = obj[k];
+      }
+    }
+    return base;
+  },
+  defaults: function(base) {
+    var sources = slice.call(arguments, 1);
+    for (var i = 0; i < sources.length; i++) {
+      var obj = sources[i];
+      for (var k in obj) {
+        if (base[k] === void 0) {
+        base[k] = obj[k];
+        }
+      }
+    }
+    return base;
+  },
+  each: function(obj, iteratee, context) {
+    var ctx = context || this;
+    var keys = !isArrayLike(obj) && Object.keys(obj);
+    var length = (keys || obj).length;
+    for (var i = 0; i < length; i++) {
+      var k = keys ? keys[i] : i;
+      iteratee.call(ctx, obj[k], k, obj);
+    }
+    return obj;
+  },
+  /**
+   * @name Utils.performance
+   * @property {Date} - A special `Date` like object to get the current millis of the session. Used internally to calculate time between frames.
+   * e.g: `Utils.performance.now() // milliseconds since epoch`
+   */
+  performance: ((root$1.performance && root$1.performance.now) ? root$1.performance : Date),
+};
+
+var trigger = function(obj, events, args) {
+  var method;
+  switch (args.length) {
+  case 0:
+    method = function(i) {
+      events[i].call(obj, args[0]);
+    };
+    break;
+  case 1:
+    method = function(i) {
+      events[i].call(obj, args[0], args[1]);
+    };
+    break;
+  case 2:
+    method = function(i) {
+      events[i].call(obj, args[0], args[1], args[2]);
+    };
+    break;
+  case 3:
+    method = function(i) {
+      events[i].call(obj, args[0], args[1], args[2], args[3]);
+    };
+    break;
+  default:
+    method = function(i) {
+      events[i].apply(obj, args);
+    };
+  }
+  for (var i = 0; i < events.length; i++) {
+    method(i);
+  }
+};
+
+/**
+ * @name Utils.Events
+ * @interface
+ * @description Object inherited by many Two.js objects in order to facilitate custom events.
+ */
+var Events = {
+
+  /**
+   * @name Utils.Events.on
+   * @function
+   * @param {String} name - The name of the event to bind a function to.
+   * @param {Function} handler - The function to be invoked when the event is dispatched.
+   * @description Call to add a listener to a specific event name.
+   */
+  on: function(name, handler) {
+
+    this._events || (this._events = {});
+    var list = this._events[name] || (this._events[name] = []);
+
+    list.push(handler);
+
+    return this;
+
+  },
+
+  /**
+   * @name Utils.Events.off
+   * @function
+   * @param {String} [name] - The name of the event intended to be removed.
+   * @param {Function} [handler] - The handler intended to be reomved.
+   * @description Call to remove listeners from a specific event. If only `name` is passed then all the handlers attached to that `name` will be removed. If no arguments are passed then all handlers for every event on the obejct are removed.
+   */
+  off: function(name, handler) {
+
+    if (!this._events) {
+      return this;
+    }
+    if (!name && !handler) {
+      this._events = {};
+      return this;
+    }
+
+    var names = name ? [name] : Object.keys(this._events);
+    for (var i = 0, l = names.length; i < l; i++) {
+
+      name = names[i];
+      var list = this._events[name];
+
+      if (list) {
+        var events = [];
+        if (handler) {
+          for (var j = 0, k = list.length; j < k; j++) {
+            var ev = list[j];
+            ev = ev.handler ? ev.handler : ev;
+            if (handler && handler !== ev) {
+              events.push(ev);
+            }
+          }
+        }
+        this._events[name] = events;
+      }
+    }
+
+    return this;
+  },
+
+  /**
+   * @name Utils.Events.trigger
+   * @function
+   * @param {String} name - The name of the event to dispatch.
+   * @param arguments - Anything can be passed after the name and those will be passed on to handlers attached to the event in the order they are passed.
+   * @description Call to trigger a custom event. Any additional arguments passed after the name will be passed along to the attached handlers.
+   */
+  trigger: function(name) {
+    if (!this._events) return this;
+    var args = Array.prototype.slice.call(arguments, 1);
+    var events = this._events[name];
+    if (events) trigger(this, events, args);
+    return this;
+  },
+
+  listen: function(obj, name, handler) {
+
+    var bound = this;
+
+    if (obj) {
+
+      var event = function () {
+        handler.apply(bound, arguments);
+      };
+
+      // Add references about the object that assigned this listener
+      event.obj = obj;
+      event.name = name;
+      event.handler = handler;
+
+      obj.on(name, event);
+
+    }
+
+    return this;
+
+  },
+
+  ignore: function(obj, name, handler) {
+
+    obj.off(name, handler);
+    return this;
+
+  },
+
+  Types: {
+    play: 'play',
+    pause: 'pause',
+    update: 'update',
+    render: 'render',
+    resize: 'resize',
+    change: 'change',
+    remove: 'remove',
+    insert: 'insert',
+    order: 'order',
+    load: 'load'
+  }
+
+};
+
+
+/**
+ * @name Two.Events.bind
+ * @function
+ * @description Alias for {@link Two.Events.on}.
+ */
+Events.bind = Events.on;
+
+/**
+ * @name Two.Events.unbind
+ * @function
+ * @description Alias for {@link Two.Events.off}.
+ */
+Events.unbind = Events.off;
+
+/**
+ * @name Two.Vector
+ * @class
+ * @param {Number} [x=0] - Any number to represent the horizontal x-component of the vector.
+ * @param {Number} [y=0] - Any number to represent the vertical y-component of the vector.
+ * @description A class to store x / y component vector data. In addition to storing data `Two.Vector` has suped up methods for commonplace mathematical operations.
+ */
+var Vector = function(x, y) {
+
+  /**
+   * @name Two.Vector#x
+   * @property {Number} - The horizontal x-component of the vector.
+   */
+  this.x = x || 0;
+
+  /**
+   * @name Two.Vector#y
+   * @property {Number} - The vertical y-component of the vector.
+   */
+  this.y = y || 0;
+
+};
+
+_.extend(Vector, {
+
+  /**
+   * @name Two.Vector.zero
+   * @readonly
+   * @property {Two.Vector} - Handy reference to a vector with component values 0, 0 at all times.
+   */
+  zero: new Vector(),
+
+  /**
+   * @name Two.Vector.add
+   * @function
+   * @param {Two.Vector} v1
+   * @param {Two.Vector} v2
+   * @returns {Two.Vector}
+   * @description Add two vectors together.
+   */
+  add: function(v1, v2) {
+    return new Vector(v1.x + v2.x, v1.y + v2.y);
+  },
+
+  /**
+   * @name Two.Vector.sub
+   * @function
+   * @param {Two.Vector} v1
+   * @param {Two.Vector} v2
+   * @returns {Two.Vector}
+   * @description Subtract two vectors: `v2` from `v1`.
+   */
+  sub: function(v1, v2) {
+    return new Vector(v1.x - v2.x, v1.y - v2.y);
+  },
+
+  /**
+   * @name Two.Vector.subtract
+   * @function
+   * @description Alias for {@link Two.Vector.sub}.
+   */
+  subtract: function(v1, v2) {
+    return Vector.sub(v1, v2);
+  },
+
+  /**
+   * @name Two.Vector.ratioBetween
+   * @function
+   * @param {Two.Vector} A
+   * @param {Two.Vector} B
+   * @returns {Number} The ratio betwen two points `v1` and `v2`.
+   */
+  ratioBetween: function(v1, v2) {
+
+    return (v1.x * v2.x + v1.y * v2.y) / (v1.length() * v2.length());
+
+  },
+
+  /**
+   * @name Two.Vector.angleBetween
+   * @function
+   * @param {Two.Vector} v1
+   * @param {Two.Vector} v2
+   * @returns {Radians} The angle between points `v1` and `v2`.
+   */
+  angleBetween: function(v1, v2) {
+
+    var dx, dy;
+
+    if (arguments.length >= 4) {
+
+      dx = arguments[0] - arguments[2];
+      dy = arguments[1] - arguments[3];
+
+      return Math.atan2(dy, dx);
+
+    }
+
+    dx = v1.x - v2.x;
+    dy = v1.y - v2.y;
+
+    return Math.atan2(dy, dx);
+
+  },
+
+  /**
+   * @name Two.Vector.distanceBetween
+   * @function
+   * @param {Two.Vector} v1
+   * @param {Two.Vector} v2
+   * @returns {Number} The distance between points `v1` and `v2`. Distance is always positive.
+   */
+  distanceBetween: function(v1, v2) {
+
+    return Math.sqrt(Vector.distanceBetweenSquared(v1, v2));
+
+  },
+
+  /**
+   * @name Two.Vector.distanceBetweenSquared
+   * @function
+   * @param {Two.Vector} v1
+   * @param {Two.Vector} v2
+   * @returns {Number} The squared distance between points `v1` and `v2`.
+   */
+  distanceBetweenSquared: function(v1, v2) {
+
+    var dx = v1.x - v2.x;
+    var dy = v1.y - v2.y;
+
+    return dx * dx + dy * dy;
+
+  },
+
+  /**
+   * @name Two.Vector.MakeObservable
+   * @function
+   * @param {Object} object - The object to make observable.
+   * @description Convenience function to apply observable qualities of a {@link Two.Vector} to any object. Handy if you'd like to extend the {@link Two.Vector} class on a custom class.
+   */
+  MakeObservable: function(object) {
+
+    // /**
+    //  * Override Backbone bind / on in order to add properly broadcasting.
+    //  * This allows Two.Vector to not broadcast events unless event listeners
+    //  * are explicity bound to it.
+    //  */
+
+    object.bind = object.on = function() {
+
+      if (!this._bound) {
+        this._x = this.x;
+        this._y = this.y;
+        Object.defineProperty(this, 'x', xgs);
+        Object.defineProperty(this, 'y', ygs);
+        _.extend(this, BoundProto);
+        this._bound = true; // Reserved for event initialization check
+      }
+
+      Events.bind.apply(this, arguments);
+
+      return this;
+
+    };
+
+  }
+
+});
+
+_.extend(Vector.prototype, Events, {
+
+  constructor: Vector,
+
+  /**
+   * @name Two.Vector#set
+   * @function
+   * @param {Number} x
+   * @param {Number} y
+   * @returns {Two.Vector} - An instance of itself for the purpose of chaining.
+   * @description Set the x / y components of a vector to specific number values.
+   */
+  set: function(x, y) {
+    this.x = x;
+    this.y = y;
+    return this;
+  },
+
+  /**
+   * @name Two.Vector#copy
+   * @function
+   * @param {Two.Vector} v
+   * @returns {Two.Vector} - An instance of itself for the purpose of chaining.
+   * @description Copy the x / y components of another object `v`.
+   */
+  copy: function(v) {
+    this.x = v.x;
+    this.y = v.y;
+    return this;
+  },
+
+  /**
+   * @name Two.Vector#clear
+   * @function
+   * @returns {Two.Vector} - An instance of itself for the purpose of chaining.
+   * @description Set the x / y component values of the vector to zero.
+   */
+  clear: function() {
+    this.x = 0;
+    this.y = 0;
+    return this;
+  },
+
+  /**
+   * @name Two.Vector#clone
+   * @function
+   * @returns {Two.Vector} - A new instance of {@link Two.Vector}.
+   * @description Create a new vector and copy the existing values onto the newly created instance.
+   */
+  clone: function() {
+    return new Vector(this.x, this.y);
+  },
+
+  /**
+   * @name Two.Vector#add
+   * @function
+   * @param {Two.Vector} v
+   * @returns {Two.Vector} - An instance of itself for the purpose of chaining.
+   * @description Add an object with x / y component values to the instance.
+   * @overloaded
+   */
+
+  /**
+   * @name Two.Vector#add
+   * @function
+   * @param {Number} v
+   * @returns {Two.Vector} - An instance of itself for the purpose of chaining.
+   * @description Add the **same** number to both x / y component values of the instance.
+   * @overloaded
+   */
+
+  /**
+   * @name Two.Vector#add
+   * @function
+   * @param {Number} x
+   * @param {Number} y
+   * @returns {Two.Vector} - An instance of itself for the purpose of chaining.
+   * @description Add `x` / `y` values to their respective component value on the instance.
+   * @overloaded
+   */
+  add: function(x, y) {
+    if (arguments.length <= 0) {
+      return this;
+    } else if (arguments.length <= 1) {
+      if (typeof x === 'number') {
+        this.x += x;
+        this.y += x;
+      } else if (x && typeof x.x === 'number' && typeof x.y === 'number') {
+        this.x += x.x;
+        this.y += x.y;
+      }
+    } else {
+      this.x += x;
+      this.y += y;
+    }
+    return this;
+  },
+
+  /**
+   * @name Two.Vector#addSelf
+   * @function
+   * @description Alias for {@link Two.Vector.add}.
+   */
+  addSelf: function(v) {
+    return this.add.apply(this, arguments);
+  },
+
+  /**
+   * @name Two.Vector#sub
+   * @function
+   * @param {Two.Vector} v
+   * @returns {Two.Vector} - An instance of itself for the purpose of chaining.
+   * @description Subtract an object with x / y component values to the instance.
+   * @overloaded
+   */
+
+  /**
+   * @name Two.Vector#sub
+   * @function
+   * @param {Number} v
+   * @returns {Two.Vector} - An instance of itself for the purpose of chaining.
+   * @description Subtract the **same** number to both x / y component values of the instance.
+   * @overloaded
+   */
+
+  /**
+   * @name Two.Vector#sub
+   * @function
+   * @param {Number} x
+   * @param {Number} y
+   * @returns {Two.Vector} - An instance of itself for the purpose of chaining.
+   * @description Subtract `x` / `y` values to their respective component value on the instance.
+   * @overloaded
+   */
+  sub: function(x, y) {
+    if (arguments.length <= 0) {
+      return this;
+    } else if (arguments.length <= 1) {
+      if (typeof x === 'number') {
+        this.x -= x;
+        this.y -= x;
+      } else if (x && typeof x.x === 'number' && typeof x.y === 'number') {
+        this.x -= x.x;
+        this.y -= x.y;
+      }
+    } else {
+      this.x -= x;
+      this.y -= y;
+    }
+    return this;
+  },
+
+  /**
+   * @name Two.Vector#subtract
+   * @function
+   * @description Alias for {@link Two.Vector.sub}.
+   */
+  subtract: function() {
+    return this.sub.apply(this, arguments);
+  },
+
+  /**
+   * @name Two.Vector#subSelf
+   * @function
+   * @description Alias for {@link Two.Vector.sub}.
+   */
+  subSelf: function(v) {
+    return this.sub.apply(this, arguments);
+  },
+
+  /**
+   * @name Two.Vector#subtractSelf
+   * @function
+   * @description Alias for {@link Two.Vector.sub}.
+   */
+  subtractSelf: function(v) {
+    return this.sub.apply(this, arguments);
+  },
+
+  /**
+   * @name Two.Vector#multiply
+   * @function
+   * @param {Two.Vector} v
+   * @returns {Two.Vector} - An instance of itself for the purpose of chaining.
+   * @description Multiply an object with x / y component values to the instance.
+   * @overloaded
+   */
+
+  /**
+   * @name Two.Vector#multiply
+   * @function
+   * @param {Number} v
+   * @returns {Two.Vector} - An instance of itself for the purpose of chaining.
+   * @description Multiply the **same** number to both x / y component values of the instance.
+   * @overloaded
+   */
+
+  /**
+   * @name Two.Vector#multiply
+   * @function
+   * @param {Number} x
+   * @param {Number} y
+   * @returns {Two.Vector} - An instance of itself for the purpose of chaining.
+   * @description Multiply `x` / `y` values to their respective component value on the instance.
+   * @overloaded
+   */
+  multiply: function(x, y) {
+    if (arguments.length <= 0) {
+      return this;
+    } else if (arguments.length <= 1) {
+      if (typeof x === 'number') {
+        this.x *= x;
+        this.y *= x;
+      } else if (x && typeof x.x === 'number' && typeof x.y === 'number') {
+        this.x *= x.x;
+        this.y *= x.y;
+      }
+    } else {
+      this.x *= x;
+      this.y *= y;
+    }
+    return this;
+  },
+
+  /**
+   * @name Two.Vector#multiplySelf
+   * @function
+   * @description Alias for {@link Two.Vector.multiply}.
+   */
+  multiplySelf: function(v) {
+    return this.multiply.apply(this, arguments);
+  },
+
+  /**
+   * @name Two.Vector#multiplyScalar
+   * @function
+   * @param {Number} s - The scalar to multiply by.
+   * @description Mulitiply the vector by a single number. Shorthand to call {@link Two.Vector#multiply} directly.
+   */
+  multiplyScalar: function(s) {
+    return this.multiply(s);
+  },
+
+  /**
+   * @name Two.Vector#divide
+   * @function
+   * @param {Two.Vector} v
+   * @returns {Two.Vector} - An instance of itself for the purpose of chaining.
+   * @description Divide an object with x / y component values to the instance.
+   * @overloaded
+   */
+
+  /**
+   * @name Two.Vector#divide
+   * @function
+   * @param {Number} v
+   * @returns {Two.Vector} - An instance of itself for the purpose of chaining.
+   * @description Divide the **same** number to both x / y component values of the instance.
+   * @overloaded
+   */
+
+  /**
+   * @name Two.Vector#divide
+   * @function
+   * @param {Number} x
+   * @param {Number} y
+   * @returns {Two.Vector} - An instance of itself for the purpose of chaining.
+   * @description Divide `x` / `y` values to their respective component value on the instance.
+   * @overloaded
+   */
+  divide: function(x, y) {
+    if (arguments.length <= 0) {
+      return this;
+    } else if (arguments.length <= 1) {
+      if (typeof x === 'number') {
+        this.x /= x;
+        this.y /= x;
+      } else if (x && typeof x.x === 'number' && typeof x.y === 'number') {
+        this.x /= x.x;
+        this.y /= x.y;
+      }
+    } else {
+      this.x /= x;
+      this.y /= y;
+    }
+    if (_.isNaN(this.x)) {
+      this.x = 0;
+    }
+    if (_.isNaN(this.y)) {
+      this.y = 0;
+    }
+    return this;
+  },
+
+  /**
+   * @name Two.Vector#divideSelf
+   * @function
+   * @description Alias for {@link Two.Vector.divide}.
+   */
+  divideSelf: function(v) {
+    return this.divide.apply(this, arguments);
+  },
+
+  /**
+   * @name Two.Vector#divideScalar
+   * @function
+   * @param {Number} s - The scalar to divide by.
+   * @description Divide the vector by a single number. Shorthand to call {@link Two.Vector#divide} directly.
+   */
+  divideScalar: function(s) {
+    return this.divide(s);
+  },
+
+  /**
+   * @name Two.Vector#negate
+   * @function
+   * @description Invert each component's sign value.
+   */
+  negate: function() {
+    return this.multiply(-1);
+  },
+
+  /**
+   * @name Two.Vector#negate
+   * @function
+   * @returns {Number}
+   * @description Get the [dot product](https://en.wikipedia.org/wiki/Dot_product) of the vector.
+   */
+  dot: function(v) {
+    return this.x * v.x + this.y * v.y;
+  },
+
+  /**
+   * @name Two.Vector#length
+   * @function
+   * @returns {Number}
+   * @description Get the length of a vector.
+   */
+  length: function() {
+    return Math.sqrt(this.lengthSquared());
+  },
+
+  /**
+   * @name Two.Vector#lengthSquared
+   * @function
+   * @returns {Number}
+   * @description Get the length of the vector to the power of two. Widely used as less expensive than {@link Two.Vector#length}, because it isn't square-rooting any numbers.
+   */
+  lengthSquared: function() {
+    return this.x * this.x + this.y * this.y;
+  },
+
+  /**
+   * @name Two.Vector#normalize
+   * @function
+   * @description Normalize the vector from negative one to one.
+   */
+  normalize: function() {
+    return this.divideScalar(this.length());
+  },
+
+  /**
+   * @name Two.Vector#distanceTo
+   * @function
+   * @returns {Number}
+   * @description Get the distance between two vectors.
+   */
+  distanceTo: function(v) {
+    return Math.sqrt(this.distanceToSquared(v));
+  },
+
+  /**
+   * @name Two.Vector#distanceToSquared
+   * @function
+   * @returns {Number}
+   * @description Get the distance between two vectors to the power of two. Widely used as less expensive than {@link Two.Vector#distanceTo}, because it isn't square-rooting any numbers.
+   */
+  distanceToSquared: function(v) {
+    var dx = this.x - v.x,
+        dy = this.y - v.y;
+    return dx * dx + dy * dy;
+  },
+
+  /**
+   * @name Two.Vector#setLength
+   * @function
+   * @param {Number} l - length to set vector to.
+   * @description Set the length of a vector.
+   */
+  setLength: function(l) {
+    return this.normalize().multiplyScalar(l);
+  },
+
+  /**
+   * @name Two.Vector#equals
+   * @function
+   * @param {Two.Vector} v - The vector to compare against.
+   * @param {Number} [eps=0.0001] - An options epsilon for precision.
+   * @returns {Boolean}
+   * @description Qualify if one vector roughly equal another. With a margin of error defined by epsilon.
+   */
+  equals: function(v, eps) {
+    eps = (typeof eps === 'undefined') ?  0.0001 : eps;
+    return (this.distanceTo(v) < eps);
+  },
+
+  /**
+   * @name Two.Vector#lerp
+   * @function
+   * @param {Two.Vector} v - The destination vector to step towards.
+   * @param {Number} t - The zero to one value of how close the current vector gets to the destination vector.
+   * @description Linear interpolate one vector to another by an amount `t` defined as a zero to one number.
+   * @see [Matt DesLauriers](https://twitter.com/mattdesl/status/1031305279227478016) has a good thread about this.
+   */
+  lerp: function(v, t) {
+    var x = (v.x - this.x) * t + this.x;
+    var y = (v.y - this.y) * t + this.y;
+    return this.set(x, y);
+  },
+
+  /**
+   * @name Two.Vector#isZero
+   * @function
+   * @param {Number} [eps=0.0001] - Optional precision amount to check against.
+   * @returns {Boolean}
+   * @description Check to see if vector is roughly zero, based on the `epsilon` precision value.
+   */
+  isZero: function(eps) {
+    eps = (typeof eps === 'undefined') ?  0.0001 : eps;
+    return (this.length() < eps);
+  },
+
+  /**
+   * @name Two.Vector#toString
+   * @function
+   * @returns {String}
+   * @description Return a comma-separated string of x, y value. Great for storing in a database.
+   */
+  toString: function() {
+    return this.x + ', ' + this.y;
+  },
+
+  /**
+   * @name Two.Vector#toObject
+   * @function
+   * @returns {Object}
+   * @description Return a JSON compatible plain object that represents the vector.
+   */
+  toObject: function() {
+    return { x: this.x, y: this.y };
+  },
+
+  /**
+   * @name Two.Vector#rotate
+   * @function
+   * @param {Radians} radians - The amoun to rotate the vector by.
+   * @description Rotate a vector.
+   */
+  rotate: function(radians) {
+    var cos = Math.cos(radians);
+    var sin = Math.sin(radians);
+    this.x = this.x * cos - this.y * sin;
+    this.y = this.x * sin + this.y * cos;
+    return this;
+  }
+
+});
+
+// The same set of prototypical functions, but using the underlying
+// getter or setter for `x` and `y` values. This set of functions
+// is used instead of the previously documented ones above when
+// Two.Vector#bind is invoked and there is event dispatching processed
+// on x / y property changes.
+var BoundProto = {
+
+  constructor: Vector,
+
+  set: function(x, y) {
+    this._x = x;
+    this._y = y;
+    return this.trigger(Events.Types.change);
+  },
+
+  copy: function(v) {
+    this._x = v.x;
+    this._y = v.y;
+    return this.trigger(Events.Types.change);
+  },
+
+  clear: function() {
+    this._x = 0;
+    this._y = 0;
+    return this.trigger(Events.Types.change);
+  },
+
+  clone: function() {
+    return new Vector(this._x, this._y);
+  },
+
+  add: function(x, y) {
+    if (arguments.length <= 0) {
+      return this;
+    } else if (arguments.length <= 1) {
+      if (typeof x === 'number') {
+        this._x += x;
+        this._y += x;
+      }  else if (x && typeof x.x === 'number' && typeof x.y === 'number') {
+        this._x += x.x;
+        this._y += x.y;
+      }
+    } else {
+      this._x += x;
+      this._y += y;
+    }
+    return this.trigger(Events.Types.change);
+  },
+
+  sub: function(x, y) {
+    if (arguments.length <= 0) {
+      return this;
+    } else if (arguments.length <= 1) {
+      if (typeof x === 'number') {
+        this._x -= x;
+        this._y -= x;
+      } else if (x && typeof x.x === 'number' && typeof x.y === 'number') {
+        this._x -= x.x;
+        this._y -= x.y;
+      }
+    } else {
+      this._x -= x;
+      this._y -= y;
+    }
+    return this.trigger(Events.Types.change);
+  },
+
+  multiply: function(x, y) {
+    if (arguments.length <= 0) {
+      return this;
+    } else if (arguments.length <= 1) {
+      if (typeof x === 'number') {
+        this._x *= x;
+        this._y *= x;
+      } else if (x && typeof x.x === 'number' && typeof x.y === 'number') {
+        this._x *= x.x;
+        this._y *= x.y;
+      }
+    } else {
+      this._x *= x;
+      this._y *= y;
+    }
+    return this.trigger(Events.Types.change);
+  },
+
+  divide: function(x, y) {
+    if (arguments.length <= 0) {
+      return this;
+    } else if (arguments.length <= 1) {
+      if (typeof x === 'number') {
+        this._x /= x;
+        this._y /= x;
+      } else if (x && typeof x.x === 'number' && typeof x.y === 'number') {
+        this._x /= x.x;
+        this._y /= x.y;
+      }
+    } else {
+      this._x /= x;
+      this._y /= y;
+    }
+    if (_.isNaN(this._x)) {
+      this._x = 0;
+    }
+    if (_.isNaN(this._y)) {
+      this._y = 0;
+    }
+    return this.trigger(Events.Types.change);
+  },
+
+  dot: function(v) {
+    return this._x * v.x + this._y * v.y;
+  },
+
+  lengthSquared: function() {
+    return this._x * this._x + this._y * this._y;
+  },
+
+  distanceToSquared: function(v) {
+    var dx = this._x - v.x,
+        dy = this._y - v.y;
+    return dx * dx + dy * dy;
+  },
+
+  lerp: function(v, t) {
+    var x = (v.x - this._x) * t + this._x;
+    var y = (v.y - this._y) * t + this._y;
+    return this.set(x, y);
+  },
+
+  toString: function() {
+    return this._x + ', ' + this._y;
+  },
+
+  toObject: function() {
+    return { x: this._x, y: this._y };
+  },
+
+  rotate: function (radians) {
+    var cos = Math.cos(radians);
+    var sin = Math.sin(radians);
+    this._x = this._x * cos - this._y * sin;
+    this._y = this._x * sin + this._y * cos;
+    return this;
+  }
+
+};
+
+var xgs = {
+  enumerable: true,
+  get: function() {
+    return this._x;
+  },
+  set: function(v) {
+    this._x = v;
+    this.trigger(Events.Types.change, 'x');
+  }
+};
+
+var ygs = {
+  enumerable: true,
+  get: function() {
+    return this._y;
+  },
+  set: function(v) {
+    this._y = v;
+    this.trigger(Events.Types.change, 'y');
+  }
+};
+
+Vector.MakeObservable(Vector.prototype);
+
+/**
+ * @class
+ * @name Two.Anchor
+ * @param {Number} [x=0] - The x position of the root anchor point.
+ * @param {Number} [y=0] - The y position of the root anchor point.
+ * @param {Number} [lx=0] - The x position of the left handle point.
+ * @param {Number} [ly=0] - The y position of the left handle point.
+ * @param {Number} [rx=0] - The x position of the right handle point.
+ * @param {Number} [ry=0] - The y position of the right handle point.
+ * @param {String} [command=Two.Commands.move] - The command to describe how to render. Applicable commands are {@link Two.Commands}
+ * @extends Two.Vector
+ * @description An object that holds 3 {@link Two.Vector}s, the anchor point and its corresponding handles: `left` and `right`. In order to properly describe the bezier curve about the point there is also a command property to describe what type of drawing should occur when Two.js renders the anchors.
+ */
+var Anchor = function(x, y, lx, ly, rx, ry, command) {
+
+  Vector.call(this, x, y);
+
+  this._broadcast = (function() {
+    this.trigger(Events.Types.change);
+  }).bind(this);
+
+  this._command = command || Commands.move;
+  this._relative = true;
+
+  var ilx = typeof lx === 'number';
+  var ily = typeof ly === 'number';
+  var irx = typeof rx === 'number';
+  var iry = typeof ry === 'number';
+
+  // Append the `controls` object only if control points are specified,
+  // keeping the Two.Anchor inline with a Two.Vector until it needs to
+  // evolve beyond those functions - e.g: a simple 2 component vector.
+  if (ilx || ily || irx || iry) {
+    Anchor.AppendCurveProperties(this);
+  }
+
+  if (ilx) {
+    this.controls.left.x = lx;
+  }
+  if (ily) {
+    this.controls.left.y = ly;
+  }
+  if (irx) {
+    this.controls.right.x = rx;
+  }
+  if (iry) {
+    this.controls.right.y = ry;
+  }
+
+};
+
+_.extend(Anchor, {
+
+  /**
+   * @name Two.Anchor.AppendCurveProperties
+   * @function
+   * @param {Two.Anchor} anchor - The instance to append the `control`object to.
+   * @description Adds the `controls` property as an object with `left` and `right` properties to access the bezier control handles that define how the curve is drawn. It also sets the `relative` property to `true` making vectors in the `controls` object relative to their corresponding root anchor point.
+   */
+  AppendCurveProperties: function(anchor) {
+
+    anchor.relative = true;
+
+    /**
+     * @name Two.Anchor#controls
+     * @property {Object} controls
+     * @description An plain object that holds the controls handles for a {@link Two.Anchor}.
+     */
+    anchor.controls = {};
+
+    /**
+     * @name Two.Anchor#controls#left
+     * @property {Two.Vector} left
+     * @description The "left" control point to define handles on a bezier curve.
+     */
+    anchor.controls.left = new Vector(0, 0);
+
+    /**
+     * @name Two.Anchor#controls#right
+     * @property {Two.Vector} right
+     * @description The "left" control point to define handles on a bezier curve.
+     */
+    anchor.controls.right = new Vector(0, 0);
+
+  },
+
+  /**
+   * @name Two.Anchor.MakeObservable
+   * @function
+   * @param {Object} object - The object to make observable.
+   * @description Convenience function to apply observable qualities of a {@link Two.Anchor} to any object. Handy if you'd like to extend the {@link Two.Anchor} class on a custom class.
+   */
+  MakeObservable: function(object) {
+
+    /**
+     * @name Two.Anchor#command
+     * @property {Two.Commands}
+     * @description A draw command associated with the anchor point.
+     */
+    Object.defineProperty(object, 'command', {
+
+      enumerable: true,
+
+      get: function() {
+        return this._command;
+      },
+
+      set: function(c) {
+        this._command = c;
+        if (this._command === Commands.curve && !_.isObject(this.controls)) {
+          Anchor.AppendCurveProperties(this);
+        }
+        this.trigger(Events.Types.change);
+      }
+
+    });
+
+    /**
+     * @name Two.Anchor#relative
+     * @property {Boolean}
+     * @description A boolean to render control points relative to the root anchor point or in global coordinate-space to the rest of the scene.
+     */
+    Object.defineProperty(object, 'relative', {
+
+      enumerable: true,
+
+      get: function() {
+        return this._relative;
+      },
+
+      set: function(b) {
+        if (this._relative != b) {
+          this._relative = !!b;
+          this.trigger(Events.Types.change);
+        }
+      }
+
+    });
+
+    _.extend(object, Vector.prototype, AnchorProto);
+
+    // Make it possible to bind and still have the Anchor specific
+    // inheritance from Two.Vector. In this case relying on `Two.Vector`
+    // to do much of the heavy event-listener binding / unbinding.
+    object.bind = object.on = function() {
+      var bound = this._bound;
+      Vector.prototype.bind.apply(this, arguments);
+      if (!bound) {
+        _.extend(this, AnchorProto);
+      }
+    };
+
+  }
+
+});
+
+var AnchorProto = {
+
+  constructor: Anchor,
+
+  /**
+   * @name Two.Anchor#listen
+   * @function
+   * @description Convenience method used mainly by {@link Two.Path#vertices} to listen and propagate changes from control points up to their respective anchors and further if necessary.
+   */
+  listen: function() {
+
+    if (!_.isObject(this.controls)) {
+      Anchor.AppendCurveProperties(this);
+    }
+
+    this.controls.left.bind(Events.Types.change, this._broadcast);
+    this.controls.right.bind(Events.Types.change, this._broadcast);
+
+    return this;
+
+  },
+
+  /**
+   * @name Two.Anchor#ignore
+   * @function
+   * @description Convenience method used mainly by {@link Two.Path#vertices} to ignore changes from a specific anchor's control points.
+   */
+  ignore: function() {
+
+    this.controls.left.unbind(Events.Types.change, this._broadcast);
+    this.controls.right.unbind(Events.Types.change, this._broadcast);
+
+    return this;
+
+  },
+
+  /**
+   * @name Two.Anchor#copy
+   * @function
+   * @param {Two.Anchor} v - The anchor to apply values to.
+   * @description Copy the properties of one {@link Two.Anchor} onto another.
+   */
+  copy: function(v) {
+
+    this.x = v.x;
+    this.y = v.y;
+
+    if (typeof v.command === 'string') {
+      this.command = v.command;
+    }
+    if (_.isObject(v.controls)) {
+      if (!_.isObject(this.controls)) {
+        Anchor.AppendCurveProperties(this);
+      }
+      // TODO: Do we need to listen here?
+      this.controls.left.copy(v.controls.left);
+      this.controls.right.copy(v.controls.right);
+    }
+    if (typeof v.relative === 'boolean') {
+      this.relative = v.relative;
+    }
+
+    // TODO: Hack for `Two.Commands.arc`
+    if (this.command === Commands.arc) {
+      this.rx = v.rx;
+      this.ry = v.ry;
+      this.xAxisRotation = v.xAxisRotation;
+      this.largeArcFlag = v.largeArcFlag;
+      this.sweepFlag = v.sweepFlag;
+    }
+
+    return this;
+
+  },
+
+  /**
+   * @name Two.Anchor#clone
+   * @function
+   * @returns {Two.Anchor}
+   * @description Create a new {@link Two.Anchor}, set all its values to the current instance and return it for use.
+   */
+  clone: function() {
+
+    var controls = this.controls;
+
+    var clone = new Anchor(
+      this.x,
+      this.y,
+      controls && controls.left.x,
+      controls && controls.left.y,
+      controls && controls.right.x,
+      controls && controls.right.y,
+      this.command
+    );
+    clone.relative = this._relative;
+    return clone;
+
+  },
+
+  /**
+   * @name Two.Anchor#toObject
+   * @function
+   * @returns {Object} - An object with properties filled out to mirror {@link Two.Anchor}.
+   * @description Create a JSON compatible plain object of the current instance. Intended for use with storing values in a database.
+   */
+  toObject: function() {
+    var o = {
+      x: this.x,
+      y: this.y
+    };
+    if (this._command) {
+      o.command = this._command;
+    }
+    if (this._relative) {
+      o.relative = this._relative;
+    }
+    if (this.controls) {
+      o.controls = {
+        left: this.controls.left.toObject(),
+        right: this.controls.right.toObject()
+      };
+    }
+    return o;
+  },
+
+  /**
+   * @name Two.Anchor#toString
+   * @function
+   * @returns {String} - A String with comma-separated values reflecting the various values on the current instance.
+   * @description Create a string form of the current instance. Intended for use with storing values in a database. This is lighter to store than the JSON compatible {@link Two.Anchor#toObject}.
+   */
+  toString: function() {
+    if (!this.controls) {
+      return [this._x, this._y].join(', ');
+    }
+    return [this._x, this._y, this.controls.left.x, this.controls.left.y,
+      this.controls.right.x, this.controls.right.y, this._command,
+      this._relative ? 1 : 0].join(', ');
+  }
+
+};
+
+Anchor.MakeObservable(Anchor.prototype);
+
+// Constants
+
+var cos = Math.cos, sin = Math.sin, tan = Math.tan;
+var array = [];
+
+/**
+ * @name Two.Matrix
+ * @class
+ * @param {Number} [a=1] - The value for element at the first column and first row.
+ * @param {Number} [b=0] - The value for element at the second column and first row.
+ * @param {Number} [c=0] - The value for element at the third column and first row.
+ * @param {Number} [d=0] - The value for element at the first column and second row.
+ * @param {Number} [e=1] - The value for element at the second column and second row.
+ * @param {Number} [f=0] - The value for element at the third column and second row.
+ * @param {Number} [g=0] - The value for element at the first column and third row.
+ * @param {Number} [h=0] - The value for element at the second column and third row.
+ * @param {Number} [i=1] - The value for element at the third column and third row.
+ * @description A class to store 3 x 3 transformation matrix information. In addition to storing data `Two.Matrix` has suped up methods for commonplace mathematical operations.
+ * @nota-bene Order is based on how to construct transformation strings for the browser.
+ */
+var Matrix$1 = function(a, b, c, d, e, f) {
+
+  /**
+   * @name Two.Matrix#elements
+   * @property {Number[]} - The underlying data stored as an array.
+   */
+  this.elements = new NumArray(9);
+
+  var elements = a;
+  if (!Array.isArray(elements)) {
+    elements = Array.prototype.slice.call(arguments);
+  }
+
+  // initialize the elements with default values.
+  this.identity();
+
+  if (elements.length > 0) {
+    this.set(elements);
+  }
+
+};
+
+setMatrix(Matrix$1);
+
+_.extend(Matrix$1, {
+
+  /**
+   * @name Two.Matrix.Identity
+   * @property {Number[]} - A stored reference to the default value of a 3 x 3 matrix.
+   */
+  Identity: [
+    1, 0, 0,
+    0, 1, 0,
+    0, 0, 1
+  ],
+
+  /**
+   * @name Two.Matrix.Multiply
+   * @function
+   * @param {Two.Matrix} A
+   * @param {Two.Matrix} B
+   * @param {Two.Matrix} [C] - An optional matrix to apply the multiplication to.
+   * @returns {Two.Matrix} - If an optional `C` matrix isn't passed then a new one is created and returned.
+   * @description Multiply two matrices together and return the result.
+   */
+  Multiply: function(A, B, C) {
+
+    if (B.length <= 3) { // Multiply Vector
+
+      var x, y, z, e = A;
+
+      var a = B[0] || 0,
+          b = B[1] || 0,
+          c = B[2] || 0;
+
+      // Go down rows first
+      // a, d, g, b, e, h, c, f, i
+
+      x = e[0] * a + e[1] * b + e[2] * c;
+      y = e[3] * a + e[4] * b + e[5] * c;
+      z = e[6] * a + e[7] * b + e[8] * c;
+
+      return { x: x, y: y, z: z };
+
+    }
+
+    var A0 = A[0], A1 = A[1], A2 = A[2];
+    var A3 = A[3], A4 = A[4], A5 = A[5];
+    var A6 = A[6], A7 = A[7], A8 = A[8];
+
+    var B0 = B[0], B1 = B[1], B2 = B[2];
+    var B3 = B[3], B4 = B[4], B5 = B[5];
+    var B6 = B[6], B7 = B[7], B8 = B[8];
+
+    C = C || new NumArray(9);
+
+    C[0] = A0 * B0 + A1 * B3 + A2 * B6;
+    C[1] = A0 * B1 + A1 * B4 + A2 * B7;
+    C[2] = A0 * B2 + A1 * B5 + A2 * B8;
+    C[3] = A3 * B0 + A4 * B3 + A5 * B6;
+    C[4] = A3 * B1 + A4 * B4 + A5 * B7;
+    C[5] = A3 * B2 + A4 * B5 + A5 * B8;
+    C[6] = A6 * B0 + A7 * B3 + A8 * B6;
+    C[7] = A6 * B1 + A7 * B4 + A8 * B7;
+    C[8] = A6 * B2 + A7 * B5 + A8 * B8;
+
+    return C;
+
+  }
+
+});
+
+_.extend(Matrix$1.prototype, Events, {
+
+  constructor: Matrix$1,
+
+  /**
+   * @name Two.Matrix#manual
+   * @property {Boolean} - Determines whether Two.js automatically calculates the values for the matrix or if the developer intends to manage the matrix.
+   * @nota-bene - Setting to `true` nullifies {@link Two.Shape#translation}, {@link Two.Shape#rotation}, and {@link Two.Shape#scale}.
+   */
+  manual: false,
+
+  /**
+   * @name Two.Matrix#set
+   * @function
+   * @param {Number} a - The value for element at the first column and first row.
+   * @param {Number} b - The value for element at the second column and first row.
+   * @param {Number} c - The value for element at the third column and first row.
+   * @param {Number} d - The value for element at the first column and second row.
+   * @param {Number} e - The value for element at the second column and second row.
+   * @param {Number} f - The value for element at the third column and second row.
+   * @param {Number} g - The value for element at the first column and third row.
+   * @param {Number} h - The value for element at the second column and third row.
+   * @param {Number} i - The value for element at the third column and third row.
+   * @description Set an array of values onto the matrix. Order described in {@link Two.Matrix}.
+   */
+
+    /**
+    * @name Two.Matrix#set
+    * @function
+    * @param {Number[]} a - The array of elements to apply.
+    * @description Set an array of values onto the matrix. Order described in {@link Two.Matrix}.
+    */
+  set: function(a, b, c, d, e, f, g, h, i) {
+
+    var elements;
+
+    if (typeof b === 'undefined') {
+      elements = a;
+      a = elements[0];
+      b = elements[1];
+      c = elements[2];
+      d = elements[3];
+      e = elements[4];
+      f = elements[5];
+      g = elements[6];
+      h = elements[7];
+      i = elements[8];
+    }
+
+    this.elements[0] = a;
+    this.elements[1] = b;
+    this.elements[2] = c;
+    this.elements[3] = d;
+    this.elements[4] = e;
+    this.elements[5] = f;
+    this.elements[6] = g;
+    this.elements[7] = h;
+    this.elements[8] = i;
+
+    return this.trigger(Events.Types.change);
+
+  },
+
+  /**
+   * @name Two.Matrix#copy
+   * @function
+   * @description Copy the matrix of one to the current instance.
+   */
+  copy: function(m) {
+
+    this.elements[0] = m.elements[0];
+    this.elements[1] = m.elements[1];
+    this.elements[2] = m.elements[2];
+    this.elements[3] = m.elements[3];
+    this.elements[4] = m.elements[4];
+    this.elements[5] = m.elements[5];
+    this.elements[6] = m.elements[6];
+    this.elements[7] = m.elements[7];
+    this.elements[8] = m.elements[8];
+
+    this.manual = m.manual;
+
+    return this.trigger(Events.Types.change);
+
+  },
+
+  /**
+   * @name Two.Matrix#identity
+   * @function
+   * @description Turn matrix to the identity, like resetting.
+   */
+  identity: function() {
+
+    this.elements[0] = Matrix$1.Identity[0];
+    this.elements[1] = Matrix$1.Identity[1];
+    this.elements[2] = Matrix$1.Identity[2];
+    this.elements[3] = Matrix$1.Identity[3];
+    this.elements[4] = Matrix$1.Identity[4];
+    this.elements[5] = Matrix$1.Identity[5];
+    this.elements[6] = Matrix$1.Identity[6];
+    this.elements[7] = Matrix$1.Identity[7];
+    this.elements[8] = Matrix$1.Identity[8];
+
+    return this.trigger(Events.Types.change);
+
+  },
+
+  /**
+   * @name Two.Matrix#multiply
+   * @function
+   * @param {Number} a - The scalar to be multiplied.
+   * @description Multiply all components of the matrix against a single scalar value.
+   * @overloaded
+   */
+
+  /**
+   * @name Two.Matrix#multiply
+   * @function
+   * @param {Number} a - The x component to be multiplied.
+   * @param {Number} b - The y component to be multiplied.
+   * @param {Number} c - The z component to be multiplied.
+   * @description Multiply all components of a matrix against a 3 component vector.
+   * @overloaded
+   */
+
+  /**
+   * @name Two.Matrix#multiply
+   * @function
+   * @param {Number} a - The value at the first column and first row of the matrix to be multiplied.
+   * @param {Number} b - The value at the second column and first row of the matrix to be multiplied.
+   * @param {Number} c - The value at the third column and first row of the matrix to be multiplied.
+   * @param {Number} d - The value at the first column and second row of the matrix to be multiplied.
+   * @param {Number} e - The value at the second column and second row of the matrix to be multiplied.
+   * @param {Number} f - The value at the third column and second row of the matrix to be multiplied.
+   * @param {Number} g - The value at the first column and third row of the matrix to be multiplied.
+   * @param {Number} h - The value at the second column and third row of the matrix to be multiplied.
+   * @param {Number} i - The value at the third column and third row of the matrix to be multiplied.
+   * @description Multiply all components of a matrix against another matrix.
+   * @overloaded
+   */
+  multiply: function(a, b, c, d, e, f, g, h, i) {
+
+    // Multiply scalar
+
+    if (typeof b === 'undefined') {
+
+      this.elements[0] *= a;
+      this.elements[1] *= a;
+      this.elements[2] *= a;
+      this.elements[3] *= a;
+      this.elements[4] *= a;
+      this.elements[5] *= a;
+      this.elements[6] *= a;
+      this.elements[7] *= a;
+      this.elements[8] *= a;
+
+      return this.trigger(Events.Types.change);
+
+    }
+
+    if (typeof d === 'undefined') { // Multiply Vector
+
+      var x, y, z;
+      a = a || 0;
+      b = b || 0;
+      c = c || 0;
+      e = this.elements;
+
+      // Go down rows first
+      // a, d, g, b, e, h, c, f, i
+
+      x = e[0] * a + e[1] * b + e[2] * c;
+      y = e[3] * a + e[4] * b + e[5] * c;
+      z = e[6] * a + e[7] * b + e[8] * c;
+
+      return { x: x, y: y, z: z };
+
+    }
+
+    // Multiple matrix
+
+    var A = this.elements;
+    var B = [a, b, c, d, e, f, g, h, i];
+
+    var A0 = A[0], A1 = A[1], A2 = A[2];
+    var A3 = A[3], A4 = A[4], A5 = A[5];
+    var A6 = A[6], A7 = A[7], A8 = A[8];
+
+    var B0 = B[0], B1 = B[1], B2 = B[2];
+    var B3 = B[3], B4 = B[4], B5 = B[5];
+    var B6 = B[6], B7 = B[7], B8 = B[8];
+
+    this.elements[0] = A0 * B0 + A1 * B3 + A2 * B6;
+    this.elements[1] = A0 * B1 + A1 * B4 + A2 * B7;
+    this.elements[2] = A0 * B2 + A1 * B5 + A2 * B8;
+
+    this.elements[3] = A3 * B0 + A4 * B3 + A5 * B6;
+    this.elements[4] = A3 * B1 + A4 * B4 + A5 * B7;
+    this.elements[5] = A3 * B2 + A4 * B5 + A5 * B8;
+
+    this.elements[6] = A6 * B0 + A7 * B3 + A8 * B6;
+    this.elements[7] = A6 * B1 + A7 * B4 + A8 * B7;
+    this.elements[8] = A6 * B2 + A7 * B5 + A8 * B8;
+
+    return this.trigger(Events.Types.change);
+
+  },
+
+  /**
+   * @name Two.Matrix#inverse
+   * @function
+   * @param {Two.Matrix} [out] - The optional matrix to apply the inversion to.
+   * @description Return an inverted version of the matrix. If no optional one is passed a new matrix is created and returned.
+   */
+  inverse: function(out) {
+
+    var a = this.elements;
+    out = out || new Matrix$1();
+
+    var a00 = a[0], a01 = a[1], a02 = a[2];
+    var a10 = a[3], a11 = a[4], a12 = a[5];
+    var a20 = a[6], a21 = a[7], a22 = a[8];
+
+    var b01 = a22 * a11 - a12 * a21;
+    var b11 = -a22 * a10 + a12 * a20;
+    var b21 = a21 * a10 - a11 * a20;
+
+    // Calculate the determinant
+    var det = a00 * b01 + a01 * b11 + a02 * b21;
+
+    if (!det) {
+      return null;
+    }
+
+    det = 1.0 / det;
+
+    out.elements[0] = b01 * det;
+    out.elements[1] = (-a22 * a01 + a02 * a21) * det;
+    out.elements[2] = (a12 * a01 - a02 * a11) * det;
+    out.elements[3] = b11 * det;
+    out.elements[4] = (a22 * a00 - a02 * a20) * det;
+    out.elements[5] = (-a12 * a00 + a02 * a10) * det;
+    out.elements[6] = b21 * det;
+    out.elements[7] = (-a21 * a00 + a01 * a20) * det;
+    out.elements[8] = (a11 * a00 - a01 * a10) * det;
+
+    return out;
+
+  },
+
+  /**
+   * @name Two.Matrix#scale
+   * @function
+   * @param {Number} scale - The one dimensional scale to apply to the matrix.
+   * @description Uniformly scale the transformation matrix.
+   */
+
+  /**
+   * @name Two.Matrix#scale
+   * @function
+   * @param {Number} sx - The horizontal scale factor.
+   * @param {Number} sy - The vertical scale factor
+   * @description Scale the transformation matrix in two dimensions.
+   */
+  scale: function(sx, sy) {
+
+    var l = arguments.length;
+    if (l <= 1) {
+      sy = sx;
+    }
+
+    return this.multiply(sx, 0, 0, 0, sy, 0, 0, 0, 1);
+
+  },
+
+  /**
+   * @name Two.Matrix#rotate
+   * @function
+   * @param {Radians} radians - The amount to rotate in radians.
+   * @description Rotate the matrix.
+   */
+  rotate: function(radians) {
+
+    var c = cos(radians);
+    var s = sin(radians);
+
+    return this.multiply(c, -s, 0, s, c, 0, 0, 0, 1);
+
+  },
+
+  /**
+   * @name Two.Matrix#translate
+   * @function
+   * @param {Number} x - The horizontal translation value to apply.
+   * @param {Number} y - The vertical translation value to apply.
+   * @description Translate the matrix.
+   */
+  translate: function(x, y) {
+
+    return this.multiply(1, 0, x, 0, 1, y, 0, 0, 1);
+
+  },
+
+  /**
+   * @name Two.Matrix#skewX
+   * @function
+   * @param {Radians} radians - The amount to skew in radians.
+   * @description Skew the matrix by an angle in the x axis direction.
+   */
+  skewX: function(radians) {
+
+    var a = tan(radians);
+
+    return this.multiply(1, a, 0, 0, 1, 0, 0, 0, 1);
+
+  },
+
+  /**
+   * @name Two.Matrix#skewY
+   * @function
+   * @param {Radians} radians - The amount to skew in radians.
+   * @description Skew the matrix by an angle in the y axis direction.
+   */
+  skewY: function(radians) {
+
+    var a = tan(radians);
+
+    return this.multiply(1, 0, 0, a, 1, 0, 0, 0, 1);
+
+  },
+
+  /**
+   * @name Two.Matrix#toString
+   * @function
+   * @param {Boolean} [fullMatrix=false] - Return the full 9 elements of the matrix or just 6 for 2D transformations.
+   * @returns {String} - The transformation matrix as a 6 component string separated by spaces.
+   * @description Create a transform string. Used for the Two.js rendering APIs.
+   */
+  toString: function(fullMatrix) {
+
+    array.length = 0;
+    this.toTransformArray(fullMatrix, array);
+
+    return array.map(toFixed).join(' ');
+
+  },
+
+  /**
+   * @name Two.Matrix#toTransformArray
+   * @function
+   * @param {Boolean} [fullMatrix=false] - Return the full 9 elements of the matrix or just 6 in the format for 2D transformations.
+   * @param {Number[]} [output] - An array empty or otherwise to apply the values to.
+   * @description Create a transform array. Used for the Two.js rendering APIs.
+   */
+  toTransformArray: function(fullMatrix, output) {
+
+    var elements = this.elements;
+    var hasOutput = !!output;
+
+    var a = elements[0];
+    var b = elements[1];
+    var c = elements[2];
+    var d = elements[3];
+    var e = elements[4];
+    var f = elements[5];
+
+    if (fullMatrix) {
+
+      var g = elements[6];
+      var h = elements[7];
+      var i = elements[8];
+
+      if (hasOutput) {
+        output[0] = a;
+        output[1] = d;
+        output[2] = g;
+        output[3] = b;
+        output[4] = e;
+        output[5] = h;
+        output[6] = c;
+        output[7] = f;
+        output[8] = i;
+        return;
+      }
+
+      return [
+        a, d, g, b, e, h, c, f, i
+      ];
+    }
+
+    if (hasOutput) {
+      output[0] = a;
+      output[1] = d;
+      output[2] = b;
+      output[3] = e;
+      output[4] = c;
+      output[5] = f;
+      return;
+    }
+
+    return [
+      a, d, b, e, c, f  // Specific format see LN:19
+    ];
+
+  },
+
+  /**
+   * @name Two.Matrix#toArray
+   * @function
+   * @param {Boolean} [fullMatrix=false] - Return the full 9 elements of the matrix or just 6 for 2D transformations.
+   * @param {Number[]} [output] - An array empty or otherwise to apply the values to.
+   * @description Create a transform array. Used for the Two.js rendering APIs.
+   */
+  toArray: function(fullMatrix, output) {
+
+    var elements = this.elements;
+    var hasOutput = !!output;
+
+    var a = elements[0];
+    var b = elements[1];
+    var c = elements[2];
+    var d = elements[3];
+    var e = elements[4];
+    var f = elements[5];
+
+    if (fullMatrix) {
+
+      var g = elements[6];
+      var h = elements[7];
+      var i = elements[8];
+
+      if (hasOutput) {
+        output[0] = a;
+        output[1] = b;
+        output[2] = c;
+        output[3] = d;
+        output[4] = e;
+        output[5] = f;
+        output[6] = g;
+        output[7] = h;
+        output[8] = i;
+        return;
+      }
+
+      return [
+        a, b, c, d, e, f, g, h, i
+      ];
+    }
+
+    if (hasOutput) {
+      output[0] = a;
+      output[1] = b;
+      output[2] = c;
+      output[3] = d;
+      output[4] = e;
+      output[5] = f;
+      return;
+    }
+
+    return [
+      a, b, c, d, e, f
+    ];
+
+  },
+
+  /**
+   * @name Two.Matrix#toObject
+   * @function
+   * @description Create a JSON compatible object that represents information of the matrix.
+   */
+  toObject: function() {
+    return {
+      elements: this.toArray(true),
+      manual: !!this.manual
+    };
+  },
+
+  /**
+   * @name Two.Matrix#clone
+   * @function
+   * @description Clone the current matrix.
+   */
+  clone: function() {
+
+    return new Matrix$1().copy(this);
+
+  }
+
+});
+
+var count = 0;
+
+var Constants = {
+
+  /**
+   * @name Two.nextFrameID
+   * @property {Integer}
+   * @description The id of the next requestAnimationFrame function.
+   */
+  nextFrameID: null,
+
+  // Primitive
+
+  /**
+   * @name Two.Types
+   * @property {Object} - The different rendering types available in the library.
+   */
+  Types: {
+    webgl: 'WebGLRenderer',
+    svg: 'SVGRenderer',
+    canvas: 'CanvasRenderer'
+  },
+
+  /**
+   * @name Two.Version
+   * @property {String} - The current working version of the library.
+   */
+  Version: 'v0.7.1',
+
+  /**
+   * @name Two.PublishDate
+   * @property {String} - The automatically generated publish date in the build process to verify version release candidates.
+   */
+  PublishDate: '2021-01-13T01:57:28.198Z',
+
+  /**
+   * @name Two.Identifier
+   * @property {String} - String prefix for all Two.js object's ids. This trickles down to SVG ids.
+   */
+  Identifier: 'two-',
+
+  /**
+   * @name Two.Resolution
+   * @property {Number} - Default amount of vertices to be used for interpreting Arcs and ArcSegments.
+   */
+  Resolution: 12,
+
+  /**
+   * @name Two.AutoCalculateImportedMatrices
+   * @property {Boolean} - When importing SVGs through the {@link two#interpret} and {@link two#load}, this boolean determines whether Two.js infers and then overrides the exact transformation matrix of the reference SVG.
+   * @nota-bene `false` copies the exact transformation matrix values, but also sets the path's `matrix.manual = true`.
+   */
+  AutoCalculateImportedMatrices: true,
+
+  /**
+   * @name Two.Instances
+   * @property {Two[]} - Registered list of all Two.js instances in the current session.
+   */
+  Instances: [],
+
+  /**
+   * @function Two.uniqueId
+   * @description Simple method to access an incrementing value. Used for `id` allocation on all Two.js objects.
+   * @returns {Number} Ever increasing integer.
+   */
+  uniqueId: function() {
+    return count++;
+  }
+
+};
+
+var HALF_PI = Math.PI / 2;
+
+/**
+ * @name Utils.Curve
+ * @property {Object} - Additional utility constant variables related to curve math and calculations.
+ */
+var Curve = {
+
+  CollinearityEpsilon: Math.pow(10, -30),
+
+  RecursionLimit: 16,
+
+  CuspLimit: 0,
+
+  Tolerance: {
+    distance: 0.25,
+    angle: 0,
+    epsilon: Number.EPSILON
+  },
+
+  // Lookup tables for abscissas and weights with values for n = 2 .. 16.
+  // As values are symmetric, only store half of them and adapt algorithm
+  // to factor in symmetry.
+  abscissas: [
+    [  0.5773502691896257645091488],
+    [0,0.7745966692414833770358531],
+    [  0.3399810435848562648026658,0.8611363115940525752239465],
+    [0,0.5384693101056830910363144,0.9061798459386639927976269],
+    [  0.2386191860831969086305017,0.6612093864662645136613996,0.9324695142031520278123016],
+    [0,0.4058451513773971669066064,0.7415311855993944398638648,0.9491079123427585245261897],
+    [  0.1834346424956498049394761,0.5255324099163289858177390,0.7966664774136267395915539,0.9602898564975362316835609],
+    [0,0.3242534234038089290385380,0.6133714327005903973087020,0.8360311073266357942994298,0.9681602395076260898355762],
+    [  0.1488743389816312108848260,0.4333953941292471907992659,0.6794095682990244062343274,0.8650633666889845107320967,0.9739065285171717200779640],
+    [0,0.2695431559523449723315320,0.5190961292068118159257257,0.7301520055740493240934163,0.8870625997680952990751578,0.9782286581460569928039380],
+    [  0.1252334085114689154724414,0.3678314989981801937526915,0.5873179542866174472967024,0.7699026741943046870368938,0.9041172563704748566784659,0.9815606342467192506905491],
+    [0,0.2304583159551347940655281,0.4484927510364468528779129,0.6423493394403402206439846,0.8015780907333099127942065,0.9175983992229779652065478,0.9841830547185881494728294],
+    [  0.1080549487073436620662447,0.3191123689278897604356718,0.5152486363581540919652907,0.6872929048116854701480198,0.8272013150697649931897947,0.9284348836635735173363911,0.9862838086968123388415973],
+    [0,0.2011940939974345223006283,0.3941513470775633698972074,0.5709721726085388475372267,0.7244177313601700474161861,0.8482065834104272162006483,0.9372733924007059043077589,0.9879925180204854284895657],
+    [  0.0950125098376374401853193,0.2816035507792589132304605,0.4580167776572273863424194,0.6178762444026437484466718,0.7554044083550030338951012,0.8656312023878317438804679,0.9445750230732325760779884,0.9894009349916499325961542]
+  ],
+
+  weights: [
+    [1],
+    [0.8888888888888888888888889,0.5555555555555555555555556],
+    [0.6521451548625461426269361,0.3478548451374538573730639],
+    [0.5688888888888888888888889,0.4786286704993664680412915,0.2369268850561890875142640],
+    [0.4679139345726910473898703,0.3607615730481386075698335,0.1713244923791703450402961],
+    [0.4179591836734693877551020,0.3818300505051189449503698,0.2797053914892766679014678,0.1294849661688696932706114],
+    [0.3626837833783619829651504,0.3137066458778872873379622,0.2223810344533744705443560,0.1012285362903762591525314],
+    [0.3302393550012597631645251,0.3123470770400028400686304,0.2606106964029354623187429,0.1806481606948574040584720,0.0812743883615744119718922],
+    [0.2955242247147528701738930,0.2692667193099963550912269,0.2190863625159820439955349,0.1494513491505805931457763,0.0666713443086881375935688],
+    [0.2729250867779006307144835,0.2628045445102466621806889,0.2331937645919904799185237,0.1862902109277342514260976,0.1255803694649046246346943,0.0556685671161736664827537],
+    [0.2491470458134027850005624,0.2334925365383548087608499,0.2031674267230659217490645,0.1600783285433462263346525,0.1069393259953184309602547,0.0471753363865118271946160],
+    [0.2325515532308739101945895,0.2262831802628972384120902,0.2078160475368885023125232,0.1781459807619457382800467,0.1388735102197872384636018,0.0921214998377284479144218,0.0404840047653158795200216],
+    [0.2152638534631577901958764,0.2051984637212956039659241,0.1855383974779378137417166,0.1572031671581935345696019,0.1215185706879031846894148,0.0801580871597602098056333,0.0351194603317518630318329],
+    [0.2025782419255612728806202,0.1984314853271115764561183,0.1861610000155622110268006,0.1662692058169939335532009,0.1395706779261543144478048,0.1071592204671719350118695,0.0703660474881081247092674,0.0307532419961172683546284],
+    [0.1894506104550684962853967,0.1826034150449235888667637,0.1691565193950025381893121,0.1495959888165767320815017,0.1246289712555338720524763,0.0951585116824927848099251,0.0622535239386478928628438,0.0271524594117540948517806]
+  ]
+
+};
+
+/**
+ * @name Utils.getComponentOnCubicBezier
+ * @function
+ * @param {Number} t - Zero-to-one value describing what percentage to calculate.
+ * @param {Number} a - The firt point's component value.
+ * @param {Number} b - The first point's bezier component value.
+ * @param {Number} c - The second point's bezier component value.
+ * @param {Number} d - The second point's component value.
+ * @returns {Number} The coordinate value for a specific component along a cubic bezier curve by `t`.
+ */
+var getComponentOnCubicBezier = function(t, a, b, c, d) {
+  var k = 1 - t;
+  return (k * k * k * a) + (3 * k * k * t * b) + (3 * k * t * t * c) +
+      (t * t * t * d);
+};
+
+/**
+ * @name Utils.subdivide
+ * @function
+ * @param {Number} x1 - x position of first anchor point.
+ * @param {Number} y1 - y position of first anchor point.
+ * @param {Number} x2 - x position of first anchor point's "right" bezier handle.
+ * @param {Number} y2 - y position of first anchor point's "right" bezier handle.
+ * @param {Number} x3 - x position of second anchor point's "left" bezier handle.
+ * @param {Number} y3 - y position of second anchor point's "left" bezier handle.
+ * @param {Number} x4 - x position of second anchor point.
+ * @param {Number} y4 - y position of second anchor point.
+ * @param {Number} [limit=Utils.Curve.RecursionLimit] - The amount of vertices to create by subdividing.
+ * @returns {Anchor[]} A list of anchor points ordered in between `x1`, `y1` and `x4`, `y4`
+ * @description Given 2 points (a, b) and corresponding control point for each return an array of points that represent points plotted along the curve. The number of returned points is determined by `limit`.
+ */
+var subdivide = function(x1, y1, x2, y2, x3, y3, x4, y4, limit) {
+
+  limit = limit || Curve.RecursionLimit;
+  var amount = limit + 1;
+
+  // TODO: Abstract 0.001 to a limiting variable
+  // Don't recurse if the end points are identical
+  if (Math.abs(x1 - x4) < 0.001 && Math.abs(y1 - y4) < 0.001) {
+    return [new Anchor(x4, y4)];
+  }
+
+  var result = [];
+
+  for (var i = 0; i < amount; i++) {
+    var t = i / amount;
+    var x = getComponentOnCubicBezier(t, x1, x2, x3, x4);
+    var y = getComponentOnCubicBezier(t, y1, y2, y3, y4);
+    result.push(new Anchor(x, y));
+  }
+
+  return result;
+
+};
+
+/**
+ * @name Utils.getCurveLength
+ * @function
+ * @param {Number} x1 - x position of first anchor point.
+ * @param {Number} y1 - y position of first anchor point.
+ * @param {Number} x2 - x position of first anchor point's "right" bezier handle.
+ * @param {Number} y2 - y position of first anchor point's "right" bezier handle.
+ * @param {Number} x3 - x position of second anchor point's "left" bezier handle.
+ * @param {Number} y3 - y position of second anchor point's "left" bezier handle.
+ * @param {Number} x4 - x position of second anchor point.
+ * @param {Number} y4 - y position of second anchor point.
+ * @param {Number} [limit=Utils.Curve.RecursionLimit] - The amount of vertices to create by subdividing.
+ * @returns {Number} The length of a curve.
+ * @description Given 2 points (a, b) and corresponding control point for each, return a float that represents the length of the curve using Gauss-Legendre algorithm. Limit iterations of calculation by `limit`.
+ */
+var getCurveLength = function(x1, y1, x2, y2, x3, y3, x4, y4, limit) {
+
+  // TODO: Better / fuzzier equality check
+  // Linear calculation
+  if (x1 === x2 && y1 === y2 && x3 === x4 && y3 === y4) {
+    var dx = x4 - x1;
+    var dy = y4 - y1;
+    return Math.sqrt(dx * dx + dy * dy);
+  }
+
+  // Calculate the coefficients of a Bezier derivative.
+  var ax = 9 * (x2 - x3) + 3 * (x4 - x1),
+    bx = 6 * (x1 + x3) - 12 * x2,
+    cx = 3 * (x2 - x1),
+
+    ay = 9 * (y2 - y3) + 3 * (y4 - y1),
+    by = 6 * (y1 + y3) - 12 * y2,
+    cy = 3 * (y2 - y1);
+
+  var integrand = function(t) {
+    // Calculate quadratic equations of derivatives for x and y
+    var dx = (ax * t + bx) * t + cx,
+      dy = (ay * t + by) * t + cy;
+    return Math.sqrt(dx * dx + dy * dy);
+  };
+
+  return integrate(
+    integrand, 0, 1, limit || Curve.RecursionLimit
+  );
+
+};
+
+/**
+ * @name Utils.getCurveBoundingBox
+ * @function
+ * @param {Number} x1 - x position of first anchor point.
+ * @param {Number} y1 - y position of first anchor point.
+ * @param {Number} x2 - x position of first anchor point's "right" bezier handle.
+ * @param {Number} y2 - y position of first anchor point's "right" bezier handle.
+ * @param {Number} x3 - x position of second anchor point's "left" bezier handle.
+ * @param {Number} y3 - y position of second anchor point's "left" bezier handle.
+ * @param {Number} x4 - x position of second anchor point.
+ * @param {Number} y4 - y position of second anchor point.
+ * @returns {Object} Object contains min and max `x` / `y` bounds.
+ * @see {@link https://github.com/adobe-webplatform/Snap.svg/blob/master/src/path.js#L856}
+ */
+var getCurveBoundingBox = function(x1, y1, x2, y2, x3, y3, x4, y4) {
+
+  var tvalues = [];
+  var bounds = [[], []];
+  var a, b, c, t, t1, t2, b2ac, sqrtb2ac;
+
+  for (var i = 0; i < 2; ++i) {
+      if (i == 0) {
+        b = 6 * x1 - 12 * x2 + 6 * x3;
+        a = -3 * x1 + 9 * x2 - 9 * x3 + 3 * x4;
+        c = 3 * x2 - 3 * x1;
+      } else {
+        b = 6 * y1 - 12 * y2 + 6 * y3;
+        a = -3 * y1 + 9 * y2 - 9 * y3 + 3 * y4;
+        c = 3 * y2 - 3 * y1;
+      }
+      if (Math.abs(a) < 1e-12) {
+        if (Math.abs(b) < 1e-12) {
+          continue;
+        }
+        t = -c / b;
+        if (0 < t && t < 1) {
+          tvalues.push(t);
+        }
+        continue;
+      }
+      b2ac = b * b - 4 * c * a;
+      sqrtb2ac = Math.sqrt(b2ac);
+      if (b2ac < 0) {
+        continue;
+      }
+      t1 = (-b + sqrtb2ac) / (2 * a);
+      if (0 < t1 && t1 < 1) {
+        tvalues.push(t1);
+      }
+      t2 = (-b - sqrtb2ac) / (2 * a);
+      if (0 < t2 && t2 < 1) {
+        tvalues.push(t2);
+      }
+  }
+
+  var j = tvalues.length;
+  var jlen = j;
+  var mt;
+
+  while (j--) {
+    t = tvalues[j];
+    mt = 1 - t;
+    bounds[0][j] = mt * mt * mt * x1 + 3 * mt * mt * t * x2 + 3 * mt * t * t * x3 + t * t * t * x4;
+    bounds[1][j] = mt * mt * mt * y1 + 3 * mt * mt * t * y2 + 3 * mt * t * t * y3 + t * t * t * y4;
+  }
+
+  bounds[0][jlen] = x1;
+  bounds[1][jlen] = y1;
+  bounds[0][jlen + 1] = x4;
+  bounds[1][jlen + 1] = y4;
+  bounds[0].length = bounds[1].length = jlen + 2;
+
+  return {
+    min: { x: Math.min.apply(0, bounds[0]), y: Math.min.apply(0, bounds[1]) },
+    max: { x: Math.max.apply(0, bounds[0]), y: Math.max.apply(0, bounds[1]) }
+  };
+
+};
+
+/**
+ * @name Utils.integrate
+ * @function
+ * @param {Function} f
+ * @param {Number} a
+ * @param {Number} b
+ * @param {Integer} n
+ * @description Integration for `getCurveLength` calculations.
+ * @see [Paper.js](@link https://github.com/paperjs/paper.js/blob/master/src/util/Numerical.js#L101)
+ */
+var integrate = function(f, a, b, n) {
+  var x = Curve.abscissas[n - 2],
+    w = Curve.weights[n - 2],
+    A = 0.5 * (b - a),
+    B = A + a,
+    i = 0,
+    m = (n + 1) >> 1,
+    sum = n & 1 ? w[i++] * f(B) : 0; // Handle odd n
+  while (i < m) {
+    var Ax = A * x[i];
+    sum += w[i++] * (f(B + Ax) + f(B - Ax));
+  }
+  return A * sum;
+};
+
+/**
+ * @name Utils.getCurveFromPoints
+ * @function
+ * @param {Anchor[]} points
+ * @param {Boolean} closed
+ * @description Sets the bezier handles on {@link Anchor}s in the `points` list with estimated values to create a catmull-rom like curve. Used by {@link Two.Path#plot}.
+ */
+var getCurveFromPoints = function(points, closed) {
+
+  var l = points.length, last = l - 1;
+
+  for (var i = 0; i < l; i++) {
+
+    var point = points[i];
+
+    if (!_.isObject(point.controls)) {
+      Anchor.AppendCurveProperties(point);
+    }
+
+    var prev = closed ? mod(i - 1, l) : Math.max(i - 1, 0);
+    var next = closed ? mod(i + 1, l) : Math.min(i + 1, last);
+
+    var a = points[prev];
+    var b = point;
+    var c = points[next];
+    getControlPoints(a, b, c);
+
+    b.command = i === 0 ? Commands.move : Commands.curve;
+
+  }
+
+};
+
+/**
+ * @name Utils.getControlPoints
+ * @function
+ * @param {Anchor} a
+ * @param {Anchor} b
+ * @param {Anchor} c
+ * @returns {Anchor} Returns the passed middle point `b`.
+ * @description Given three coordinates set the control points for the middle, b, vertex based on its position with the adjacent points.
+ */
+var getControlPoints = function(a, b, c) {
+
+  var a1 = Vector.angleBetween(a, b);
+  var a2 = Vector.angleBetween(c, b);
+
+  var d1 = Vector.distanceBetween(a, b);
+  var d2 = Vector.distanceBetween(c, b);
+
+  var mid = (a1 + a2) / 2;
+
+  // TODO: Issue 73
+  if (d1 < 0.0001 || d2 < 0.0001) {
+    if (typeof b.relative === 'boolean' && !b.relative) {
+      b.controls.left.copy(b);
+      b.controls.right.copy(b);
+    }
+    return b;
+  }
+
+  d1 *= 0.33; // Why 0.33?
+  d2 *= 0.33;
+
+  if (a2 < a1) {
+    mid += HALF_PI;
+  } else {
+    mid -= HALF_PI;
+  }
+
+  b.controls.left.x = Math.cos(mid) * d1;
+  b.controls.left.y = Math.sin(mid) * d1;
+
+  mid -= Math.PI;
+
+  b.controls.right.x = Math.cos(mid) * d2;
+  b.controls.right.y = Math.sin(mid) * d2;
+
+  if (typeof b.relative === 'boolean' && !b.relative) {
+    b.controls.left.x += b.x;
+    b.controls.left.y += b.y;
+    b.controls.right.x += b.x;
+    b.controls.right.y += b.y;
+  }
+
+  return b;
+
+};
+
+/**
+ * @name Utils.getReflection
+ * @function
+ * @param {Vector} a
+ * @param {Vector} b
+ * @param {Boolean} [relative=false]
+ * @returns {Vector} New {@link Vector} that represents the reflection point.
+ * @description Get the reflection of a point `b` about point `a`. Where `a` is in absolute space and `b` is relative to `a`.
+ * @see {@link http://www.w3.org/TR/SVG11/implnote.html#PathElementImplementationNotes}
+ */
+var getReflection = function(a, b, relative) {
+
+  return new Vector(
+    2 * a.x - (b.x + a.x) - (relative ? a.x : 0),
+    2 * a.y - (b.y + a.y) - (relative ? a.y : 0)
+  );
+
+};
+
+/**
+ * @name Utils.getAnchorsFromArcData
+ * @function
+ * @param {Vector} center
+ * @param {Radians} xAxisRotation
+ * @param {Number} rx - x radius
+ * @param {Number} ry - y radius
+ * @param {Radians} ts
+ * @param {Radians} td
+ * @param {Boolean} [ccw=false] - Set path traversal to counter-clockwise
+ */
+var getAnchorsFromArcData = function(center, xAxisRotation, rx, ry, ts, td, ccw) {
+
+  var matrix = new Matrix$1()
+    .translate(center.x, center.y)
+    .rotate(xAxisRotation);
+
+  var resolution = Constants.Resolution;
+
+  for (var i = 0; i < resolution; i++) {
+    var pct = (i + 1) / resolution;
+    if (ccw) {
+      pct = 1 - pct;
+    }
+
+    var theta = pct * td + ts;
+    var x = rx * Math.cos(theta);
+    var y = ry * Math.sin(theta);
+
+    // x += center.x;
+    // y += center.y;
+
+    var anchor = new Anchor(x, y);
+    Anchor.AppendCurveProperties(anchor);
+    anchor.command = Commands.line;
+  }
+
+};
+
+var Curves = /*#__PURE__*/Object.freeze({
+  __proto__: null,
+  Curve: Curve,
+  getComponentOnCubicBezier: getComponentOnCubicBezier,
+  subdivide: subdivide,
+  getCurveLength: getCurveLength,
+  getCurveBoundingBox: getCurveBoundingBox,
+  integrate: integrate,
+  getCurveFromPoints: getCurveFromPoints,
+  getControlPoints: getControlPoints,
+  getReflection: getReflection,
+  getAnchorsFromArcData: getAnchorsFromArcData
+});
+
+var devicePixelRatio = root$1.devicePixelRatio || 1;
+
+var getBackingStoreRatio = function(ctx) {
+  return ctx.webkitBackingStorePixelRatio ||
+  ctx.mozBackingStorePixelRatio ||
+  ctx.msBackingStorePixelRatio ||
+  ctx.oBackingStorePixelRatio ||
+  ctx.backingStorePixelRatio || 1;
+};
+
+/**
+ * @name Utils.getRatio
+ * @function
+ * @param {CanvasRenderingContext2D} ctx
+ * @returns {Number} The ratio of a unit in Two.js to the pixel density of a session's screen.
+ * @see [High DPI Rendering](http://www.html5rocks.com/en/tutorials/canvas/hidpi/)
+ */
+var getRatio = function(ctx) {
+  return devicePixelRatio / getBackingStoreRatio(ctx);
+};
+
+/**
+ * @name Utils.Collection
+ * @class
+ * @extends Utils.Events
+ * @description An `Array` like object with additional event propagation on actions. `pop`, `shift`, and `splice` trigger `removed` events. `push`, `unshift`, and `splice` with more than 2 arguments trigger 'inserted'. Finally, `sort` and `reverse` trigger `order` events.
+ */
+var Collection = function() {
+
+  Array.call(this);
+
+  if (arguments.length > 1) {
+    Array.prototype.push.apply(this, arguments);
+  } else if (arguments[0] && Array.isArray(arguments[0])) {
+    Array.prototype.push.apply(this, arguments[0]);
+  }
+
+};
+
+Collection.prototype = new Array();
+Collection.prototype.constructor = Collection;
+
+_.extend(Collection.prototype, Events, {
+
+  pop: function() {
+    var popped = Array.prototype.pop.apply(this, arguments);
+    this.trigger(Events.Types.remove, [popped]);
+    return popped;
+  },
+
+  shift: function() {
+    var shifted = Array.prototype.shift.apply(this, arguments);
+    this.trigger(Events.Types.remove, [shifted]);
+    return shifted;
+  },
+
+  push: function() {
+    var pushed = Array.prototype.push.apply(this, arguments);
+    this.trigger(Events.Types.insert, arguments);
+    return pushed;
+  },
+
+  unshift: function() {
+    var unshifted = Array.prototype.unshift.apply(this, arguments);
+    this.trigger(Events.Types.insert, arguments);
+    return unshifted;
+  },
+
+  splice: function() {
+    var spliced = Array.prototype.splice.apply(this, arguments);
+    var inserted;
+
+    this.trigger(Events.Types.remove, spliced);
+
+    if (arguments.length > 2) {
+      inserted = this.slice(arguments[0], arguments[0] + arguments.length - 2);
+      this.trigger(Events.Types.insert, inserted);
+      this.trigger(Events.Types.order);
+    }
+    return spliced;
+  },
+
+  sort: function() {
+    Array.prototype.sort.apply(this, arguments);
+    this.trigger(Events.Types.order);
+    return this;
+  },
+
+  reverse: function() {
+    Array.prototype.reverse.apply(this, arguments);
+    this.trigger(Events.Types.order);
+    return this;
+  }
+
+});
+
+/**
+ * @name Two.Shape
+ * @class
+ * @extends Events
+ * @description The foundational transformation object for the Two.js scenegraph.
+ */
+var Shape = function() {
+
+  /**
+   * @name Two.Shape#_renderer
+   * @property {Object}
+   * @private
+   * @description A private object to store relevant renderer specific variables.
+   * @nota-bene With the {@link Two.SvgRenderer} you can access the underlying SVG element created via `shape._renderer.elem`.
+   */
+  this._renderer = {};
+  this._renderer.flagMatrix = Shape.FlagMatrix.bind(this);
+  this.isShape = true;
+
+  /**
+   * @name Two.Shape#id
+   * @property {String} - Session specific unique identifier.
+   * @nota-bene In the {@link Two.SvgRenderer} change this to change the underlying SVG element's id too.
+   */
+  this.id = Constants.Identifier + Constants.uniqueId();
+
+  /**
+   * @name Two.Shape#classList
+   * @property {String[]}
+   * @description A list of class strings stored if imported / interpreted  from an SVG element.
+   */
+  this.classList = [];
+
+  /**
+   * @name Two.Shape#matrix
+   * @property {Two.Matrix}
+   * @description The transformation matrix of the shape.
+   * @nota-bene {@link Two.Shape#translation}, {@link Two.Shape#rotation}, and {@link Two.Shape#scale} apply their values to the matrix when changed. The matrix is what is sent to the renderer to be drawn.
+   */
+  this.matrix = new Matrix$1();
+
+  /**
+   * @name Two.Shape#translation
+   * @property {Two.Vector} - The x and y value for where the shape is placed relative to its parent.
+   */
+  this.translation = new Vector();
+
+  /**
+   * @name Two.Shape#rotation
+   * @property {Radians} - The value in radians for how much the shape is rotated relative to its parent.
+   */
+  this.rotation = 0;
+
+  /**
+   * @name Two.Shape#scale
+   * @property {Number} - The value for how much the shape is scaled relative to its parent.
+   * @nota-bene This value can be replaced with a {@link Two.Vector} to do non-uniform scaling. e.g: `shape.scale = new Two.Vector(2, 1);`
+   */
+  this.scale = 1;
+
+};
+
+_.extend(Shape, {
+
+  /**
+   * @name Two.Shape.FlagMatrix
+   * @function
+   * @description Utility function used in conjunction with event handlers to update the flagMatrix of a shape.
+   */
+  FlagMatrix: function() {
+    this._flagMatrix = true;
+  },
+
+  /**
+   * @name Two.Shape.MakeObservable
+   * @function
+   * @param {Object} object - The object to make observable.
+   * @description Convenience function to apply observable qualities of a {@link Two.Shape} to any object. Handy if you'd like to extend the {@link Two.Shape} class on a custom class.
+   */
+  MakeObservable: function(object) {
+
+    var translation = {
+      enumerable: false,
+      get: function() {
+        return this._translation;
+      },
+      set: function(v) {
+        if (this._translation) {
+          this._translation.unbind(Events.Types.change, this._renderer.flagMatrix);
+        }
+        this._translation = v;
+        this._translation.bind(Events.Types.change, this._renderer.flagMatrix);
+        Shape.FlagMatrix.call(this);
+      }
+    };
+
+    Object.defineProperty(object, 'translation', translation);
+    Object.defineProperty(object, 'position', translation);
+
+    Object.defineProperty(object, 'rotation', {
+      enumerable: true,
+      get: function() {
+        return this._rotation;
+      },
+      set: function(v) {
+        this._rotation = v;
+        this._flagMatrix = true;
+      }
+    });
+
+    Object.defineProperty(object, 'scale', {
+      enumerable: true,
+      get: function() {
+        return this._scale;
+      },
+      set: function(v) {
+
+        if (this._scale instanceof Vector) {
+          this._scale.unbind(Events.Types.change, this._renderer.flagMatrix);
+        }
+
+        this._scale = v;
+
+        if (this._scale instanceof Vector) {
+          this._scale.bind(Events.Types.change, this._renderer.flagMatrix);
+        }
+
+        this._flagMatrix = true;
+        this._flagScale = true;
+
+      }
+    });
+
+    Object.defineProperty(object, 'matrix', {
+      enumerable: true,
+      get: function() {
+        return this._matrix;
+      },
+      set: function(v) {
+        this._matrix = v;
+        this._flagMatrix = true;
+      }
+    });
+
+    Object.defineProperty(object, 'className', {
+
+      enumerable: true,
+
+      get: function() {
+        return this._className;
+      },
+
+      set: function(v) {
+
+        this._flagClassName = this._className !== v;
+
+        if (this._flagClassName) {
+
+          var prev = this._className.split(/\s+?/);
+          var dest = v.split(/\s+?/);
+
+          for (var i = 0; i < prev.length; i++) {
+            var className = prev[i];
+            var index = Array.prototype.indexOf.call(this.classList, className);
+            if (index >= 0) {
+              this.classList.splice(index, 1);
+            }
+          }
+
+          this.classList = this.classList.concat(dest);
+
+        }
+
+        this._className = v;
+
+      }
+
+    });
+
+  }
+
+});
+
+_.extend(Shape.prototype, Events, {
+
+  // Flags
+
+  /**
+   * @name Two.Shape#_flagMatrix
+   * @private
+   * @property {Boolean} - Determines whether the matrix needs updating.
+   */
+  _flagMatrix: true,
+
+  /**
+   * @name Two.Shape#_flagScale
+   * @private
+   * @property {Boolean} - Determines whether the scale needs updating.
+   */
+  _flagScale: false,
+
+  // _flagMask: false,
+  // _flagClip: false,
+
+  /**
+   * @name Two.Shape#_flagClassName
+   * @private
+   * @property {Boolean} - Determines whether the {@link Two.Group#className} need updating.
+   */
+  _flagClassName: false,
+
+  // Underlying Properties
+
+  /**
+   * @name Two.Shape#_translation
+   * @private
+   * @property {Two.Vector} - The translation values as a {@link Two.Vector}.
+   */
+  _translation: null,
+
+  /**
+   * @name Two.Shape#_rotation
+   * @private
+   * @property {Radians} - The rotation value in radians.
+   */
+  _rotation: 0,
+
+  /**
+   * @name Two.Shape#_translation
+   * @private
+   * @property {Two.Vector} - The translation values as a {@link Two.Vector}.
+   */
+  _scale: 1,
+
+  // _mask: null,
+  // _clip: false,
+
+  /**
+   * @name Two.Shape#className
+   * @property {String} - A class to be applied to the element to be compatible with CSS styling.
+   * @nota-bene Only available for the SVG renderer.
+   */
+  _className: '',
+
+  constructor: Shape,
+
+  /**
+   * @name Two.Shape#addTo
+   * @function
+   * @param {Two.Group} group - The parent the shape adds itself to.
+   * @description Convenience method to add itself to the scenegraph.
+   */
+  addTo: function(group) {
+    group.add(this);
+    return this;
+  },
+
+  /**
+   * @name Two.Shape#clone
+   * @function
+   * @param {Two.Group} [parent] - Optional argument to automatically add the shape to a scenegraph.
+   * @returns {Two.Shape}
+   * @description Create a new {@link Two.Shape} with the same values as the current shape.
+   */
+  clone: function(parent) {
+
+    var clone = new Shape();
+
+    clone.translation.copy(this.translation);
+    clone.rotation = this.rotation;
+    clone.scale = this.scale;
+
+    if (this.matrix.manual) {
+      clone.matrix.copy(this.matrix);
+    }
+
+    if (parent) {
+      parent.add(clone);
+    }
+
+    return clone._update();
+
+  },
+
+  /**
+   * @name Two.Shape#_update
+   * @function
+   * @private
+   * @param {Boolean} [bubbles=false] - Force the parent to `_update` as well.
+   * @description This is called before rendering happens by the renderer. This applies all changes necessary so that rendering is up-to-date but not updated more than it needs to be.
+   * @nota-bene Try not to call this method more than once a frame.
+   */
+  _update: function(bubbles) {
+
+    if (!this._matrix.manual && this._flagMatrix) {
+
+      this._matrix
+        .identity()
+        .translate(this.translation.x, this.translation.y);
+
+        if (this._scale instanceof Vector) {
+          this._matrix.scale(this._scale.x, this._scale.y);
+        } else {
+          this._matrix.scale(this._scale);
+        }
+
+        this._matrix.rotate(this.rotation);
+
+    }
+
+    if (bubbles) {
+      if (this.parent && this.parent._update) {
+        this.parent._update();
+      }
+    }
+
+    return this;
+
+  },
+
+  /**
+   * @name Two.Shape#flagReset
+   * @function
+   * @private
+   * @description Called internally to reset all flags. Ensures that only properties that change are updated before being sent to the renderer.
+   */
+  flagReset: function() {
+
+    this._flagMatrix = this._flagScale = this._flagClassName = false;
+
+    return this;
+
+  }
+
+});
+
+Shape.MakeObservable(Shape.prototype);
+
+/**
+ * @class
+ * @name Two.Group.Children
+ * @extends Two.Utils.Collection
+ * @description A children collection which is accesible both by index and by object `id`.
+ */
+var Children = function() {
+
+  Collection.apply(this, arguments);
+
+  Object.defineProperty(this, '_events', {
+    value : {},
+    enumerable: false
+  });
+
+  /**
+   * @name Two.Group.Children#ids
+   * @property {Object} - Map of all elements in the list keyed by `id`s.
+   */
+  this.ids = {};
+
+  this.on(Events.Types.insert, this.attach);
+  this.on(Events.Types.remove, this.detach);
+  Children.prototype.attach.apply(this, arguments);
+
+};
+
+Children.prototype = new Collection();
+
+_.extend(Children.prototype, {
+
+  constructor: Children,
+
+  /**
+   * @function
+   * @name Two.Group.Children#attach
+   * @param {Two.Shape[]} children - The objects which extend {@link Two.Shape} to be added.
+   * @description Adds elements to the `ids` map.
+   */
+  attach: function(children) {
+    for (var i = 0; i < children.length; i++) {
+      this.ids[children[i].id] = children[i];
+    }
+    return this;
+  },
+
+  /**
+   * @function
+   * @name Two.Group.Children#detach
+   * @param {Two.Shape[]} children - The objects which extend {@link Two.Shape} to be removed.
+   * @description Removes elements to the `ids` map.
+   */
+  detach: function(children) {
+    for (var i = 0; i < children.length; i++) {
+      delete this.ids[children[i].id];
+    }
+    return this;
+  }
+
+});
+
+// Constants
+
+var min = Math.min, max = Math.max;
+
+/**
+ * @name Two.Group
+ * @class
+ * @extends Two.Shape
+ * @param {Two.Shape[]} [children] - A list of objects that inherit {@link Two.Shape}. For instance, the array could be a {@link Two.Path}, {@link Two.Text}, and {@link Two.RoundedRectangle}.
+ * @description This is the primary class for grouping objects that are then drawn in Two.js. In Illustrator this is a group, in After Effects it would be a Null Object. Whichever the case, the `Two.Group` contains a transformation matrix and commands to style its children, but it by itself doesn't render to the screen.
+ * @nota-bene The {@link Two#scene} is an instance of `Two.Group`.
+ */
+var Group = function(children) {
+
+  Shape.call(this, true);
+
+  this._renderer.type = 'group';
+
+  /**
+   * @name Two.Group#additions
+   * @property {Two.Shape[]}
+   * @description An automatically updated list of children that need to be appended to the renderer's scenegraph.
+   */
+  this.additions = [];
+
+  /**
+   * @name Two.Group#subtractions
+   * @property {Two.Shape[]}
+   * @description An automatically updated list of children that need to be removed from the renderer's scenegraph.
+   */
+  this.subtractions = [];
+
+  /**
+   * @name Two.Group#additions
+   * @property {Two.Group.Children}
+   * @description A list of all the children in the scenegraph.
+   * @nota-bene Ther order of this list indicates the order each element is rendered to the screen.
+   */
+  this.children = Array.isArray(children) ? children : Array.prototype.slice.call(arguments);
+
+};
+
+_.extend(Group, {
+
+  Children: Children,
+
+  /**
+   * @name Two.Group.InsertChildren
+   * @function
+   * @param {Two.Shape[]} children - The objects to be inserted.
+   * @description Cached method to let renderers know children have been added to a {@link Two.Group}.
+   */
+  InsertChildren: function(children) {
+    for (var i = 0; i < children.length; i++) {
+      replaceParent.call(this, children[i], this);
+    }
+  },
+
+  /**
+   * @name Two.Group.RemoveChildren
+   * @function
+   * @param {Two.Shape[]} children - The objects to be removed.
+   * @description Cached method to let renderers know children have been removed from a {@link Two.Group}.
+   */
+  RemoveChildren: function(children) {
+    for (var i = 0; i < children.length; i++) {
+      replaceParent.call(this, children[i]);
+    }
+  },
+
+  /**
+   * @name Two.Group.OrderChildren
+   * @function
+   * @description Cached method to let renderers know order has been updated on a {@link Two.Group}.
+   */
+  OrderChildren: function(children) {
+    this._flagOrder = true;
+  },
+
+  /**
+   * @name Two.Group.Properties
+   * @property {String[]} - A list of properties that are on every {@link Two.Group}.
+   */
+  Properties: [
+    'fill',
+    'stroke',
+    'linewidth',
+    'visible',
+    'cap',
+    'join',
+    'miter',
+
+    'closed',
+    'curved',
+    'automatic'
+  ],
+
+  /**
+   * @name Two.Group.MakeObservable
+   * @function
+   * @param {Object} object - The object to make observable.
+   * @description Convenience function to apply observable qualities of a {@link Two.Group} to any object. Handy if you'd like to extend the {@link Two.Group} class on a custom class.
+   */
+  MakeObservable: function(object) {
+
+    var properties = Group.Properties;
+
+    Object.defineProperty(object, 'opacity', {
+
+      enumerable: true,
+
+      get: function() {
+        return this._opacity;
+      },
+
+      set: function(v) {
+        this._flagOpacity = this._opacity !== v;
+        this._opacity = v;
+      }
+
+    });
+
+    Object.defineProperty(object, 'beginning', {
+
+      enumerable: true,
+
+      get: function() {
+        return this._beginning;
+      },
+
+      set: function(v) {
+        this._flagBeginning = this._beginning !== v;
+        this._beginning = v;
+      }
+
+    });
+
+    Object.defineProperty(object, 'ending', {
+
+      enumerable: true,
+
+      get: function() {
+        return this._ending;
+      },
+
+      set: function(v) {
+        this._flagEnding = this._ending !== v;
+        this._ending = v;
+      }
+
+    });
+
+    Object.defineProperty(object, 'length', {
+
+      enumerable: true,
+
+      get: function() {
+        if (this._flagLength || this._length <= 0) {
+          this._length = 0;
+          if (!this.children) {
+            return this._length;
+          }
+          for (var i = 0; i < this.children.length; i++) {
+            var child = this.children[i];
+            this._length += child.length;
+          }
+        }
+        return this._length;
+      }
+
+    });
+
+    Shape.MakeObservable(object);
+    Group.MakeGetterSetters(object, properties);
+
+    Object.defineProperty(object, 'children', {
+
+      enumerable: true,
+
+      get: function() {
+        return this._children;
+      },
+
+      set: function(children) {
+
+        var insertChildren = Group.InsertChildren.bind(this);
+        var removeChildren = Group.RemoveChildren.bind(this);
+        var orderChildren = Group.OrderChildren.bind(this);
+
+        if (this._children) {
+          this._children.unbind();
+        }
+
+        this._children = new Children(children);
+        this._children.bind(Events.Types.insert, insertChildren);
+        this._children.bind(Events.Types.remove, removeChildren);
+        this._children.bind(Events.Types.order, orderChildren);
+
+      }
+
+    });
+
+    Object.defineProperty(object, 'mask', {
+
+      enumerable: true,
+
+      get: function() {
+        return this._mask;
+      },
+
+      set: function(v) {
+        this._mask = v;
+        this._flagMask = true;
+        if (!v.clip) {
+          v.clip = true;
+        }
+      }
+
+    });
+
+  },
+
+  /**
+   * @name Two.Group.MakeGetterSetters
+   * @function
+   * @param {Two.Group} group - The group to apply getters and setters.
+   * @param {Object} properties - A key / value object containing properties to inherit.
+   * @description Convenience method to apply getter / setter logic on an array of properties. Used in {@link Two.Group.MakeObservable}.
+   */
+  MakeGetterSetters: function(group, properties) {
+
+    if (!Array.isArray(properties)) {
+      properties = [properties];
+    }
+
+    _.each(properties, function(k) {
+      Group.MakeGetterSetter(group, k);
+    });
+
+  },
+
+  /**
+   * @name Two.Group.MakeGetterSetter
+   * @function
+   * @param {Two.Group} group - The group to apply getters and setters.
+   * @param {String} key - The key which will become a property on the group.
+   * @description Convenience method to apply getter / setter logic specific to how `Two.Group`s trickle down styles to their children. Used in {@link Two.Group.MakeObservable}.
+   */
+  MakeGetterSetter: function(group, key) {
+
+    var secret = '_' + key;
+
+    Object.defineProperty(group, key, {
+
+      enumerable: true,
+
+      get: function() {
+        return this[secret];
+      },
+
+      set: function(v) {
+        this[secret] = v;
+        // Trickle down styles
+        for (var i = 0; i < this.children.length; i++) {
+          var child = this.children[i];
+          child[key] = v;
+        }
+      }
+
+    });
+
+  }
+
+});
+
+_.extend(Group.prototype, Shape.prototype, {
+
+  // Flags
+  // http://en.wikipedia.org/wiki/Flag
+
+  /**
+   * @name Two.Group#_flagAdditions
+   * @private
+   * @property {Boolean} - Determines whether the {@link Two.Group#additions} need updating.
+   */
+  _flagAdditions: false,
+
+  /**
+   * @name Two.Group#_flagSubtractions
+   * @private
+   * @property {Boolean} - Determines whether the {@link Two.Group#subtractions} need updating.
+   */
+  _flagSubtractions: false,
+
+  /**
+   * @name Two.Group#_flagOrder
+   * @private
+   * @property {Boolean} - Determines whether the {@link Two.Group#order} need updating.
+   */
+  _flagOrder: false,
+
+  /**
+   * @name Two.Group#_flagOpacity
+   * @private
+   * @property {Boolean} - Determines whether the {@link Two.Group#opacity} need updating.
+   */
+  _flagOpacity: true,
+
+  /**
+   * @name Two.Group#_flagBeginning
+   * @private
+   * @property {Boolean} - Determines whether the {@link Two.Group#beginning} need updating.
+   */
+  _flagBeginning: false,
+
+  /**
+   * @name Two.Group#_flagEnding
+   * @private
+   * @property {Boolean} - Determines whether the {@link Two.Group#ending} need updating.
+   */
+  _flagEnding: false,
+
+  /**
+   * @name Two.Group#_flagLength
+   * @private
+   * @property {Boolean} - Determines whether the {@link Two.Group#length} need updating.
+   */
+  _flagLength: false,
+
+  /**
+   * @name Two.Group#_flagMask
+   * @private
+   * @property {Boolean} - Determines whether the {@link Two.Group#mask} need updating.
+   */
+  _flagMask: false,
+
+  // Underlying Properties
+
+  /**
+   * @name Two.Group#fill
+   * @property {(CssColor|Two.Gradient|Two.Texture)} - The value of what all child shapes should be filled in with.
+   * @see {@link https://developer.mozilla.org/en-US/docs/Web/CSS/color_value} for more information on CSS Colors.
+   */
+  _fill: '#fff',
+
+  /**
+   * @name Two.Group#stroke
+   * @property {(CssColor|Two.Gradient|Two.Texture)} - The value of what all child shapes should be outlined in with.
+   * @see {@link https://developer.mozilla.org/en-US/docs/Web/CSS/color_value} for more information on CSS Colors.
+   */
+  _stroke: '#000',
+
+  /**
+   * @name Two.Group#linewidth
+   * @property {Number} - The thickness in pixels of the stroke for all child shapes.
+   */
+  _linewidth: 1.0,
+
+  /**
+   * @name Two.Group#opacity
+   * @property {Number} - The opaqueness of all child shapes.
+   * @nota-bene Becomes multiplied by the individual child's opacity property.
+   */
+  _opacity: 1.0,
+
+  /**
+   * @name Two.Group#visible
+   * @property {Boolean} - Display the path or not.
+   * @nota-bene For {@link Two.CanvasRenderer} and {@link Two.WebGLRenderer} when set to false all updating is disabled improving performance dramatically with many objects in the scene.
+   */
+  _visible: true,
+
+  /**
+   * @name Two.Group#cap
+   * @property {String}
+   * @see {@link https://www.w3.org/TR/SVG11/painting.html#StrokeLinecapProperty}
+   */
+  _cap: 'round',
+
+  /**
+   * @name Two.Group#join
+   * @property {String}
+   * @see {@link https://www.w3.org/TR/SVG11/painting.html#StrokeLinejoinProperty}
+   */
+  _join: 'round',
+
+  /**
+   * @name Two.Group#miter
+   * @property {String}
+   * @see {@link https://www.w3.org/TR/SVG11/painting.html#StrokeMiterlimitProperty}
+   */
+  _miter: 4,
+
+  /**
+   * @name Two.Group#closed
+   * @property {Boolean} - Determines whether a final line is drawn between the final point in the `vertices` array and the first point of all child shapes.
+   */
+  _closed: true,
+
+  /**
+   * @name Two.Group#curved
+   * @property {Boolean} - When the child's path is `automatic = true` this boolean determines whether the lines between the points are curved or not.
+   */
+  _curved: false,
+
+  /**
+   * @name Two.Group#automatic
+   * @property {Boolean} - Determines whether or not Two.js should calculate curves, lines, and commands automatically for you or to let the developer manipulate them for themselves.
+   */
+  _automatic: true,
+
+  /**
+   * @name Two.Group#beginning
+   * @property {Number} - Number between zero and one to state the beginning of where the path is rendered.
+   * @description {@link Two.Group#beginning} is a percentage value that represents at what percentage into all child shapes should the renderer start drawing.
+   * @nota-bene This is great for animating in and out stroked paths in conjunction with {@link Two.Group#ending}.
+   */
+  _beginning: 0,
+
+  /**
+   * @name Two.Group#ending
+   * @property {Number} - Number between zero and one to state the ending of where the path is rendered.
+   * @description {@link Two.Group#ending} is a percentage value that represents at what percentage into all child shapes should the renderer start drawing.
+   * @nota-bene This is great for animating in and out stroked paths in conjunction with {@link Two.Group#beginning}.
+   */
+  _ending: 1.0,
+
+  /**
+   * @name Two.Group#length
+   * @property {Number} - The sum of distances between all child lengths.
+   */
+  _length: 0,
+
+  /**
+   * @name Two.Group#mask
+   * @property {Two.Shape} - The Two.js object to clip from a group's rendering.
+   */
+  _mask: null,
+
+  constructor: Group,
+
+  /**
+   * @name Two.Group#clone
+   * @function
+   * @param {Two.Group} [parent] - The parent group or scene to add the clone to.
+   * @returns {Two.Group}
+   * @description Create a new instance of {@link Two.Group} with the same properties of the current group.
+   */
+  clone: function(parent) {
+
+    // /**
+    //  * TODO: Group has a gotcha in that it's at the moment required to be bound to
+    //  * an instance of two in order to add elements correctly. This needs to
+    //  * be rethought and fixed.
+    //  */
+
+    var clone = new Group();
+    var children = this.children.map(function(child) {
+      return child.clone();
+    });
+
+    clone.add(children);
+
+    clone.opacity = this.opacity;
+
+    if (this.mask) {
+      clone.mask = this.mask;
+    }
+
+    clone.translation.copy(this.translation);
+    clone.rotation = this.rotation;
+    clone.scale = this.scale;
+    clone.className = this.className;
+
+    if (this.matrix.manual) {
+      clone.matrix.copy(this.matrix);
+    }
+
+    if (parent) {
+      parent.add(clone);
+    }
+
+    return clone._update();
+
+  },
+
+  /**
+   * @name Two.Group#toObject
+   * @function
+   * @returns {Object}
+   * @description Return a JSON compatible plain object that represents the group.
+   */
+  toObject: function() {
+
+    var result = {
+      children: [],
+      translation: this.translation.toObject(),
+      rotation: this.rotation,
+      scale: this.scale instanceof Vector ? this.scale.toObject() : this.scale,
+      opacity: this.opacity,
+      className: this.className,
+      mask: (this.mask ? this.mask.toObject() : null)
+    };
+
+    if (this.matrix.manual) {
+      result.matrix = this.matrix.toObject();
+    }
+
+    _.each(this.children, function(child, i) {
+      result.children[i] = child.toObject();
+    }, this);
+
+    return result;
+
+  },
+
+  /**
+   * @name Two.Group#corner
+   * @function
+   * @description Orient the children of the group to the upper left-hand corner of that group.
+   */
+  corner: function() {
+
+    var rect = this.getBoundingClientRect(true);
+    var corner = { x: rect.left, y: rect.top };
+
+    this.children.forEach(function(child) {
+      child.translation.sub(corner);
+    });
+
+    return this;
+
+  },
+
+  /**
+   * @name Two.Group#center
+   * @function
+   * @description Orient the children of the group to the center of that group.
+   */
+  center: function() {
+
+    var rect = this.getBoundingClientRect(true);
+
+    rect.centroid = {
+      x: rect.left + rect.width / 2 - this.translation.x,
+      y: rect.top + rect.height / 2 - this.translation.y
+    };
+
+    this.children.forEach(function(child) {
+      if (child.isShape) {
+        child.translation.sub(rect.centroid);
+      }
+    });
+
+    return this;
+
+  },
+
+  /**
+   * @name Two.Group#getById
+   * @function
+   * @description Recursively search for id. Returns the first element found.
+   * @returns {Two.Shape} - Or `null` if nothing is found.
+   */
+  getById: function (id) {
+    var found = null;
+    function search(node) {
+      if (node.id === id) {
+        return node;
+      } else if (node.children) {
+        for (var i = 0; i < node.children.length; i++) {
+          found = search(node.children[i]);
+          if (found) {
+            return found;
+          }
+        }
+      }
+      return null;
+    }
+    return search(this);
+  },
+
+  /**
+   * @name Two.Group#getByClassName
+   * @function
+   * @description Recursively search for classes. Returns an array of matching elements.
+   * @returns {Two.Shape[]} - Or empty array if nothing is found.
+   */
+  getByClassName: function(className) {
+    var found = [];
+    function search(node) {
+      if (Array.prototype.indexOf.call(node.classList, className) >= 0) {
+        found.push(node);
+      }
+      if (node.children) {
+        for (var i = 0; i < node.children.length; i++) {
+          var child = node.children[i];
+          search(child);
+        }
+      }
+      return found;
+    }
+    return search(this);
+  },
+
+  /**
+   * @name Two.Group#getByType
+   * @function
+   * @description Recursively search for children of a specific type, e.g. {@link Two.Path}. Pass a reference to this type as the param. Returns an array of matching elements.
+   * @returns {Two.Shape[]} - Empty array if nothing is found.
+   */
+  getByType: function(type) {
+    var found = [];
+    function search(node) {
+      if (node instanceof type) {
+        found.push(node);
+      }
+      if (node.children) {
+        for (var i = 0; i < node.children.length; i++) {
+          var child = node.children[i];
+          search(child);
+        }
+      }
+      return found;
+    }
+    return search(this);
+  },
+
+  /**
+   * @name Two.Group#add
+   * @function
+   * @param {Two.Shape[]} objects - An array of objects to be added. Can be also be supplied as individual arguments.
+   * @description Add objects to the group.
+   */
+  add: function(objects) {
+
+    // Allow to pass multiple objects either as array or as multiple arguments
+    // If it's an array also create copy of it in case we're getting passed
+    // a childrens array directly.
+    if (!(objects instanceof Array)) {
+      objects = Array.prototype.slice.call(arguments);
+    } else {
+      objects = objects.slice();
+    }
+
+    // Add the objects
+    for (var i = 0; i < objects.length; i++) {
+      var child = objects[i];
+      if (!(child && child.id)) {
+        continue;
+      }
+      var index = Array.prototype.indexOf.call(this.children, child);
+      if (index >= 0) {
+        this.children.splice(index, 1);
+      }
+      this.children.push(child);
+    }
+
+    return this;
+
+  },
+
+  /**
+   * @name Two.Group#add
+   * @function
+   * @param {Two.Shape[]} objects - An array of objects to be removed. Can be also removed as individual arguments.
+   * @description Remove objects from the group.
+   */
+  remove: function(objects) {
+
+    var l = arguments.length,
+      grandparent = this.parent;
+
+    // Allow to call remove without arguments
+    // This will detach the object from its own parent.
+    if (l <= 0 && grandparent) {
+      grandparent.remove(this);
+      return this;
+    }
+
+    // Allow to pass multiple objects either as array or as multiple arguments
+    // If it's an array also create copy of it in case we're getting passed
+    // a childrens array directly.
+    if (!(objects instanceof Array)) {
+      objects = Array.prototype.slice.call(arguments);
+    } else {
+      objects = objects.slice();
+    }
+
+    // Remove the objects
+    for (var i = 0; i < objects.length; i++) {
+      if (!objects[i] || !(this.children.ids[objects[i].id])) continue;
+      this.children.splice(Array.prototype.indexOf.call(this.children, objects[i]), 1);
+    }
+
+    return this;
+
+  },
+
+  /**
+   * @name Two.Group#getBoundingClientRect
+   * @function
+   * @param {Boolean} [shallow=false] - Describes whether to calculate off local matrix or world matrix.
+   * @returns {Object} - Returns object with top, left, right, bottom, width, height attributes.
+   * @description Return an object with top, left, right, bottom, width, and height parameters of the group.
+   */
+  getBoundingClientRect: function(shallow) {
+    var rect;
+
+    // TODO: Update this to not __always__ update. Just when it needs to.
+    this._update(true);
+
+    // Variables need to be defined here, because of nested nature of groups.
+    var left = Infinity, right = -Infinity,
+        top = Infinity, bottom = -Infinity;
+
+    var regex = /texture|gradient/i;
+
+    for (var i = 0; i < this.children.length; i++) {
+
+      var child = this.children[i];
+
+      if (!child.visible || regex.test(child._renderer.type)) {
+        continue;
+      }
+
+      rect = child.getBoundingClientRect(shallow);
+
+      if (typeof rect.top !== 'number'   || typeof rect.left !== 'number' ||
+          typeof rect.right !== 'number' || typeof rect.bottom !== 'number') {
+        continue;
+      }
+
+      top = min(rect.top, top);
+      left = min(rect.left, left);
+      right = max(rect.right, right);
+      bottom = max(rect.bottom, bottom);
+
+    }
+
+    return {
+      top: top,
+      left: left,
+      right: right,
+      bottom: bottom,
+      width: right - left,
+      height: bottom - top
+    };
+
+  },
+
+  /**
+   * @name Two.Group#noFill
+   * @function
+   * @description Apply `noFill` method to all child shapes.
+   */
+  noFill: function() {
+    this.children.forEach(function(child) {
+      child.noFill();
+    });
+    return this;
+  },
+
+  /**
+   * @name Two.Group#noStroke
+   * @function
+   * @description Apply `noStroke` method to all child shapes.
+   */
+  noStroke: function() {
+    this.children.forEach(function(child) {
+      child.noStroke();
+    });
+    return this;
+  },
+
+  /**
+   * @name Two.Group#subdivide
+   * @function
+   * @description Apply `subdivide` method to all child shapes.
+   */
+  subdivide: function() {
+    var args = arguments;
+    this.children.forEach(function(child) {
+      child.subdivide.apply(child, args);
+    });
+    return this;
+  },
+
+  /**
+   * @name Two.Group#_update
+   * @function
+   * @private
+   * @param {Boolean} [bubbles=false] - Force the parent to `_update` as well.
+   * @description This is called before rendering happens by the renderer. This applies all changes necessary so that rendering is up-to-date but not updated more than it needs to be.
+   * @nota-bene Try not to call this method more than once a frame.
+   */
+  _update: function() {
+
+    if (this._flagBeginning || this._flagEnding) {
+
+      var beginning = Math.min(this._beginning, this._ending);
+      var ending = Math.max(this._beginning, this._ending);
+      var length = this.length;
+      var sum = 0;
+
+      var bd = beginning * length;
+      var ed = ending * length;
+
+      for (var i = 0; i < this.children.length; i++) {
+
+        var child = this.children[i];
+        var l = child.length;
+
+        if (bd > sum + l) {
+          child.beginning = 1;
+          child.ending = 1;
+        } else if (ed < sum) {
+          child.beginning = 0;
+          child.ending = 0;
+        } else if (bd > sum && bd < sum + l) {
+          child.beginning = (bd - sum) / l;
+          child.ending = 1;
+        } else if (ed > sum && ed < sum + l) {
+          child.beginning = 0;
+          child.ending = (ed - sum) / l;
+        } else {
+          child.beginning = 0;
+          child.ending = 1;
+        }
+
+        sum += l;
+
+      }
+
+    }
+
+    return Shape.prototype._update.apply(this, arguments);
+
+  },
+
+  /**
+   * @name Two.Group#flagReset
+   * @function
+   * @private
+   * @description Called internally to reset all flags. Ensures that only properties that change are updated before being sent to the renderer.
+   */
+  flagReset: function() {
+
+    if (this._flagAdditions) {
+      this.additions.length = 0;
+      this._flagAdditions = false;
+    }
+
+    if (this._flagSubtractions) {
+      this.subtractions.length = 0;
+      this._flagSubtractions = false;
+    }
+
+    this._flagOrder = this._flagMask = this._flagOpacity =
+      this._flagBeginning = this._flagEnding = false;
+
+    Shape.prototype.flagReset.call(this);
+
+    return this;
+
+  }
+
+});
+
+Group.MakeObservable(Group.prototype);
+
+// /**
+//  * Helper function used to sync parent-child relationship within the
+//  * `Two.Group.children` object.
+//  *
+//  * Set the parent of the passed object to another object
+//  * and updates parent-child relationships
+//  * Calling with one arguments will simply remove the parenting
+//  */
+function replaceParent(child, newParent) {
+
+  var parent = child.parent;
+  var index;
+
+  if (parent === newParent) {
+    add();
+    return;
+  }
+
+  if (parent && parent.children.ids[child.id]) {
+
+    index = Array.prototype.indexOf.call(parent.children, child);
+    parent.children.splice(index, 1);
+
+    splice();
+
+  }
+
+  if (newParent) {
+    add();
+    return;
+  }
+
+  splice();
+
+  if (parent._flagAdditions && parent.additions.length === 0) {
+    parent._flagAdditions = false;
+  }
+  if (parent._flagSubtractions && parent.subtractions.length === 0) {
+    parent._flagSubtractions = false;
+  }
+
+  delete child.parent;
+
+  function add() {
+
+    if (newParent.subtractions.length > 0) {
+      index = Array.prototype.indexOf.call(newParent.subtractions, child);
+
+      if (index >= 0) {
+        newParent.subtractions.splice(index, 1);
+      }
+    }
+
+    if (newParent.additions.length > 0) {
+      index = Array.prototype.indexOf.call(newParent.additions, child);
+
+      if (index >= 0) {
+        newParent.additions.splice(index, 1);
+      }
+    }
+
+    child.parent = newParent;
+    newParent.additions.push(child);
+    newParent._flagAdditions = true;
+
+  }
+
+  function splice() {
+
+    index = Array.prototype.indexOf.call(parent.additions, child);
+
+    if (index >= 0) {
+      parent.additions.splice(index, 1);
+    }
+
+    index = Array.prototype.indexOf.call(parent.subtractions, child);
+
+    if (index < 0) {
+      parent.subtractions.push(child);
+      parent._flagSubtractions = true;
+    }
+
+  }
+
+}
+
+// Constants
+var emptyArray = [];
+var TWO_PI = Math.PI * 2,
+  max$1 = Math.max,
+  min$1 = Math.min,
+  abs = Math.abs,
+  sin$1 = Math.sin,
+  cos$1 = Math.cos,
+  acos = Math.acos,
+  sqrt = Math.sqrt;
+
+// Returns true if this is a non-transforming matrix
+var isDefaultMatrix = function (m) {
+  return (m[0] == 1 && m[3] == 0 && m[1] == 0 && m[4] == 1 && m[2] == 0 && m[5] == 0);
+};
+
+var canvas = {
+
+  isHidden: /(undefined|none|transparent)/i,
+
+  alignments: {
+    left: 'start',
+    middle: 'center',
+    right: 'end'
+  },
+
+  shim: function(elem, name) {
+    elem.tagName = elem.nodeName = name || 'canvas';
+    elem.nodeType = 1;
+    elem.getAttribute = function(prop) {
+      return this[prop];
+    };
+    elem.setAttribute = function(prop, val) {
+      this[prop] = val;
+      return this;
+    };
+    return elem;
+  },
+
+  group: {
+
+    renderChild: function(child) {
+      canvas[child._renderer.type].render.call(child, this.ctx, true, this.clip);
+    },
+
+    render: function(ctx) {
+
+      // TODO: Add a check here to only invoke _update if need be.
+      this._update();
+
+      var matrix = this._matrix.elements;
+      var parent = this.parent;
+      this._renderer.opacity = this._opacity
+        * (parent && parent._renderer ? parent._renderer.opacity : 1);
+
+      var mask = this._mask;
+      // var clip = this._clip;
+
+      var defaultMatrix = isDefaultMatrix(matrix);
+      var shouldIsolate = !defaultMatrix || !!mask;
+
+      if (!this._renderer.context) {
+        this._renderer.context = {};
+      }
+
+      this._renderer.context.ctx = ctx;
+      // this._renderer.context.clip = clip;
+
+      if (shouldIsolate) {
+        ctx.save();
+        if (!defaultMatrix) {
+          ctx.transform(  matrix[0], matrix[3], matrix[1],
+            matrix[4], matrix[2], matrix[5]);
+        }
+      }
+
+      if (mask) {
+        canvas[mask._renderer.type].render.call(mask, ctx, true);
+      }
+
+      if (this.opacity > 0 && this.scale !== 0) {
+        for (var i = 0; i < this.children.length; i++) {
+          var child = this.children[i];
+          canvas[child._renderer.type].render.call(child, ctx);
+        }
+      }
+
+      if (shouldIsolate) {
+        ctx.restore();
+      }
+
+      // Commented two-way functionality of clips / masks with groups and
+      // polygons. Uncomment when this bug is fixed:
+      // https://code.google.com/p/chromium/issues/detail?id=370951
+
+      // if (clip) {
+      //   ctx.clip();
+      // }
+
+      return this.flagReset();
+
+    }
+
+  },
+
+  path: {
+
+    render: function(ctx, forced, parentClipped) {
+
+      var matrix, stroke, linewidth, fill, opacity, visible, cap, join, miter,
+          closed, commands, length, last, next, prev, a, b, c, d, ux, uy, vx, vy,
+          ar, bl, br, cl, x, y, clip, defaultMatrix, isOffset, dashes;
+
+      // TODO: Add a check here to only invoke _update if need be.
+      this._update();
+
+      matrix = this._matrix.elements;
+      stroke = this._stroke;
+      linewidth = this._linewidth;
+      fill = this._fill;
+      opacity = this._opacity * this.parent._renderer.opacity;
+      visible = this._visible;
+      cap = this._cap;
+      join = this._join;
+      miter = this._miter;
+      closed = this._closed;
+      commands = this._renderer.vertices; // Commands
+      length = commands.length;
+      last = length - 1;
+      defaultMatrix = isDefaultMatrix(matrix);
+      dashes = this.dashes;
+
+      // mask = this._mask;
+      clip = this._clip;
+
+      if (!forced && (!visible || clip)) {
+        return this;
+      }
+
+      // Transform
+      if (!defaultMatrix) {
+        ctx.save();
+        ctx.transform(matrix[0], matrix[3], matrix[1], matrix[4], matrix[2], matrix[5]);
+      }
+
+      // Commented two-way functionality of clips / masks with groups and
+      // polygons. Uncomment when this bug is fixed:
+      // https://code.google.com/p/chromium/issues/detail?id=370951
+
+      // if (mask) {
+      //   canvas[mask._renderer.type].render.call(mask, ctx, true);
+      // }
+
+      // Styles
+      if (fill) {
+        if (typeof fill === 'string') {
+          ctx.fillStyle = fill;
+        } else {
+          canvas[fill._renderer.type].render.call(fill, ctx);
+          ctx.fillStyle = fill._renderer.effect;
+        }
+      }
+      if (stroke) {
+        if (typeof stroke === 'string') {
+          ctx.strokeStyle = stroke;
+        } else {
+          canvas[stroke._renderer.type].render.call(stroke, ctx);
+          ctx.strokeStyle = stroke._renderer.effect;
+        }
+        if (linewidth) {
+          ctx.lineWidth = linewidth;
+        }
+        if (miter) {
+          ctx.miterLimit = miter;
+        }
+        if (join) {
+          ctx.lineJoin = join;
+        }
+        if (!closed && cap) {
+          ctx.lineCap = cap;
+        }
+      }
+      if (typeof opacity === 'number') {
+        ctx.globalAlpha = opacity;
+      }
+
+      if (dashes && dashes.length > 0) {
+        ctx.lineDashOffset = dashes.offset || 0;
+        ctx.setLineDash(dashes);
+      }
+
+      ctx.beginPath();
+
+      for (var i = 0; i < commands.length; i++) {
+
+        b = commands[i];
+
+        x = b.x;
+        y = b.y;
+
+        switch (b.command) {
+
+          case Commands.close:
+            ctx.closePath();
+            break;
+
+          case Commands.arc:
+
+            var rx = b.rx;
+            var ry = b.ry;
+            var xAxisRotation = b.xAxisRotation;
+            var largeArcFlag = b.largeArcFlag;
+            var sweepFlag = b.sweepFlag;
+
+            prev = closed ? mod(i - 1, length) : max$1(i - 1, 0);
+            a = commands[prev];
+
+            var ax = a.x;
+            var ay = a.y;
+
+            canvas.renderSvgArcCommand(ctx, ax, ay, rx, ry, largeArcFlag, sweepFlag, xAxisRotation, x, y);
+            break;
+
+          case Commands.curve:
+
+            prev = closed ? mod(i - 1, length) : Math.max(i - 1, 0);
+            next = closed ? mod(i + 1, length) : Math.min(i + 1, last);
+
+            a = commands[prev];
+            c = commands[next];
+            ar = (a.controls && a.controls.right) || Vector.zero;
+            bl = (b.controls && b.controls.left) || Vector.zero;
+
+            if (a._relative) {
+              vx = (ar.x + a.x);
+              vy = (ar.y + a.y);
+            } else {
+              vx = ar.x;
+              vy = ar.y;
+            }
+
+            if (b._relative) {
+              ux = (bl.x + b.x);
+              uy = (bl.y + b.y);
+            } else {
+              ux = bl.x;
+              uy = bl.y;
+            }
+
+            ctx.bezierCurveTo(vx, vy, ux, uy, x, y);
+
+            if (i >= last && closed) {
+
+              c = d;
+
+              br = (b.controls && b.controls.right) || Vector.zero;
+              cl = (c.controls && c.controls.left) || Vector.zero;
+
+              if (b._relative) {
+                vx = (br.x + b.x);
+                vy = (br.y + b.y);
+              } else {
+                vx = br.x;
+                vy = br.y;
+              }
+
+              if (c._relative) {
+                ux = (cl.x + c.x);
+                uy = (cl.y + c.y);
+              } else {
+                ux = cl.x;
+                uy = cl.y;
+              }
+
+              x = c.x;
+              y = c.y;
+
+              ctx.bezierCurveTo(vx, vy, ux, uy, x, y);
+
+            }
+
+            break;
+
+          case Commands.line:
+            ctx.lineTo(x, y);
+            break;
+
+          case Commands.move:
+            d = b;
+            ctx.moveTo(x, y);
+            break;
+
+        }
+      }
+
+      // Loose ends
+
+      if (closed) {
+        ctx.closePath();
+      }
+
+      if (!clip && !parentClipped) {
+        if (!canvas.isHidden.test(fill)) {
+          isOffset = fill._renderer && fill._renderer.offset;
+          if (isOffset) {
+            ctx.save();
+            ctx.translate(
+              - fill._renderer.offset.x, - fill._renderer.offset.y);
+            ctx.scale(fill._renderer.scale.x, fill._renderer.scale.y);
+          }
+          ctx.fill();
+          if (isOffset) {
+            ctx.restore();
+          }
+        }
+        if (!canvas.isHidden.test(stroke)) {
+          isOffset = stroke._renderer && stroke._renderer.offset;
+          if (isOffset) {
+            ctx.save();
+            ctx.translate(
+              - stroke._renderer.offset.x, - stroke._renderer.offset.y);
+            ctx.scale(stroke._renderer.scale.x, stroke._renderer.scale.y);
+            ctx.lineWidth = linewidth / stroke._renderer.scale.x;
+          }
+          ctx.stroke();
+          if (isOffset) {
+            ctx.restore();
+          }
+        }
+      }
+
+      if (!defaultMatrix) {
+        ctx.restore();
+      }
+
+      if (clip && !parentClipped) {
+        ctx.clip();
+      }
+
+      if (dashes && dashes.length > 0) {
+        ctx.setLineDash(emptyArray);
+      }
+
+      return this.flagReset();
+
+    }
+
+  },
+
+  text: {
+
+    render: function(ctx, forced, parentClipped) {
+
+      // TODO: Add a check here to only invoke _update if need be.
+      this._update();
+
+      var matrix = this._matrix.elements;
+      var stroke = this._stroke;
+      var linewidth = this._linewidth;
+      var fill = this._fill;
+      var decoration = this._decoration;
+      var opacity = this._opacity * this.parent._renderer.opacity;
+      var visible = this._visible;
+      var defaultMatrix = isDefaultMatrix(matrix);
+      var isOffset = fill._renderer && fill._renderer.offset
+        && stroke._renderer && stroke._renderer.offset;
+      var dashes = this.dashes;
+      var alignment = canvas.alignments[this._alignment] || this._alignment;
+      var baseline = this._baseline;
+
+      var a, b, c, d, e, sx, sy, x1, y1, x2, y2;
+
+      // mask = this._mask;
+      var clip = this._clip;
+
+      if (!forced && (!visible || clip)) {
+        return this;
+      }
+
+      // Transform
+      if (!defaultMatrix) {
+        ctx.save();
+        ctx.transform(matrix[0], matrix[3], matrix[1], matrix[4], matrix[2], matrix[5]);
+      }
+
+      // Commented two-way functionality of clips / masks with groups and
+      // polygons. Uncomment when this bug is fixed:
+      // https://code.google.com/p/chromium/issues/detail?id=370951
+
+      // if (mask) {
+      //   canvas[mask._renderer.type].render.call(mask, ctx, true);
+      // }
+
+      if (!isOffset) {
+        ctx.font = [this._style, this._weight, this._size + 'px/' +
+          this._leading + 'px', this._family].join(' ');
+      }
+
+      ctx.textAlign = alignment;
+      ctx.textBaseline = baseline;
+
+      // Styles
+      if (fill) {
+        if (typeof fill === 'string') {
+          ctx.fillStyle = fill;
+        } else {
+          canvas[fill._renderer.type].render.call(fill, ctx);
+          ctx.fillStyle = fill._renderer.effect;
+        }
+      }
+      if (stroke) {
+        if (typeof stroke === 'string') {
+          ctx.strokeStyle = stroke;
+        } else {
+          canvas[stroke._renderer.type].render.call(stroke, ctx);
+          ctx.strokeStyle = stroke._renderer.effect;
+        }
+        if (linewidth) {
+          ctx.lineWidth = linewidth;
+        }
+      }
+      if (typeof opacity === 'number') {
+        ctx.globalAlpha = opacity;
+      }
+      if (dashes && dashes.length > 0) {
+        ctx.lineDashOffset = dashes.offset || 0;
+        ctx.setLineDash(dashes);
+      }
+
+      if (!clip && !parentClipped) {
+
+        if (!canvas.isHidden.test(fill)) {
+
+          if (fill._renderer && fill._renderer.offset) {
+
+            sx = fill._renderer.scale.x;
+            sy = fill._renderer.scale.y;
+
+            ctx.save();
+            ctx.translate( - fill._renderer.offset.x,
+              - fill._renderer.offset.y);
+            ctx.scale(sx, sy);
+
+            a = this._size / fill._renderer.scale.y;
+            b = this._leading / fill._renderer.scale.y;
+            ctx.font = [this._style, this._weight, a + 'px/',
+              b + 'px', this._family].join(' ');
+
+            c = fill._renderer.offset.x / fill._renderer.scale.x;
+            d = fill._renderer.offset.y / fill._renderer.scale.y;
+
+            ctx.fillText(this.value, c, d);
+            ctx.restore();
+
+          } else {
+            ctx.fillText(this.value, 0, 0);
+          }
+
+        }
+
+        if (!canvas.isHidden.test(stroke)) {
+
+          if (stroke._renderer && stroke._renderer.offset) {
+
+            sx = stroke._renderer.scale.x;
+            sy = stroke._renderer.scale.y;
+
+            ctx.save();
+            ctx.translate(- stroke._renderer.offset.x,
+              - stroke._renderer.offset.y);
+            ctx.scale(sx, sy);
+
+            a = this._size / stroke._renderer.scale.y;
+            b = this._leading / stroke._renderer.scale.y;
+            ctx.font = [this._style, this._weight, a + 'px/',
+              b + 'px', this._family].join(' ');
+
+            c = stroke._renderer.offset.x / stroke._renderer.scale.x;
+            d = stroke._renderer.offset.y / stroke._renderer.scale.y;
+            e = linewidth / stroke._renderer.scale.x;
+
+            ctx.lineWidth = e;
+            ctx.strokeText(this.value, c, d);
+            ctx.restore();
+
+          } else {
+            ctx.strokeText(this.value, 0, 0);
+          }
+        }
+      }
+
+      // Handle text-decoration
+      if (/(underline|strikethrough)/i.test(decoration)) {
+
+        var metrics = ctx.measureText(this.value);
+        var scalar = 1;
+
+        switch (decoration) {
+          case 'underline':
+            y1 = metrics.actualBoundingBoxAscent;
+            y2 = metrics.actualBoundingBoxAscent;
+            break;
+          case 'strikethrough':
+            y1 = 0;
+            y2 = 0;
+            scalar = 0.5;
+            break;
+        }
+
+        switch (baseline) {
+          case 'top':
+            y1 += this._size * scalar;
+            y2 += this._size * scalar;
+            break;
+          case 'baseline':
+          case 'bottom':
+            y1 -= this._size * scalar;
+            y2 -= this._size * scalar;
+            break;
+        }
+
+        switch (alignment) {
+          case 'left':
+          case 'start':
+            x1 = 0;
+            x2 = metrics.width;
+            break;
+          case 'right':
+          case 'end':
+            x1 = - metrics.width;
+            x2 = 0;
+            break;
+          default:
+            x1 = - metrics.width / 2;
+            x2 = metrics.width / 2;
+        }
+
+        ctx.lineWidth = Math.max(Math.floor(this._size / 15), 1);
+        ctx.strokeStyle = ctx.fillStyle;
+
+        ctx.beginPath();
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(x2, y2);
+        ctx.stroke();
+
+      }
+
+      if (!defaultMatrix) {
+        ctx.restore();
+      }
+
+      // TODO: Test for text
+      if (clip && !parentClipped) {
+        ctx.clip();
+      }
+
+      if (dashes && dashes.length > 0) {
+        ctx.setLineDash(emptyArray);
+      }
+
+      return this.flagReset();
+
+    }
+
+  },
+
+  'linear-gradient': {
+
+    render: function(ctx) {
+
+      this._update();
+
+      if (!this._renderer.effect || this._flagEndPoints || this._flagStops) {
+
+        this._renderer.effect = ctx.createLinearGradient(
+          this.left._x, this.left._y,
+          this.right._x, this.right._y
+        );
+
+        for (var i = 0; i < this.stops.length; i++) {
+          var stop = this.stops[i];
+          this._renderer.effect.addColorStop(stop._offset, stop._color);
+        }
+
+      }
+
+      return this.flagReset();
+
+    }
+
+  },
+
+  'radial-gradient': {
+
+    render: function(ctx) {
+
+      this._update();
+
+      if (!this._renderer.effect || this._flagCenter || this._flagFocal
+          || this._flagRadius || this._flagStops) {
+
+        this._renderer.effect = ctx.createRadialGradient(
+          this.center._x, this.center._y, 0,
+          this.focal._x, this.focal._y, this._radius
+        );
+
+        for (var i = 0; i < this.stops.length; i++) {
+          var stop = this.stops[i];
+          this._renderer.effect.addColorStop(stop._offset, stop._color);
+        }
+
+      }
+
+      return this.flagReset();
+
+    }
+
+  },
+
+  texture: {
+
+    render: function(ctx) {
+
+      this._update();
+
+      var image = this.image;
+
+      if (!this._renderer.effect || ((this._flagLoaded || this._flagImage || this._flagVideo || this._flagRepeat) && this.loaded)) {
+        this._renderer.effect = ctx.createPattern(this.image, this._repeat);
+      }
+
+      if (this._flagOffset || this._flagLoaded || this._flagScale) {
+
+        if (!(this._renderer.offset instanceof Vector)) {
+          this._renderer.offset = new Vector();
+        }
+
+        this._renderer.offset.x = - this._offset.x;
+        this._renderer.offset.y = - this._offset.y;
+
+        if (image) {
+
+          this._renderer.offset.x += image.width / 2;
+          this._renderer.offset.y += image.height / 2;
+
+          if (this._scale instanceof Vector) {
+            this._renderer.offset.x *= this._scale.x;
+            this._renderer.offset.y *= this._scale.y;
+          } else {
+            this._renderer.offset.x *= this._scale;
+            this._renderer.offset.y *= this._scale;
+          }
+        }
+
+      }
+
+      if (this._flagScale || this._flagLoaded) {
+
+        if (!(this._renderer.scale instanceof Vector)) {
+          this._renderer.scale = new Vector();
+        }
+
+        if (this._scale instanceof Vector) {
+          this._renderer.scale.copy(this._scale);
+        } else {
+          this._renderer.scale.set(this._scale, this._scale);
+        }
+
+      }
+
+      return this.flagReset();
+
+    }
+
+  },
+
+  renderSvgArcCommand: function(ctx, ax, ay, rx, ry, largeArcFlag, sweepFlag, xAxisRotation, x, y) {
+
+    xAxisRotation = xAxisRotation * Math.PI / 180;
+
+    // Ensure radii are positive
+    rx = abs(rx);
+    ry = abs(ry);
+
+    // Compute (x1′, y1′)
+    var dx2 = (ax - x) / 2.0;
+    var dy2 = (ay - y) / 2.0;
+    var x1p = cos$1(xAxisRotation) * dx2 + sin$1(xAxisRotation) * dy2;
+    var y1p = - sin$1(xAxisRotation) * dx2 + cos$1(xAxisRotation) * dy2;
+
+    // Compute (cx′, cy′)
+    var rxs = rx * rx;
+    var rys = ry * ry;
+    var x1ps = x1p * x1p;
+    var y1ps = y1p * y1p;
+
+    // Ensure radii are large enough
+    var cr = x1ps / rxs + y1ps / rys;
+
+    if (cr > 1) {
+
+      // scale up rx,ry equally so cr == 1
+      var s = sqrt(cr);
+      rx = s * rx;
+      ry = s * ry;
+      rxs = rx * rx;
+      rys = ry * ry;
+
+    }
+
+    var dq = (rxs * y1ps + rys * x1ps);
+    var pq = (rxs * rys - dq) / dq;
+    var q = sqrt(max$1(0, pq));
+    if (largeArcFlag === sweepFlag) q = - q;
+    var cxp = q * rx * y1p / ry;
+    var cyp = - q * ry * x1p / rx;
+
+    // Step 3: Compute (cx, cy) from (cx′, cy′)
+    var cx = cos$1(xAxisRotation) * cxp
+      - sin$1(xAxisRotation) * cyp + (ax + x) / 2;
+    var cy = sin$1(xAxisRotation) * cxp
+      + cos$1(xAxisRotation) * cyp + (ay + y) / 2;
+
+    // Step 4: Compute θ1 and Δθ
+    var startAngle = svgAngle(1, 0, (x1p - cxp) / rx, (y1p - cyp) / ry);
+    var delta = svgAngle((x1p - cxp) / rx, (y1p - cyp) / ry,
+      (- x1p - cxp) / rx, (- y1p - cyp) / ry) % TWO_PI;
+
+    var endAngle = startAngle + delta;
+
+    var clockwise = sweepFlag === 0;
+
+    renderArcEstimate(ctx, cx, cy, rx, ry, startAngle, endAngle,
+      clockwise, xAxisRotation);
+
+  }
+
+};
+
+/**
+ * @name Two.CanvasRenderer
+ * @class
+ * @extends Two.Events
+ * @param {Object} [parameters] - This object is inherited when constructing a new instance of {@link Two}.
+ * @param {Element} [parameters.domElement] - The `<canvas />` to draw to. If none given a new one will be constructed.
+ * @param {Boolean} [parameters.overdraw] - Determines whether the canvas should clear the background or not. Defaults to `true`.
+ * @param {Boolean} [parameters.smoothing=true] - Determines whether the canvas should antialias drawing. Set it to `false` when working with pixel art. `false` can lead to better performance, since it would use a cheaper interpolation algorithm.
+ * @description This class is used by {@link Two} when constructing with `type` of `Two.Types.canvas`. It takes Two.js' scenegraph and renders it to a `<canvas />`.
+ */
+var Renderer = function(params) {
+
+  // It might not make a big difference on GPU backed canvases.
+  var smoothing = (params.smoothing !== false);
+
+  /**
+   * @name Two.CanvasRenderer#domElement
+   * @property {Element} - The `<canvas />` associated with the Two.js scene.
+   */
+  this.domElement = params.domElement || document.createElement('canvas');
+
+  /**
+   * @name Two.CanvasRenderer#ctx
+   * @property {Canvas2DContext} - Associated two dimensional context to render on the `<canvas />`.
+   */
+  this.ctx = this.domElement.getContext('2d');
+
+  /**
+   * @name Two.CanvasRenderer#overdraw
+   * @property {Boolean} - Determines whether the canvas clears the background each draw call.
+   * @default true
+   */
+  this.overdraw = params.overdraw || false;
+
+  if (typeof this.ctx.imageSmoothingEnabled !== 'undefined') {
+    this.ctx.imageSmoothingEnabled = smoothing;
+  }
+
+  /**
+   * @name Two.CanvasRenderer#scene
+   * @property {Two.Group} - The root group of the scenegraph.
+   */
+  this.scene = new Group();
+  this.scene.parent = this;
+};
+
+
+_.extend(Renderer, {
+
+  /**
+   * @name Two.CanvasRenderer.Utils
+   * @property {Object} - A massive object filled with utility functions and properties to render Two.js objects to a `<canvas />`.
+   */
+  Utils: canvas
+
+});
+
+_.extend(Renderer.prototype, Events, {
+
+  constructor: Renderer,
+
+  /**
+   * @name Two.CanvasRenderer#setSize
+   * @function
+   * @fires resize
+   * @param {Number} width - The new width of the renderer.
+   * @param {Number} height - The new height of the renderer.
+   * @param {Number} [ratio] - The new pixel ratio (pixel density) of the renderer. Defaults to calculate the pixel density of the user's screen.
+   * @description Change the size of the renderer.
+   */
+  setSize: function(width, height, ratio) {
+
+    this.width = width;
+    this.height = height;
+
+    this.ratio = typeof ratio === 'undefined' ? getRatio(this.ctx) : ratio;
+
+    this.domElement.width = width * this.ratio;
+    this.domElement.height = height * this.ratio;
+
+    if (this.domElement.style) {
+      _.extend(this.domElement.style, {
+        width: width + 'px',
+        height: height + 'px'
+      });
+    }
+
+    return this.trigger(Events.Types.resize, width, height, ratio);
+
+  },
+
+  /**
+   * @name Two.CanvasRenderer#render
+   * @function
+   * @description Render the current scene to the `<canvas />`.
+   */
+  render: function() {
+
+    var isOne = this.ratio === 1;
+
+    if (!isOne) {
+      this.ctx.save();
+      this.ctx.scale(this.ratio, this.ratio);
+    }
+
+    if (!this.overdraw) {
+      this.ctx.clearRect(0, 0, this.width, this.height);
+    }
+
+    canvas.group.render.call(this.scene, this.ctx);
+
+    if (!isOne) {
+      this.ctx.restore();
+    }
+
+    return this;
+
+  }
+
+});
+
+function renderArcEstimate(ctx, ox, oy, rx, ry, startAngle, endAngle, clockwise, xAxisRotation) {
+
+  var epsilon = Curve.Tolerance.epsilon;
+  var deltaAngle = endAngle - startAngle;
+  var samePoints = Math.abs(deltaAngle) < epsilon;
+
+  // ensures that deltaAngle is 0 .. 2 PI
+  deltaAngle = mod(deltaAngle, TWO_PI);
+
+  if (deltaAngle < epsilon) {
+
+    if (samePoints) {
+
+      deltaAngle = 0;
+
+    } else {
+
+      deltaAngle = TWO_PI;
+
+    }
+
+  }
+
+  if (clockwise === true && ! samePoints) {
+
+    if (deltaAngle === TWO_PI) {
+
+      deltaAngle = - TWO_PI;
+
+    } else {
+
+      deltaAngle = deltaAngle - TWO_PI;
+
+    }
+
+  }
+
+  for (var i = 0; i < Constants.Resolution; i++) {
+
+    var t = i / (Constants.Resolution - 1);
+
+    var angle = startAngle + t * deltaAngle;
+    var x = ox + rx * Math.cos(angle);
+    var y = oy + ry * Math.sin(angle);
+
+    if (xAxisRotation !== 0) {
+
+      var cos = Math.cos(xAxisRotation);
+      var sin = Math.sin(xAxisRotation);
+
+      var tx = x - ox;
+      var ty = y - oy;
+
+      // Rotate the point about the center of the ellipse.
+      x = tx * cos - ty * sin + ox;
+      y = tx * sin + ty * cos + oy;
+
+    }
+
+    ctx.lineTo(x, y);
+
+  }
+
+}
+
+function svgAngle(ux, uy, vx, vy) {
+
+  var dot = ux * vx + uy * vy;
+  var len = sqrt(ux * ux + uy * uy) *  sqrt(vx * vx + vy * vy);
+  // floating point precision, slightly over values appear
+  var ang = acos(max$1(-1, min$1(1, dot / len)));
+  if ((ux * vy - uy * vx) < 0) {
+    ang = - ang;
+  }
+
+  return ang;
+
+}
+
+var CanvasShim = {
+
+  Image: null,
+
+  isHeadless: false,
+
+  /**
+   * @name Utils.shim
+   * @function
+   * @param {canvas} canvas - The instanced `Canvas` object provided by `node-canvas`.
+   * @param {Image} [Image] - The prototypical `Image` object provided by `node-canvas`. This is only necessary to pass if you're going to load bitmap imagery.
+   * @returns {canvas} Returns the instanced canvas object you passed from with additional attributes needed for Two.js.
+   * @description Convenience method for defining all the dependencies from the npm package `node-canvas`. See [node-canvas](https://github.com/Automattic/node-canvas) for additional information on setting up HTML5 `<canvas />` drawing in a node.js environment.
+   */
+  shim: function(canvas, Image) {
+    Renderer.Utils.shim(canvas);
+    if (typeof Image !== 'undefined') {
+      CanvasShim.Image = Image;
+    }
+    CanvasShim.isHeadless = true;
+    return canvas;
+  }
+
+};
+
+var dom = {
+
+  temp: (root$1.document ? root$1.document.createElement('div') : {}),
+
+  hasEventListeners: typeof root$1.addEventListener === 'function',
+
+  bind: function(elem, event, func, bool) {
+    if (this.hasEventListeners) {
+      elem.addEventListener(event, func, !!bool);
+    } else {
+      elem.attachEvent('on' + event, func);
+    }
+    return dom;
+  },
+
+  unbind: function(elem, event, func, bool) {
+    if (dom.hasEventListeners) {
+      elem.removeEventListeners(event, func, !!bool);
+    } else {
+      elem.detachEvent('on' + event, func);
+    }
+    return dom;
+  },
+
+  getRequestAnimationFrame: function() {
+
+    var lastTime = 0;
+    var vendors = ['ms', 'moz', 'webkit', 'o'];
+    var request = root$1.requestAnimationFrame, cancel;
+
+    if(!request) {
+      for (var i = 0; i < vendors.length; i++) {
+        request = root$1[vendors[i] + 'RequestAnimationFrame'] || request;
+        cancel = root$1[vendors[i] + 'CancelAnimationFrame']
+          || root$1[vendors[i] + 'CancelRequestAnimationFrame'] || cancel;
+      }
+
+      request = request || function(callback, element) {
+        var currTime = new Date().getTime();
+        var timeToCall = Math.max(0, 16 - (currTime - lastTime));
+        var id = root$1.setTimeout(function() { callback(currTime + timeToCall); }, timeToCall);
+        lastTime = currTime + timeToCall;
+        return id;
+      };
+    }
+
+    return request;
+
+  }
+
+};
+
+/**
+ * @name Utils.Error
+ * @class
+ * @description Custom error throwing for Two.js specific identification.
+ */
+var TwoError = function(message) {
+  this.name = 'Two.js';
+  this.message = message;
+};
+
+
+TwoError.prototype = new Error();
+TwoError.prototype.constructor = TwoError;
+
+/**
+ * @name Utils.defineGetterSetter
+ * @function
+ * @this Two#
+ * @param {String} property - The property to add an enumerable getter / setter to.
+ * @description Convenience function to setup the flag based getter / setter that most properties are defined as in Two.js.
+ */
+var defineGetterSetter = function(property) {
+
+  var object = this;
+  var secret = '_' + property;
+  var flag = '_flag' + property.charAt(0).toUpperCase() + property.slice(1);
+
+  Object.defineProperty(object, property, {
+    enumerable: true,
+    get: function() {
+      return this[secret];
+    },
+    set: function(v) {
+      this[secret] = v;
+      this[flag] = true;
+    }
+  });
+
+};
+
+/**
+ * @name Two.Registry
+ * @class
+ * @description An arbitrary class to manage a directory of things. Mainly used for keeping tabs of textures in Two.js.
+ */
+var Registry = function() {
+
+  this.map = {};
+
+};
+
+_.extend(Registry.prototype, {
+
+  constructor: Registry,
+
+  /**
+   * @name Two.Registry#add
+   * @function
+   * @param {String} id - A unique identifier.
+   * @param value - Any type of variable to be registered to the directory.
+   * @description Adds any value to the directory. Assigned by the `id`.
+   */
+  add: function(id, obj) {
+    this.map[id] = obj;
+    return this;
+  },
+
+  /**
+   * @name Two.Registry#remove
+   * @function
+   * @param {String} id - A unique identifier.
+   * @description Remove any value from the directory by its `id`.
+   */
+  remove: function(id) {
+    delete this.map[id];
+    return this;
+  },
+
+  /**
+   * @name Two.Registry#get
+   * @function
+   * @param {String} id - A unique identifier.
+   * @returns The associated value. If unavailable then `undefined` is returned.
+   * @description Get a registered value by its `id`.
+   */
+  get: function(id) {
+    return this.map[id];
+  },
+
+  /**
+   * @name Two.Registry#contains
+   * @function
+   * @param {String} id - A unique identifier.
+   * @returns {Boolean}
+   * @description Convenience method to see if a value is registered to an `id` already.
+   */
+  contains: function(id) {
+    return id in this.map;
+  }
+
+});
+
+/**
+ * @name Two.Stop
+ * @class
+ * @param {Number} [offset] - The offset percentage of the stop represented as a zero-to-one value. Default value flip flops from zero-to-one as new stops are created.
+ * @param {CssColor} [color] - The color of the stop. Default value flip flops from white to black as new stops are created.
+ * @param {Number} [opacity] - The opacity value. Default value is 1, cannot be lower than 0.
+ * @nota-bene Used specifically in conjunction with {@link Two.Gradient}s to control color graduation.
+ */
+var Stop = function(offset, color, opacity) {
+
+  /**
+   * @name Two.Stop#_renderer
+   * @property {Object}
+   * @private
+   * @description A private object to store relevant renderer specific variables.
+   * @nota-bene With the {@link Two.SvgRenderer} you can access the underlying SVG element created via `stop._renderer.elem`.
+   */
+  this._renderer = {};
+  this._renderer.type = 'stop';
+
+  /**
+   * @name Two.Stop#offset
+   * @property {Number} - The offset percentage of the stop represented as a zero-to-one value.
+   */
+  this.offset = typeof offset === 'number' ? offset
+    : Stop.Index <= 0 ? 0 : 1;
+
+  /**
+   * @name Two.Stop#opacity
+   * @property {Number} - The alpha percentage of the stop represented as a zero-to-one value.
+   */
+  this.opacity = typeof opacity === 'number' ? opacity : 1;
+
+  /**
+   * @name Two.Stop#color
+   * @property {CssColor} - The color of the stop.
+   */
+  this.color = (typeof color === 'string') ? color
+    : Stop.Index <= 0 ? '#fff' : '#000';
+
+  Stop.Index = (Stop.Index + 1) % 2;
+
+};
+
+_.extend(Stop, {
+
+  /**
+   * @name Two.Stop.Index
+   * @property {Number} - The current index being referenced for calculating a stop's default offset value.
+   */
+  Index: 0,
+
+  /**
+   * @name Two.Stop.Properties
+   * @property {String[]} - A list of properties that are on every {@link Two.Stop}.
+   */
+  Properties: [
+    'offset',
+    'opacity',
+    'color'
+  ],
+
+  /**
+   * @name Two.Stop.MakeObservable
+   * @function
+   * @param {Object} object - The object to make observable.
+   * @description Convenience function to apply observable qualities of a {@link Two.Stop} to any object. Handy if you'd like to extend the {@link Two.Stop} class on a custom class.
+   */
+  MakeObservable: function(object) {
+
+    _.each(Stop.Properties, function(property) {
+
+      var object = this;
+      var secret = '_' + property;
+      var flag = '_flag' + property.charAt(0).toUpperCase() + property.slice(1);
+
+      Object.defineProperty(object, property, {
+        enumerable: true,
+        get: function() {
+          return this[secret];
+        },
+        set: function(v) {
+          this[secret] = v;
+          this[flag] = true;
+          if (this.parent) {
+            this.parent._flagStops = true;
+          }
+        }
+      });
+
+    }, object);
+
+  }
+
+});
+
+_.extend(Stop.prototype, Events, {
+
+  constructor: Stop,
+
+  /**
+   * @name Two.Stop#clone
+   * @function
+   * @param {Two.Group} [parent] - The parent group or scene to add the clone to.
+   * @returns {Two.Stop}
+   * @description Create a new instance of {@link Two.Stop} with the same properties of the current path.
+   */
+  clone: function() {
+
+    var clone = new Stop();
+
+    _.each(Stop.Properties, function(property) {
+      clone[property] = this[property];
+    }, this);
+
+    return clone;
+
+  },
+
+  /**
+   * @name Two.Stop#toObject
+   * @function
+   * @returns {Object}
+   * @description Return a JSON compatible plain object that represents the path.
+   */
+  toObject: function() {
+
+    var result = {};
+
+    _.each(Stop.Properties, function(k) {
+      result[k] = this[k];
+    }, this);
+
+    return result;
+
+  },
+
+  /**
+   * @name Two.Stop#flagReset
+   * @function
+   * @private
+   * @description Called internally to reset all flags. Ensures that only properties that change are updated before being sent to the renderer.
+   */
+  flagReset: function() {
+
+    this._flagOffset = this._flagColor = this._flagOpacity = false;
+
+    return this;
+
+  }
+
+});
+
+Stop.MakeObservable(Stop.prototype);
+Stop.prototype.constructor = Stop;
+
+/**
+ * @name Two.Gradient
+ * @class
+ * @param {Two.Stop[]} [stops] - A list of {@link Two.Stop}s that contain the gradient fill pattern for the gradient.
+ * @description This is the base class for constructing different types of gradients with Two.js. The two common gradients are {@link Two.LinearGradient} and {@link Two.RadialGradient}.
+ */
+var Gradient = function(stops) {
+
+  /**
+   * @name Two.Gradient#_renderer
+   * @property {Object}
+   * @private
+   * @description A private object to store relevant renderer specific variables.
+   * @nota-bene With the {@link Two.SvgRenderer} you can access the underlying SVG element created via `gradient._renderer.elem`.
+   */
+  this._renderer = {};
+  this._renderer.type = 'gradient';
+
+  /**
+   * @name Two.Gradient#id
+   * @property {String} - Session specific unique identifier.
+   * @nota-bene In the {@link Two.SvgRenderer} change this to change the underlying SVG element's id too.
+   */
+  this.id = Constants.Identifier + Constants.uniqueId();
+  this.classList = [];
+
+  this._renderer.flagStops = Gradient.FlagStops.bind(this);
+  this._renderer.bindStops = Gradient.BindStops.bind(this);
+  this._renderer.unbindStops = Gradient.UnbindStops.bind(this);
+
+  /**
+   * @name Two.Gradient#spread
+   * @property {String} - Indicates what happens if the gradient starts or ends inside the bounds of the target rectangle. Possible values are `'pad'`, `'reflect'`, and `'repeat'`.
+   * @see {@link https://www.w3.org/TR/SVG11/pservers.html#LinearGradientElementSpreadMethodAttribute} for more information
+   */
+  this.spread = 'pad';
+
+  /**
+   * @name Two.Gradient#stops
+   * @property {Two.Stop[]} - An ordered list of {@link Two.Stop}s for rendering the gradient.
+   */
+  this.stops = stops;
+
+};
+
+_.extend(Gradient, {
+
+  /**
+   * @name Two.Gradient#Stop
+   * @see {@link Two.Stop}
+   */
+  Stop: Stop,
+
+  /**
+   * @name Two.Gradient.Properties
+   * @property {String[]} - A list of properties that are on every {@link Two.Gradient}.
+   */
+  Properties: [
+    'spread'
+  ],
+
+  /**
+   * @name Two.Gradient.MakeObservable
+   * @function
+   * @param {Object} object - The object to make observable.
+   * @description Convenience function to apply observable qualities of a {@link Two.Gradient} to any object. Handy if you'd like to extend the {@link Two.Gradient} class on a custom class.
+   */
+  MakeObservable: function(object) {
+
+    _.each(Gradient.Properties, defineGetterSetter, object);
+
+    Object.defineProperty(object, 'stops', {
+
+      enumerable: true,
+
+      get: function() {
+        return this._stops;
+      },
+
+      set: function(stops) {
+
+        var updateStops = this._renderer.flagStops;
+        var bindStops = this._renderer.bindStops;
+        var unbindStops = this._renderer.unbindStops;
+
+        // Remove previous listeners
+        if (this._stops) {
+          this._stops
+            .unbind(Events.Types.insert, bindStops)
+            .unbind(Events.Types.remove, unbindStops);
+        }
+
+        // Create new Collection with copy of Stops
+        this._stops = new Collection((stops || []).slice(0));
+
+        // Listen for Collection changes and bind / unbind
+        this._stops
+          .bind(Events.Types.insert, bindStops)
+          .bind(Events.Types.remove, unbindStops);
+
+        // Bind Initial Stops
+        bindStops(this._stops);
+
+      }
+
+    });
+
+  },
+
+  /**
+   * @name Two.Gradient.FlagStops
+   * @function
+   * @description Cached method to let renderers know stops have been updated on a {@link Two.Gradient}.
+   */
+  FlagStops: function() {
+    this._flagStops = true;
+  },
+
+  /**
+   * @name Two.Gradient.BindVertices
+   * @function
+   * @description Cached method to let {@link Two.Gradient} know vertices have been added to the instance.
+   */
+  BindStops: function(items) {
+
+    // This function is called a lot
+    // when importing a large SVG
+    var i = items.length;
+    while(i--) {
+      items[i].bind(Events.Types.change, this._renderer.flagStops);
+      items[i].parent = this;
+    }
+
+    this._renderer.flagStops();
+
+  },
+
+  /**
+   * @name Two.Gradient.UnbindStops
+   * @function
+   * @description Cached method to let {@link Two.Gradient} know vertices have been removed from the instance.
+   */
+  UnbindStops: function(items) {
+
+    var i = items.length;
+    while(i--) {
+      items[i].unbind(Events.Types.change, this._renderer.flagStops);
+      delete items[i].parent;
+    }
+
+    this._renderer.flagStops();
+
+  }
+
+});
+
+_.extend(Gradient.prototype, Events, {
+
+  /**
+   * @name Two.Gradient#_flagStops
+   * @private
+   * @property {Boolean} - Determines whether the {@link Two.Gradient#stops} need updating.
+   */
+  _flagStops: false,
+  /**
+   * @name Two.Gradient#_flagSpread
+   * @private
+   * @property {Boolean} - Determines whether the {@link Two.Gradient#spread} need updating.
+   */
+  _flagSpread: false,
+
+  /**
+   * @name Two.Gradient#clone
+   * @function
+   * @param {Two.Group} [parent] - The parent group or scene to add the clone to.
+   * @returns {Two.Gradient}
+   * @description Create a new instance of {@link Two.Gradient} with the same properties of the current path.
+   */
+  clone: function(parent) {
+
+    var stops = this.stops.map(function(s) {
+      return s.clone();
+    });
+
+    var clone = new Gradient(stops);
+
+    _.each(Gradient.Properties, function(k) {
+      clone[k] = this[k];
+    }, this);
+
+    if (parent) {
+      parent.add(clone);
+    }
+
+    return clone;
+
+  },
+
+  /**
+   * @name Two.Gradient#toObject
+   * @function
+   * @returns {Object}
+   * @description Return a JSON compatible plain object that represents the path.
+   */
+  toObject: function() {
+
+    var result = {
+      stops: this.stops.map(function(s) {
+        return s.toObject();
+      })
+    };
+
+    _.each(Gradient.Properties, function(k) {
+      result[k] = this[k];
+    }, this);
+
+    return result;
+
+  },
+
+  /**
+   * @name Two.Gradient#_update
+   * @function
+   * @private
+   * @param {Boolean} [bubbles=false] - Force the parent to `_update` as well.
+   * @description This is called before rendering happens by the renderer. This applies all changes necessary so that rendering is up-to-date but not updated more than it needs to be.
+   * @nota-bene Try not to call this method more than once a frame.
+   */
+  _update: function() {
+
+    if (this._flagSpread || this._flagStops) {
+      this.trigger(Events.Types.change);
+    }
+
+    return this;
+
+  },
+
+  /**
+   * @name Two.Gradient#flagReset
+   * @function
+   * @private
+   * @description Called internally to reset all flags. Ensures that only properties that change are updated before being sent to the renderer.
+   */
+  flagReset: function() {
+
+    this._flagSpread = this._flagStops = false;
+
+    return this;
+
+  }
+
+});
+
+Gradient.MakeObservable(Gradient.prototype);
+
+/**
+ * @name Two.LinearGradient
+ * @class
+ * @extends Two.Gradient
+ * @param {Number} [x1=0] - The x position of the first end point of the linear gradient.
+ * @param {Number} [y1=0] - The y position of the first end point of the linear gradient.
+ * @param {Number} [x2=0] - The x position of the second end point of the linear gradient.
+ * @param {Number} [y2=0] - The y position of the second end point of the linear gradient.
+ * @param {Two.Stop[]} [stops] - A list of {@link Two.Stop}s that contain the gradient fill pattern for the gradient.
+ * @nota-bene The linear gradient lives within the space of the parent object's matrix space.
+ */
+var LinearGradient = function(x1, y1, x2, y2, stops) {
+
+  Gradient.call(this, stops);
+
+  this._renderer.type = 'linear-gradient';
+
+  var flagEndPoints = LinearGradient.FlagEndPoints.bind(this);
+
+  /**
+   * @name Two.LinearGradient#left
+   * @property {Two.Vector} - The x and y value for where the first end point is placed on the canvas.
+   */
+  this.left = new Vector().bind(Events.Types.change, flagEndPoints);
+  /**
+   * @name Two.LinearGradient#right
+   * @property {Two.Vector} - The x and y value for where the second end point is placed on the canvas.
+   */
+  this.right = new Vector().bind(Events.Types.change, flagEndPoints);
+
+  if (typeof x1 === 'number') {
+    this.left.x = x1;
+  }
+  if (typeof y1 === 'number') {
+    this.left.y = y1;
+  }
+  if (typeof x2 === 'number') {
+    this.right.x = x2;
+  }
+  if (typeof y2 === 'number') {
+    this.right.y = y2;
+  }
+
+};
+
+_.extend(LinearGradient, {
+
+  /**
+   * @name Two.LinearGradient#Stop
+   * @see {@link Two.Stop}
+   */
+  Stop: Stop,
+
+  /**
+   * @name Two.LinearGradient.MakeObservable
+   * @function
+   * @param {Object} object - The object to make observable.
+   * @description Convenience function to apply observable qualities of a {@link Two.LinearGradient} to any object. Handy if you'd like to extend the {@link Two.LinearGradient} class on a custom class.
+   */
+  MakeObservable: function(object) {
+    Gradient.MakeObservable(object);
+  },
+
+  /**
+   * @name Two.LinearGradient.FlagEndPoints
+   * @function
+   * @description Cached method to let renderers know end points have been updated on a {@link Two.LinearGradient}.
+   */
+  FlagEndPoints: function() {
+    this._flagEndPoints = true;
+  }
+
+});
+
+_.extend(LinearGradient.prototype, Gradient.prototype, {
+
+  /**
+   * @name Two.LinearGradient#_flagEndPoints
+   * @private
+   * @property {Boolean} - Determines whether the {@link Two.LinearGradient#left} or {@link Two.LinearGradient#right} changed and needs to update.
+   */
+  _flagEndPoints: false,
+
+  constructor: LinearGradient,
+
+  /**
+   * @name Two.LinearGradient#clone
+   * @function
+   * @param {Two.Group} [parent] - The parent group or scene to add the clone to.
+   * @returns {Two.Gradient}
+   * @description Create a new instance of {@link Two.LinearGradient} with the same properties of the current path.
+   */
+  clone: function(parent) {
+
+    var stops = this.stops.map(function(stop) {
+      return stop.clone();
+    });
+
+    var clone = new LinearGradient(this.left._x, this.left._y,
+      this.right._x, this.right._y, stops);
+
+    _.each(Gradient.Properties, function(k) {
+      clone[k] = this[k];
+    }, this);
+
+    if (parent) {
+      parent.add(clone);
+    }
+
+    return clone;
+
+  },
+
+  /**
+   * @name Two.LinearGradient#toObject
+   * @function
+   * @returns {Object}
+   * @description Return a JSON compatible plain object that represents the path.
+   */
+  toObject: function() {
+
+    var result = Gradient.prototype.toObject.call(this);
+
+    result.left = this.left.toObject();
+    result.right = this.right.toObject();
+
+    return result;
+
+  },
+
+  /**
+   * @name Two.LinearGradient#_update
+   * @function
+   * @private
+   * @param {Boolean} [bubbles=false] - Force the parent to `_update` as well.
+   * @description This is called before rendering happens by the renderer. This applies all changes necessary so that rendering is up-to-date but not updated more than it needs to be.
+   * @nota-bene Try not to call this method more than once a frame.
+   */
+  _update: function() {
+
+    if (this._flagEndPoints || this._flagSpread || this._flagStops) {
+      this.trigger(Events.Types.change);
+    }
+
+    return this;
+
+  },
+
+  /**
+   * @name Two.LinearGradient#flagReset
+   * @function
+   * @private
+   * @description Called internally to reset all flags. Ensures that only properties that change are updated before being sent to the renderer.
+   */
+  flagReset: function() {
+
+    this._flagEndPoints = false;
+
+    Gradient.prototype.flagReset.call(this);
+
+    return this;
+
+  }
+
+});
+
+LinearGradient.MakeObservable(LinearGradient.prototype);
+
+/**
+ * @name Two.RadialGradient
+ * @class
+ * @extends Two.Gradient
+ * @param {Number} [x=0] - The x position of the origin of the radial gradient.
+ * @param {Number} [y=0] - The y position of the origin of the radial gradient.
+ * @param {Number} [radius=0] - The radius of the radial gradient.
+ * @param {Two.Stop[]} [stops] - A list of {@link Two.Stop}s that contain the gradient fill pattern for the gradient.
+ * @param {Number} [focalX=0] - The x position of the focal point on the radial gradient.
+ * @param {Number} [focalY=0] - The y position of the focal point on the radial gradient.
+ * @nota-bene The radial gradient lives within the space of the parent object's matrix space.
+ */
+var RadialGradient = function(cx, cy, r, stops, fx, fy) {
+
+  Gradient.call(this, stops);
+
+  this._renderer.type = 'radial-gradient';
+
+  /**
+   * @name Two.RadialGradient#center
+   * @property {Two.Vector} - The x and y value for where the origin of the radial gradient is.
+   */
+  this.center = new Vector()
+    .bind(Events.Types.change, (function() {
+      this._flagCenter = true;
+    }).bind(this));
+
+  this.radius = typeof r === 'number' ? r : 20;
+
+  /**
+   * @name Two.RadialGradient#focal
+   * @property {Two.Vector} - The x and y value for where the focal point of the radial gradient is.
+   * @nota-bene This effects the spray or spread of the radial gradient.
+   */
+  this.focal = new Vector()
+    .bind(Events.Types.change, (function() {
+      this._flagFocal = true;
+    }).bind(this));
+
+  if (typeof cx === 'number') {
+    this.center.x = cx;
+  }
+  if (typeof cy === 'number') {
+    this.center.y = cy;
+  }
+
+  this.focal.copy(this.center);
+
+  if (typeof fx === 'number') {
+    this.focal.x = fx;
+  }
+  if (typeof fy === 'number') {
+    this.focal.y = fy;
+  }
+
+};
+
+_.extend(RadialGradient, {
+
+  /**
+   * @name Two.RadialGradient#Stop
+   * @see {@link Two.Stop}
+   */
+  Stop: Stop,
+
+  /**
+   * @name Two.RadialGradient.Properties
+   * @property {String[]} - A list of properties that are on every {@link Two.RadialGradient}.
+   */
+  Properties: [
+    'radius'
+  ],
+
+  /**
+   * @name Two.RadialGradient.MakeObservable
+   * @function
+   * @param {Object} object - The object to make observable.
+   * @description Convenience function to apply observable qualities of a {@link Two.RadialGradient} to any object. Handy if you'd like to extend the {@link Two.RadialGradient} class on a custom class.
+   */
+  MakeObservable: function(object) {
+
+    Gradient.MakeObservable(object);
+
+    _.each(RadialGradient.Properties, defineGetterSetter, object);
+
+  }
+
+});
+
+_.extend(RadialGradient.prototype, Gradient.prototype, {
+
+  /**
+   * @name Two.RadialGradient#_flagRadius
+   * @private
+   * @property {Boolean} - Determines whether the {@link Two.RadialGradient#radius} changed and needs to update.
+   */
+  _flagRadius: false,
+  /**
+   * @name Two.RadialGradient#_flagCenter
+   * @private
+   * @property {Boolean} - Determines whether the {@link Two.RadialGradient#center} changed and needs to update.
+   */
+  _flagCenter: false,
+  /**
+   * @name Two.RadialGradient#_flagFocal
+   * @private
+   * @property {Boolean} - Determines whether the {@link Two.RadialGradient#focal} changed and needs to update.
+   */
+  _flagFocal: false,
+
+  constructor: RadialGradient,
+
+  /**
+   * @name Two.RadialGradient#clone
+   * @function
+   * @param {Two.Group} [parent] - The parent group or scene to add the clone to.
+   * @returns {Two.Gradient}
+   * @description Create a new instance of {@link Two.RadialGradient} with the same properties of the current path.
+   */
+  clone: function(parent) {
+
+    var stops = this.stops.map(function(stop) {
+      return stop.clone();
+    });
+
+    var clone = new RadialGradient(this.center._x, this.center._y,
+        this._radius, stops, this.focal._x, this.focal._y);
+
+    _.each(Gradient.Properties.concat(RadialGradient.Properties), function(k) {
+      clone[k] = this[k];
+    }, this);
+
+    if (parent) {
+      parent.add(clone);
+    }
+
+    return clone;
+
+  },
+
+  /**
+   * @name Two.RadialGradient#toObject
+   * @function
+   * @returns {Object}
+   * @description Return a JSON compatible plain object that represents the path.
+   */
+  toObject: function() {
+
+    var result = Gradient.prototype.toObject.call(this);
+
+    _.each(RadialGradient.Properties, function(k) {
+      result[k] = this[k];
+    }, this);
+
+    result.center = this.center.toObject();
+    result.focal = this.focal.toObject();
+
+    return result;
+
+  },
+
+  /**
+   * @name Two.RadialGradient#_update
+   * @function
+   * @private
+   * @param {Boolean} [bubbles=false] - Force the parent to `_update` as well.
+   * @description This is called before rendering happens by the renderer. This applies all changes necessary so that rendering is up-to-date but not updated more than it needs to be.
+   * @nota-bene Try not to call this method more than once a frame.
+   */
+  _update: function() {
+
+    if (this._flagRadius || this._flatCenter || this._flagFocal
+      || this._flagSpread || this._flagStops) {
+      this.trigger(Events.Types.change);
+    }
+
+    return this;
+
+  },
+
+  /**
+   * @name Two.RadialGradient#flagReset
+   * @function
+   * @private
+   * @description Called internally to reset all flags. Ensures that only properties that change are updated before being sent to the renderer.
+   */
+  flagReset: function() {
+
+    this._flagRadius = this._flagCenter = this._flagFocal = false;
+
+    Gradient.prototype.flagReset.call(this);
+
+    return this;
+
+  }
+
+});
+
+RadialGradient.MakeObservable(RadialGradient.prototype);
+
+var anchor;
+var regex = {
+  video: /\.(mp4|webm|ogg)$/i,
+  image: /\.(jpe?g|png|gif|tiff|webp)$/i,
+  effect: /texture|gradient/i
+};
+
+if (root$1.document) {
+  anchor = document.createElement('a');
+}
+
+/**
+ * @name Two.Texture
+ * @class
+ * @extends Two.Shape
+ * @param {String|ImageElement} [src] - The URL path to an image file or an `<img />` element.
+ * @param {Function} [callback] - An optional callback function once the image has been loaded.
+ * @description Fundamental to work with bitmap data, a.k.a. pregenerated imagery, in Two.js. Supported formats include jpg, png, gif, and tiff. See {@link Two.Texture.RegularExpressions} for a full list of supported formats.
+ */
+var Texture = function(src, callback) {
+
+  this._renderer = {};
+  this._renderer.type = 'texture';
+  this._renderer.flagOffset = Texture.FlagOffset.bind(this);
+  this._renderer.flagScale = Texture.FlagScale.bind(this);
+
+  this.id = Constants.Identifier + Constants.uniqueId();
+  this.classList = [];
+
+  /**
+   * @name Two.Texture#loaded
+   * @property {Boolean} - Shorthand value to determine if image has been loaded into the texture.
+   */
+  this.loaded = false;
+
+  /**
+   * @name Two.Texture#repeat
+   * @property {String} - CSS style declaration to tile {@link Two.Path}. Valid values include: `'no-repeat'`, `'repeat'`, `'repeat-x'`, `'repeat-y'`.
+   * @see {@link https://www.w3.org/TR/2dcontext/#dom-context-2d-createpattern}
+   */
+  this.repeat = 'no-repeat';
+
+  /**
+   * @name Two.Texture#offset
+   * @property {Two.Vector} - A two-component vector describing any pixel offset of the texture when applied to a {@link Two.Path}.
+   */
+  this.offset = new Vector();
+
+  if (typeof callback === 'function') {
+    var loaded = (function() {
+      this.unbind(Events.Types.load, loaded);
+      if (typeof callback === 'function') {
+        callback();
+      }
+    }).bind(this);
+    this.bind(Events.Types.load, loaded);
+  }
+
+  /**
+   * @name Two.Texture#src
+   * @property {String} - The URL path to the image data.
+   * @nota-bene This property is ultimately serialized in a {@link Two.Registry} to cache retrieval.
+   */
+  if (typeof src === 'string') {
+    this.src = src;
+  } else if (typeof src === 'object') {
+    var elemString = Object.prototype.toString.call(src);
+    if (
+      elemString === '[object HTMLImageElement]' ||
+      elemString === '[object HTMLCanvasElement]' ||
+      elemString === '[object HTMLVideoElement]' ||
+      elemString === '[object Image]'
+    ) {
+      /**
+       * @name Two.Texture#image
+       * @property {Element} - The corresponding DOM Element of the texture. Can be a `<img />`, `<canvas />`, or `<video />` element. See {@link Two.Texture.RegularExpressions} for a full list of supported elements.
+       * @nota-bene In headless environments this is a `Canvas.Image` object. See {@link https://github.com/Automattic/node-canvas} for more information on headless image objects.
+       */
+      this.image = src;
+    }
+  }
+
+  this._update();
+
+};
+
+_.extend(Texture, {
+
+  /**
+   * @name Two.Texture.Properties
+   * @property {String[]} - A list of properties that are on every {@link Two.Texture}.
+   */
+  Properties: [
+    'src',
+    'loaded',
+    'repeat'
+  ],
+
+  /**
+   * @name Two.Texture.RegularExpressions
+   * @property {Object} - A map of compatible DOM Elements categorized by media format.
+   */
+  RegularExpressions: regex,
+
+  /**
+   * @name Two.Texture.ImageRegistry
+   * @property {Two.Registry} - A canonical listing of image data used in a single session of Two.js.
+   * @nota-bene This object is used to cache image data between different textures.
+   */
+  ImageRegistry: new Registry(),
+
+  /**
+   * @name Two.Texture.getAbsoluteURL
+   * @property {Function} - Serializes a URL as an absolute path for canonical attribution in {@link Two.ImageRegistry}.
+   * @param {String} path
+   * @returns {String} - The serialized absolute path.
+   */
+  getAbsoluteURL: function(path) {
+    if (!anchor) {
+      // TODO: Fix for headless environments
+      return path;
+    }
+    anchor.href = path;
+    return anchor.href;
+  },
+
+  /**
+   * @name Two.Texture.loadHeadlessBuffer
+   * @property {Function} - Loads an image as a buffer in headless environments.
+   * @param {Two.Texture} texture - The {@link Two.Texture} to be loaded.
+   * @param {Function} loaded - The callback function to be triggered once the image is loaded.
+   * @nota-bene - This function uses node's `fs.readFileSync` to spoof the `<img />` loading process in the browser.
+   */
+  loadHeadlessBuffer: function(texture, loaded) {
+
+    texture.image.onload = loaded;
+    texture.image.src = texture.src;
+
+  },
+
+  /**
+   * @name Two.Texture.getTag
+   * @property {Function} - Retrieves the tag name of an image, video, or canvas node.
+   * @param {ImageElement} - The image to infer the tag name from.
+   * @returns {String} - Returns the tag name of an image, video, or canvas node.
+   */
+  getTag: function(image) {
+    return (image && image.nodeName && image.nodeName.toLowerCase())
+      // Headless environments
+      || 'img';
+  },
+
+  /**
+   * @name Two.Texture.getImage
+   * @property {Function} - Convenience function to set {@link Two.Texture#image} properties with canonincal versions set in {@link Two.Texture.ImageRegistry}.
+   * @param {String} src - The URL path of the image.
+   * @returns {ImageElement} - Returns either a cached version of the image or a new one that is registered in {@link Two.Texture.ImageRegistry}.
+   */
+  getImage: function(src) {
+
+    var absoluteSrc = Texture.getAbsoluteURL(src);
+
+    if (Texture.ImageRegistry.contains(absoluteSrc)) {
+      return Texture.ImageRegistry.get(absoluteSrc);
+    }
+
+    var image;
+
+    if (CanvasShim.Image) {
+
+      // TODO: Fix for headless environments
+      image = new CanvasShim.Image();
+      Renderer.Utils.shim(image, 'img');
+
+    } else if (root$1.document) {
+
+      if (regex.video.test(absoluteSrc)) {
+        image = document.createElement('video');
+      } else {
+        image = document.createElement('img');
+      }
+
+    } else {
+
+      console.warn('Two.js: no prototypical image defined for Two.Texture');
+
+    }
+
+    image.crossOrigin = 'anonymous';
+
+    return image;
+
+  },
+
+  /**
+   * @name Two.Register
+   * @interface
+   * @description A collection of functions to register different types of textures. Used internally by a {@link Two.Texture}.
+   */
+  Register: {
+    canvas: function(texture, callback) {
+      texture._src = '#' + texture.id;
+      Texture.ImageRegistry.add(texture.src, texture.image);
+      if (typeof callback === 'function') {
+        callback();
+      }
+    },
+    img: function(texture, callback) {
+
+      var image = texture.image;
+
+      var loaded = function(e) {
+        if (!CanvasShim.isHeadless && image.removeEventListener && typeof image.removeEventListener === 'function') {
+          image.removeEventListener('load', loaded, false);
+          image.removeEventListener('error', error, false);
+        }
+        if (typeof callback === 'function') {
+          callback();
+        }
+      };
+      var error = function(e) {
+        if (!CanvasShim.isHeadless && typeof image.removeEventListener === 'function') {
+          image.removeEventListener('load', loaded, false);
+          image.removeEventListener('error', error, false);
+        }
+        throw new TwoError('unable to load ' + texture.src);
+      };
+
+      if (typeof image.width === 'number' && image.width > 0
+        && typeof image.height === 'number' && image.height > 0) {
+          loaded();
+      } else if (!CanvasShim.isHeadless && typeof image.addEventListener === 'function') {
+        image.addEventListener('load', loaded, false);
+        image.addEventListener('error', error, false);
+      }
+
+      texture._src = Texture.getAbsoluteURL(texture._src);
+
+      if (!CanvasShim.isHeadless && image && image.getAttribute('two-src')) {
+        return;
+      }
+
+      if (!CanvasShim.isHeadless) {
+        image.setAttribute('two-src', texture.src);
+      }
+
+      Texture.ImageRegistry.add(texture.src, image);
+
+      if (CanvasShim.isHeadless) {
+
+        Texture.loadHeadlessBuffer(texture, loaded);
+
+      } else {
+
+        texture.image.src = texture.src;
+
+      }
+
+    },
+    video: function(texture, callback) {
+
+      if (CanvasShim.isHeadless) {
+        throw new TwoError('video textures are not implemented in headless environments.');
+      }
+
+      var loaded = function(e) {
+        texture.image.removeEventListener('canplaythrough', loaded, false);
+        texture.image.removeEventListener('error', error, false);
+        texture.image.width = texture.image.videoWidth;
+        texture.image.height = texture.image.videoHeight;
+        if (typeof callback === 'function') {
+          callback();
+        }
+      };
+      var error = function(e) {
+        texture.image.removeEventListener('canplaythrough', loaded, false);
+        texture.image.removeEventListener('error', error, false);
+        throw new TwoError('unable to load ' + texture.src);
+      };
+
+      texture._src = Texture.getAbsoluteURL(texture._src);
+
+      if (!texture.image.getAttribute('two-src')) {
+        texture.image.setAttribute('two-src', texture.src);
+        Texture.ImageRegistry.add(texture.src, texture.image);
+      }
+
+      if (texture.image.readyState >= 4) {
+        loaded();
+      } else {
+        texture.image.addEventListener('canplaythrough', loaded, false);
+        texture.image.addEventListener('error', error, false);
+        texture.image.src = texture.src;
+        texture.image.load();
+      }
+
+    }
+  },
+
+  /**
+   * @name Two.Texture.load
+   * @function
+   * @param {Two.Texture} texture - The texture to load.
+   * @param {Function} callback - The function to be called once the texture is loaded.
+   */
+  load: function(texture, callback) {
+
+    var src = texture.src;
+    var image = texture.image;
+    var tag = Texture.getTag(image);
+
+    if (texture._flagImage) {
+      if (/canvas/i.test(tag)) {
+        Texture.Register.canvas(texture, callback);
+      } else {
+        texture._src = (!CanvasShim.isHeadless && image.getAttribute('two-src')) || image.src;
+        Texture.Register[tag](texture, callback);
+      }
+    }
+
+    if (texture._flagSrc) {
+      if (!image) {
+        image = Texture.getImage(texture.src);
+        texture.image = image;
+      }
+      tag = Texture.getTag(image);
+      Texture.Register[tag](texture, callback);
+    }
+
+  },
+
+  /**
+   * @name Two.Texture.FlagOffset
+   * @function
+   * @description Cached method to let renderers know `offset` has been updated on a {@link Two.Texture}.
+   */
+  FlagOffset: function() {
+    this._flagOffset = true;
+  },
+
+  /**
+   * @name Two.Texture.FlagScale
+   * @function
+   * @description Cached method to let renderers know `scale` has been updated on a {@link Two.Texture}.
+   */
+  FlagScale: function() {
+    this._flagScale = true;
+  },
+
+  /**
+   * @name Two.Texture.MakeObservable
+   * @function
+   * @param {Object} object - The object to make observable.
+   * @description Convenience function to apply observable qualities of a {@link Two.Texture} to any object. Handy if you'd like to extend or inherit the {@link Two.Texture} class on a custom class.
+   */
+  MakeObservable: function(object) {
+
+    _.each(Texture.Properties, defineGetterSetter, object);
+
+    Object.defineProperty(object, 'image', {
+      enumerable: true,
+      get: function() {
+        return this._image;
+      },
+      set: function(image) {
+
+        var tag = Texture.getTag(image);
+        var index;
+
+        switch (tag) {
+          case 'canvas':
+            index = '#' + image.id;
+            break;
+          default:
+            index = image.src;
+        }
+
+        if (Texture.ImageRegistry.contains(index)) {
+          this._image = Texture.ImageRegistry.get(image.src);
+        } else {
+          this._image = image;
+        }
+
+        this._flagImage = true;
+
+      }
+
+    });
+
+    Object.defineProperty(object, 'offset', {
+      enumerable: true,
+      get: function() {
+        return this._offset;
+      },
+      set: function(v) {
+        if (this._offset) {
+          this._offset.unbind(Events.Types.change, this._renderer.flagOffset);
+        }
+        this._offset = v;
+        this._offset.bind(Events.Types.change, this._renderer.flagOffset);
+        this._flagOffset = true;
+      }
+    });
+
+    Object.defineProperty(object, 'scale', {
+      enumerable: true,
+      get: function() {
+        return this._scale;
+      },
+      set: function(v) {
+
+        if (this._scale instanceof Vector) {
+          this._scale.unbind(Events.Types.change, this._renderer.flagScale);
+        }
+
+        this._scale = v;
+
+        if (this._scale instanceof Vector) {
+          this._scale.bind(Events.Types.change, this._renderer.flagScale);
+        }
+
+        this._flagScale = true;
+
+      }
+    });
+
+  }
+
+});
+
+_.extend(Texture.prototype, Events, Shape.prototype, {
+
+  /**
+   * @name Two.Texture#_flagSrc
+   * @private
+   * @property {Boolean} - Determines whether the {@link Two.Texture#src} needs updating.
+   */
+  _flagSrc: false,
+
+  /**
+   * @name Two.Texture#_flagImage
+   * @private
+   * @property {Boolean} - Determines whether the {@link Two.Texture#image} needs updating.
+   */
+  _flagImage: false,
+
+  /**
+   * @name Two.Texture#_flagVideo
+   * @private
+   * @property {Boolean} - Determines whether the {@link Two.Texture#video} needs updating.
+   */
+  _flagVideo: false,
+
+  /**
+   * @name Two.Texture#_flagLoaded
+   * @private
+   * @property {Boolean} - Determines whether the {@link Two.Texture#loaded} needs updating.
+   */
+  _flagLoaded: false,
+
+  /**
+   * @name Two.Texture#_flagRepeat
+   * @private
+   * @property {Boolean} - Determines whether the {@link Two.Texture#repeat} needs updating.
+   */
+  _flagRepeat: false,
+
+  /**
+   * @name Two.Texture#_flagOffset
+   * @private
+   * @property {Boolean} - Determines whether the {@link Two.Texture#offset} needs updating.
+   */
+  _flagOffset: false,
+
+  /**
+   * @name Two.Texture#_flagScale
+   * @private
+   * @property {Boolean} - Determines whether the {@link Two.Texture#scale} needs updating.
+   */
+  _flagScale: false,
+
+  /**
+   * @name Two.Texture#_src
+   * @private
+   * @see {@link Two.Texture#src}
+   */
+  _src: '',
+
+  /**
+   * @name Two.Texture#_image
+   * @private
+   * @see {@link Two.Texture#image}
+   */
+  _image: null,
+
+  /**
+   * @name Two.Texture#_loaded
+   * @private
+   * @see {@link Two.Texture#loaded}
+   */
+  _loaded: false,
+
+  /**
+   * @name Two.Texture#_repeat
+   * @private
+   * @see {@link Two.Texture#repeat}
+   */
+  _repeat: 'no-repeat',
+
+  /**
+   * @name Two.Texture#_scale
+   * @private
+   * @see {@link Two.Texture#scale}
+   */
+  _scale: 1,
+
+  /**
+   * @name Two.Texture#_offset
+   * @private
+   * @see {@link Two.Texture#offset}
+   */
+  _offset: null,
+
+  constructor: Texture,
+
+  /**
+   * @name Two.Texture#clone
+   * @function
+   * @returns {Two.Texture}
+   * @description Create a new instance of {@link Two.Texture} with the same properties of the current texture.
+   */
+  clone: function() {
+    var clone = new Texture(this.src);
+    clone.repeat = this.repeat;
+    clone.offset.copy(this.origin);
+    clone.scale = this.scale;
+    return clone;
+  },
+
+  /**
+   * @name Two.Texture#toObject
+   * @function
+   * @returns {Object}
+   * @description Return a JSON compatible plain object that represents the texture.
+   */
+  toObject: function() {
+    return {
+      src: this.src,
+      // image: this.image,
+      repeat: this.repeat,
+      origin: this.origin.toObject(),
+      scale: typeof this.scale === 'number' ? this.scale : this.scale.toObject()
+    };
+  },
+
+  /**
+   * @name Two.Texture#_update
+   * @function
+   * @private
+   * @param {Boolean} [bubbles=false] - Force the parent to `_update` as well.
+   * @description This is called before rendering happens by the renderer. This applies all changes necessary so that rendering is up-to-date but not updated more than it needs to be.
+   * @nota-bene Try not to call this method more than once a frame.
+   */
+  _update: function() {
+
+    if (this._flagSrc || this._flagImage) {
+
+      this.trigger(Events.Types.change);
+
+      if (this._flagSrc || this._flagImage) {
+        this.loaded = false;
+        Texture.load(this, (function() {
+          this.loaded = true;
+          this
+            .trigger(Events.Types.change)
+            .trigger(Events.Types.load);
+        }).bind(this));
+      }
+
+    }
+
+    if (this._image && this._image.readyState >= 4) {
+      this._flagVideo = true;
+    }
+
+    return this;
+
+  },
+
+  /**
+   * @name Two.Texture#flagReset
+   * @function
+   * @private
+   * @description Called internally to reset all flags. Ensures that only properties that change are updated before being sent to the renderer.
+   */
+  flagReset: function() {
+
+    this._flagSrc = this._flagImage = this._flagLoaded
+      = this._flagVideo = this._flagScale = this._flagOffset = false;
+
+    return this;
+
+  }
+
+});
+
+Texture.MakeObservable(Texture.prototype);
+
+// Constants
+
+var min$2 = Math.min, max$2 = Math.max, ceil = Math.ceil, floor = Math.floor;
+
+/**
+ * @name Two.Path
+ * @class
+ * @extends Two.Shape
+ * @param {Two.Anchor[]} [vertices] - A list of {@link Two.Anchor}s that represent the order and coordinates to construct the rendered shape.
+ * @param {Boolean} [closed=false] - Describes whether the shape is closed or open.
+ * @param {Boolean} [curved=false] - Describes whether the shape automatically calculates bezier handles for each vertex.
+ * @param {Boolean} [manual=false] - Describes whether the developer controls how vertices are plotted or if Two.js automatically plots coordinates based on closed and curved booleans.
+ * @description This is the primary primitive class for creating all drawable shapes in Two.js. Unless specified methods return their instance of `Two.Path` for the purpose of chaining.
+ */
+var Path = function(vertices, closed, curved, manual) {
+
+  Shape.call(this);
+
+  this._renderer.type = 'path';
+  this._renderer.flagVertices = Path.FlagVertices.bind(this);
+  this._renderer.bindVertices = Path.BindVertices.bind(this);
+  this._renderer.unbindVertices = Path.UnbindVertices.bind(this);
+
+  this._renderer.flagFill = Path.FlagFill.bind(this);
+  this._renderer.flagStroke = Path.FlagStroke.bind(this);
+  this._renderer.vertices = [];
+  this._renderer.collection = [];
+
+  /**
+   * @name Two.Path#closed
+   * @property {Boolean} - Determines whether a final line is drawn between the final point in the `vertices` array and the first point.
+   */
+  this._closed = !!closed;
+
+  /**
+   * @name Two.Path#curved
+   * @property {Boolean} - When the path is `automatic = true` this boolean determines whether the lines between the points are curved or not.
+   */
+  this._curved = !!curved;
+
+  /**
+   * @name Two.Path#beginning
+   * @property {Number} - Number between zero and one to state the beginning of where the path is rendered.
+   * @description {@link Two.Path#beginning} is a percentage value that represents at what percentage into the path should the renderer start drawing.
+   * @nota-bene This is great for animating in and out stroked paths in conjunction with {@link Two.Path#ending}.
+   */
+  this.beginning = 0;
+
+  /**
+   * @name Two.Path#ending
+   * @property {Number} - Number between zero and one to state the ending of where the path is rendered.
+   * @description {@link Two.Path#ending} is a percentage value that represents at what percentage into the path should the renderer start drawing.
+   * @nota-bene This is great for animating in and out stroked paths in conjunction with {@link Two.Path#beginning}.
+   */
+  this.ending = 1;
+
+  // Style properties
+
+  /**
+   * @name Two.Path#fill
+   * @property {(CssColor|Two.Gradient|Two.Texture)} - The value of what the path should be filled in with.
+   * @see {@link https://developer.mozilla.org/en-US/docs/Web/CSS/color_value} for more information on CSS Colors.
+   */
+  this.fill = '#fff';
+
+  /**
+   * @name Two.Path#stroke
+   * @property {(CssColor|Two.Gradient|Two.Texture)} - The value of what the path should be outlined in with.
+   * @see {@link https://developer.mozilla.org/en-US/docs/Web/CSS/color_value} for more information on CSS Colors.
+   */
+  this.stroke = '#000';
+
+  /**
+   * @name Two.Path#linewidth
+   * @property {Number} - The thickness in pixels of the stroke.
+   */
+  this.linewidth = 1.0;
+
+  /**
+   * @name Two.Path#opacity
+   * @property {Number} - The opaqueness of the path.
+   * @nota-bene Can be used in conjunction with CSS Colors that have an alpha value.
+   */
+  this.opacity = 1.0;
+
+  /**
+   * @name Two.Path#className
+   * @property {String} - A class to be applied to the element to be compatible with CSS styling.
+   * @nota-bene Only available for the SVG renderer.
+   */
+  this.className = '';
+
+  /**
+   * @name Two.Path#visible
+   * @property {Boolean} - Display the path or not.
+   * @nota-bene For {@link Two.CanvasRenderer} and {@link Two.WebGLRenderer} when set to false all updating is disabled improving performance dramatically with many objects in the scene.
+   */
+  this.visible = true;
+
+  /**
+   * @name Two.Path#cap
+   * @property {String}
+   * @see {@link https://www.w3.org/TR/SVG11/painting.html#StrokeLinecapProperty}
+   */
+  this.cap = 'butt';      // Default of Adobe Illustrator
+
+  /**
+   * @name Two.Path#join
+   * @property {String}
+   * @see {@link https://www.w3.org/TR/SVG11/painting.html#StrokeLinejoinProperty}
+   */
+  this.join = 'miter';    // Default of Adobe Illustrator
+
+  /**
+   * @name Two.Path#miter
+   * @property {String}
+   * @see {@link https://www.w3.org/TR/SVG11/painting.html#StrokeMiterlimitProperty}
+   */
+  this.miter = 4;         // Default of Adobe Illustrator
+
+  /**
+   * @name Two.Path#vertices
+   * @property {Two.Anchor[]} - An ordered list of anchor points for rendering the path.
+   * @description A list of {@link Two.Anchor} objects that consist of what form the path takes.
+   * @nota-bene The array when manipulating is actually a {@link Two.Utils.Collection}.
+   */
+  this.vertices = vertices;
+
+  /**
+   * @name Two.Path#automatic
+   * @property {Boolean} - Determines whether or not Two.js should calculate curves, lines, and commands automatically for you or to let the developer manipulate them for themselves.
+   */
+  this.automatic = !manual;
+
+  /**
+   * @name Two.Path#dashes
+   * @property {Number[]} - Array of numbers. Odd indices represent dash length. Even indices represent dash space.
+   * @description A list of numbers that represent the repeated dash length and dash space applied to the stroke of the text.
+   * @see {@link https://developer.mozilla.org/en-US/docs/Web/SVG/Attribute/stroke-dasharray} for more information on the SVG stroke-dasharray attribute.
+   */
+  this.dashes = [];
+
+  /**
+   * @name Two.Path#dashes#offset
+   * @property {Number} - A number in pixels to offset {@link Two.Path#dashes} display.
+   */
+  this.dashes.offset = 0;
+
+};
+
+_.extend(Path, {
+
+  /**
+   * @name Two.Path.Properties
+   * @property {String[]} - A list of properties that are on every {@link Two.Path}.
+   */
+  Properties: [
+    'fill',
+    'stroke',
+    'linewidth',
+    'opacity',
+    'visible',
+    'cap',
+    'join',
+    'miter',
+
+    'closed',
+    'curved',
+    'automatic',
+    'beginning',
+    'ending'
+  ],
+
+  Utils: {
+    getCurveLength: getCurveLength$1
+  },
+
+  /**
+   * @name Two.Path.FlagVertices
+   * @function
+   * @description Cached method to let renderers know vertices have been updated on a {@link Two.Path}.
+   */
+  FlagVertices: function() {
+    this._flagVertices = true;
+    this._flagLength = true;
+    if (this.parent) {
+      this.parent._flagLength = true;
+    }
+  },
+
+  /**
+   * @name Two.Path.BindVertices
+   * @function
+   * @description Cached method to let {@link Two.Path} know vertices have been added to the instance.
+   */
+  BindVertices: function(items) {
+
+    // This function is called a lot
+    // when importing a large SVG
+    var i = items.length;
+    while (i--) {
+      items[i].bind(Events.Types.change, this._renderer.flagVertices);
+    }
+
+    this._renderer.flagVertices();
+
+  },
+
+  /**
+   * @name Two.Path.UnbindVertices
+   * @function
+   * @description Cached method to let {@link Two.Path} know vertices have been removed from the instance.
+   */
+  UnbindVertices: function(items) {
+
+    var i = items.length;
+    while (i--) {
+      items[i].unbind(Events.Types.change, this._renderer.flagVertices);
+    }
+
+    this._renderer.flagVertices();
+
+  },
+
+  /**
+   * @name Two.Path.FlagFill
+   * @function
+   * @description Cached method to let {@link Two.Path} know the fill has changed.
+   */
+  FlagFill: function() {
+    this._flagFill = true;
+  },
+
+  /**
+   * @name Two.Path.FlagFill
+   * @function
+   * @description Cached method to let {@link Two.Path} know the stroke has changed.
+   */
+  FlagStroke: function() {
+    this._flagStroke = true;
+  },
+
+  /**
+   * @name Two.Path.MakeObservable
+   * @function
+   * @param {Object} object - The object to make observable.
+   * @description Convenience function to apply observable qualities of a {@link Two.Path} to any object. Handy if you'd like to extend the {@link Two.Path} class on a custom class.
+   */
+  MakeObservable: function(object) {
+
+    Shape.MakeObservable(object);
+
+    // Only the 7 defined properties are flagged like this. The subsequent
+    // properties behave differently and need to be hand written.
+    _.each(Path.Properties.slice(2, 8), defineGetterSetter, object);
+
+    Object.defineProperty(object, 'fill', {
+      enumerable: true,
+      get: function() {
+        return this._fill;
+      },
+      set: function(f) {
+
+        if (this._fill instanceof Gradient
+          || this._fill instanceof LinearGradient
+          || this._fill instanceof RadialGradient
+          || this._fill instanceof Texture) {
+          this._fill.unbind(Events.Types.change, this._renderer.flagFill);
+        }
+
+        this._fill = f;
+        this._flagFill = true;
+
+        if (this._fill instanceof Gradient
+          || this._fill instanceof LinearGradient
+          || this._fill instanceof RadialGradient
+          || this._fill instanceof Texture) {
+          this._fill.bind(Events.Types.change, this._renderer.flagFill);
+        }
+
+      }
+    });
+
+    Object.defineProperty(object, 'stroke', {
+      enumerable: true,
+      get: function() {
+        return this._stroke;
+      },
+      set: function(f) {
+
+        if (this._stroke instanceof Gradient
+          || this._stroke instanceof LinearGradient
+          || this._stroke instanceof RadialGradient
+          || this._stroke instanceof Texture) {
+          this._stroke.unbind(Events.Types.change, this._renderer.flagStroke);
+        }
+
+        this._stroke = f;
+        this._flagStroke = true;
+
+        if (this._stroke instanceof Gradient
+          || this._stroke instanceof LinearGradient
+          || this._stroke instanceof RadialGradient
+          || this._stroke instanceof Texture) {
+          this._stroke.bind(Events.Types.change, this._renderer.flagStroke);
+        }
+
+      }
+    });
+
+    /**
+     * @name Two.Path#length
+     * @property {Number} - The sum of distances between all {@link Two.Path#vertices}.
+     */
+    Object.defineProperty(object, 'length', {
+      get: function() {
+        if (this._flagLength) {
+          this._updateLength();
+        }
+        return this._length;
+      }
+    });
+
+    Object.defineProperty(object, 'closed', {
+      enumerable: true,
+      get: function() {
+        return this._closed;
+      },
+      set: function(v) {
+        this._closed = !!v;
+        this._flagVertices = true;
+      }
+    });
+
+    Object.defineProperty(object, 'curved', {
+      enumerable: true,
+      get: function() {
+        return this._curved;
+      },
+      set: function(v) {
+        this._curved = !!v;
+        this._flagVertices = true;
+      }
+    });
+
+    Object.defineProperty(object, 'automatic', {
+      enumerable: true,
+      get: function() {
+        return this._automatic;
+      },
+      set: function(v) {
+        if (v === this._automatic) {
+          return;
+        }
+        this._automatic = !!v;
+        var method = this._automatic ? 'ignore' : 'listen';
+        _.each(this.vertices, function(v) {
+          v[method]();
+        });
+      }
+    });
+
+    Object.defineProperty(object, 'beginning', {
+      enumerable: true,
+      get: function() {
+        return this._beginning;
+      },
+      set: function(v) {
+        this._beginning = v;
+        this._flagVertices = true;
+      }
+    });
+
+    Object.defineProperty(object, 'ending', {
+      enumerable: true,
+      get: function() {
+        return this._ending;
+      },
+      set: function(v) {
+        this._ending = v;
+        this._flagVertices = true;
+      }
+    });
+
+    Object.defineProperty(object, 'vertices', {
+
+      enumerable: true,
+
+      get: function() {
+        return this._collection;
+      },
+
+      set: function(vertices) {
+
+        var updateVertices = this._renderer.flagVertices;
+        var bindVertices = this._renderer.bindVertices;
+        var unbindVertices = this._renderer.unbindVertices;
+
+        // Remove previous listeners
+        if (this._collection) {
+          this._collection
+            .unbind(Events.Types.insert, bindVertices)
+            .unbind(Events.Types.remove, unbindVertices);
+        }
+
+        // Create new Collection with copy of vertices
+        if (vertices instanceof Collection) {
+          this._collection = vertices;
+        } else {
+          this._collection = new Collection(vertices || []);
+        }
+
+
+        // Listen for Collection changes and bind / unbind
+        this._collection
+          .bind(Events.Types.insert, bindVertices)
+          .bind(Events.Types.remove, unbindVertices);
+
+        // Bind Initial Vertices
+        bindVertices(this._collection);
+
+      }
+
+    });
+
+    /**
+     * @name Two.Path#clip
+     * @property {Two.Shape} - Object to define clipping area.
+     * @nota-bene This property is currently not working becuase of SVG spec issues found here {@link https://code.google.com/p/chromium/issues/detail?id=370951}.
+     */
+    Object.defineProperty(object, 'clip', {
+      enumerable: true,
+      get: function() {
+        return this._clip;
+      },
+      set: function(v) {
+        this._clip = v;
+        this._flagClip = true;
+      }
+    });
+
+    Object.defineProperty(object, 'dashes', {
+      enumerable: true,
+      get: function() {
+        return this._dashes;
+      },
+      set: function(v) {
+        if (typeof v.offset !== 'number') {
+          v.offset = this._dashes.offset || 0;
+        }
+        this._dashes = v;
+      }
+    });
+
+  }
+
+});
+
+_.extend(Path.prototype, Shape.prototype, {
+
+  // Flags
+  // http://en.wikipedia.org/wiki/Flag
+
+  /**
+   * @name Two.Path#_flagVertices
+   * @private
+   * @property {Boolean} - Determines whether the {@link Two.Path#vertices} need updating.
+   */
+  _flagVertices: true,
+
+  /**
+   * @name Two.Path#_flagLength
+   * @private
+   * @property {Boolean} - Determines whether the {@link Two.Path#length} needs updating.
+   */
+  _flagLength: true,
+
+  /**
+   * @name Two.Path#_flagFill
+   * @private
+   * @property {Boolean} - Determines whether the {@link Two.Path#fill} needs updating.
+   */
+  _flagFill: true,
+
+  /**
+   * @name Two.Path#_flagStroke
+   * @private
+   * @property {Boolean} - Determines whether the {@link Two.Path#stroke} needs updating.
+   */
+  _flagStroke: true,
+
+  /**
+   * @name Two.Path#_flagLinewidth
+   * @private
+   * @property {Boolean} - Determines whether the {@link Two.Path#linewidth} needs updating.
+   */
+  _flagLinewidth: true,
+
+  /**
+   * @name Two.Path#_flagOpacity
+   * @private
+   * @property {Boolean} - Determines whether the {@link Two.Path#opacity} needs updating.
+   */
+  _flagOpacity: true,
+
+  /**
+   * @name Two.Path#_flagVisible
+   * @private
+   * @property {Boolean} - Determines whether the {@link Two.Path#visible} needs updating.
+   */
+  _flagVisible: true,
+
+  /**
+   * @name Two.Path#_flagCap
+   * @private
+   * @property {Boolean} - Determines whether the {@link Two.Path#cap} needs updating.
+   */
+  _flagCap: true,
+
+  /**
+   * @name Two.Path#_flagJoin
+   * @private
+   * @property {Boolean} - Determines whether the {@link Two.Path#join} needs updating.
+   */
+  _flagJoin: true,
+
+  /**
+   * @name Two.Path#_flagMiter
+   * @private
+   * @property {Boolean} - Determines whether the {@link Two.Path#miter} needs updating.
+   */
+  _flagMiter: true,
+
+  /**
+   * @name Two.Path#_flagClip
+   * @private
+   * @property {Boolean} - Determines whether the {@link Two.Path#clip} needs updating.
+   */
+  _flagClip: false,
+
+  // Underlying Properties
+
+  /**
+   * @name Two.Path#_length
+   * @private
+   * @see {@link Two.Path#length}
+   */
+  _length: 0,
+
+  /**
+   * @name Two.Path#_fill
+   * @private
+   * @see {@link Two.Path#fill}
+   */
+  _fill: '#fff',
+
+  /**
+   * @name Two.Path#_stroke
+   * @private
+   * @see {@link Two.Path#stroke}
+   */
+  _stroke: '#000',
+
+  /**
+   * @name Two.Path#_linewidth
+   * @private
+   * @see {@link Two.Path#linewidth}
+   */
+  _linewidth: 1.0,
+
+  /**
+   * @name Two.Path#_opacity
+   * @private
+   * @see {@link Two.Path#opacity}
+   */
+  _opacity: 1.0,
+
+  /**
+   * @name Two.Path#_visible
+   * @private
+   * @see {@link Two.Path#visible}
+   */
+  _visible: true,
+
+  /**
+   * @name Two.Path#_cap
+   * @private
+   * @see {@link Two.Path#cap}
+   */
+  _cap: 'round',
+
+  /**
+   * @name Two.Path#_join
+   * @private
+   * @see {@link Two.Path#join}
+   */
+  _join: 'round',
+
+  /**
+   * @name Two.Path#_miter
+   * @private
+   * @see {@link Two.Path#miter}
+   */
+  _miter: 4,
+
+  /**
+   * @name Two.Path#_closed
+   * @private
+   * @see {@link Two.Path#closed}
+   */
+  _closed: true,
+
+  /**
+   * @name Two.Path#_curved
+   * @private
+   * @see {@link Two.Path#curved}
+   */
+  _curved: false,
+
+  /**
+   * @name Two.Path#_automatic
+   * @private
+   * @see {@link Two.Path#automatic}
+   */
+  _automatic: true,
+
+  /**
+   * @name Two.Path#_beginning
+   * @private
+   * @see {@link Two.Path#beginning}
+   */
+  _beginning: 0,
+
+  /**
+   * @name Two.Path#_ending
+   * @private
+   * @see {@link Two.Path#ending}
+   */
+  _ending: 1.0,
+
+  /**
+   * @name Two.Path#_clip
+   * @private
+   * @see {@link Two.Path#clip}
+   */
+  _clip: false,
+
+  /**
+   * @name Two.Path#_dashes
+   * @private
+   * @see {@link Two.Path#dashes}
+   */
+  _dashes: [],
+
+  constructor: Path,
+
+  /**
+   * @name Two.Path#clone
+   * @function
+   * @param {Two.Group} [parent] - The parent group or scene to add the clone to.
+   * @returns {Two.Path}
+   * @description Create a new instance of {@link Two.Path} with the same properties of the current path.
+   */
+  clone: function(parent) {
+
+    var clone = new Path();
+
+    for (var j = 0; j < this.vertices.length; j++) {
+      clone.vertices.push(this.vertices[j].clone());
+    }
+
+    for (var i = 0; i < Path.Properties.length; i++) {
+      var k = Path.Properties[i];
+      clone[k] = this[k];
+    }
+
+    clone.className = this.className;
+
+    clone.translation.copy(this.translation);
+    clone.rotation = this.rotation;
+    clone.scale = this.scale;
+
+    if (this.matrix.manual) {
+      clone.matrix.copy(this.matrix);
+    }
+
+    if (parent) {
+      parent.add(clone);
+    }
+
+    return clone._update();
+
+  },
+
+  /**
+   * @name Two.Path#toObject
+   * @function
+   * @returns {Object}
+   * @description Return a JSON compatible plain object that represents the path.
+   */
+  toObject: function() {
+
+    var result = {
+      vertices: this.vertices.map(function(v) {
+        return v.toObject();
+      })
+    };
+
+    _.each(Path.Properties, function(k) {
+      result[k] = this[k];
+    }, this);
+
+    result.className = this.className;
+
+    result.translation = this.translation.toObject();
+    result.rotation = this.rotation;
+    result.scale = this.scale instanceof Vector ? this.scale.toObject() : this.scale;
+
+    if (this.matrix.manual) {
+      result.matrix = this.matrix.toObject();
+    }
+
+    return result;
+
+  },
+
+  /**
+   * @name Two.Path#noFill
+   * @function
+   * @description Short hand method to set fill to `transparent`.
+   */
+  noFill: function() {
+    this.fill = 'transparent';
+    return this;
+  },
+
+  /**
+   * @name Two.Path#noStroke
+   * @function
+   * @description Short hand method to set stroke to `transparent`.
+   */
+  noStroke: function() {
+    this.stroke = undefined;
+    return this;
+  },
+
+  /**
+   * @name Two.Path#corner
+   * @function
+   * @description Orient the vertices of the shape to the upper left-hand corner of the path.
+   */
+  corner: function() {
+
+    var rect = this.getBoundingClientRect(true);
+
+    rect.centroid = {
+      x: rect.left + rect.width / 2,
+      y: rect.top + rect.height / 2
+    };
+
+    _.each(this.vertices, function(v) {
+      v.subSelf(rect.centroid);
+      v.x += rect.width / 2;
+      v.y += rect.height / 2;
+    });
+
+    return this;
+
+  },
+
+  /**
+   * @name Two.Path#center
+   * @function
+   * @description Orient the vertices of the shape to the center of the path.
+   */
+  center: function() {
+
+    var rect = this.getBoundingClientRect(true);
+
+    rect.centroid = {
+      x: rect.left + rect.width / 2 - this.translation.x,
+      y: rect.top + rect.height / 2 - this.translation.y
+    };
+
+    _.each(this.vertices, function(v) {
+      v.subSelf(rect.centroid);
+    });
+
+    return this;
+
+  },
+
+  /**
+   * @name Two.Path#remove
+   * @function
+   * @description Remove self from the scene / parent.
+   */
+  remove: function() {
+
+    if (!this.parent) {
+      return this;
+    }
+
+    this.parent.remove(this);
+
+    return this;
+
+  },
+
+  /**
+   * @name Two.Path#getBoundingClientRect
+   * @function
+   * @param {Boolean} [shallow=false] - Describes whether to calculate off local matrix or world matrix.
+   * @returns {Object} - Returns object with top, left, right, bottom, width, height attributes.
+   * @description Return an object with top, left, right, bottom, width, and height parameters of the path.
+   */
+  getBoundingClientRect: function(shallow) {
+    var matrix, border, l, i, v0, c0, c1, v1;
+
+    var left = Infinity, right = -Infinity,
+        top = Infinity, bottom = -Infinity;
+
+    // TODO: Update this to not __always__ update. Just when it needs to.
+    this._update(true);
+
+    matrix = shallow ? this._matrix : getComputedMatrix(this);
+
+    border = this.linewidth / 2;
+    l = this._renderer.vertices.length;
+
+    if (l <= 0) {
+      return {
+        width: 0,
+        height: 0
+      };
+    }
+
+    for (i = 0; i < l; i++) {
+
+      v1 = this._renderer.vertices[i];
+      // If i = 0, then this "wraps around" to the last vertex. Otherwise, it's the previous vertex.
+      // This is important for handling cyclic paths.
+      v0 = this._renderer.vertices[(i + l - 1) % l];
+
+      if (v0.controls && v1.controls) {
+
+        if (v0.relative) {
+          c0 = matrix.multiply(
+            v0.controls.right.x + v0.x, v0.controls.right.y + v0.y, 1);
+        } else {
+          c0 = matrix.multiply(
+            v0.controls.right.x, v0.controls.right.y, 1);
+        }
+        v0 = matrix.multiply(v0.x, v0.y, 1);
+
+        if (v1.relative) {
+          c1 = matrix.multiply(
+            v1.controls.left.x + v1.x, v1.controls.left.y + v1.y, 1);
+        } else {
+          c1 = matrix.multiply(
+            v1.controls.left.x, v1.controls.left.y, 1);
+        }
+        v1 = matrix.multiply(v1.x, v1.y, 1);
+
+        var bb = getCurveBoundingBox(
+          v0.x, v0.y, c0.x, c0.y, c1.x, c1.y, v1.x, v1.y);
+
+        top = min$2(bb.min.y - border, top);
+        left = min$2(bb.min.x - border, left);
+        right = max$2(bb.max.x + border, right);
+        bottom = max$2(bb.max.y + border, bottom);
+
+      } else {
+
+        if (i <= 1) {
+
+          v0 = matrix.multiply(v0.x, v0.y, 1);
+
+          top = min$2(v0.y - border, top);
+          left = min$2(v0.x - border, left);
+          right = max$2(v0.x + border, right);
+          bottom = max$2(v0.y + border, bottom);
+
+        }
+
+        v1 = matrix.multiply(v1.x, v1.y, 1);
+
+        top = min$2(v1.y - border, top);
+        left = min$2(v1.x - border, left);
+        right = max$2(v1.x + border, right);
+        bottom = max$2(v1.y + border, bottom);
+
+      }
+
+    }
+
+    return {
+      top: top,
+      left: left,
+      right: right,
+      bottom: bottom,
+      width: right - left,
+      height: bottom - top
+    };
+
+  },
+
+  /**
+   * @name Two.Path#getPointAt
+   * @function
+   * @param {Boolean} t - Percentage value describing where on the Two.Path to estimate and assign coordinate values.
+   * @param {Two.Vector} [obj=undefined] - Object to apply calculated x, y to. If none available returns new Object.
+   * @returns {Object}
+   * @description Given a float `t` from 0 to 1, return a point or assign a passed `obj`'s coordinates to that percentage on this Two.Path's curve.
+   */
+  getPointAt: function(t, obj) {
+
+    var ia, ib, result;
+    var x, x1, x2, x3, x4, y, y1, y2, y3, y4, left, right;
+    var target = this.length * Math.min(Math.max(t, 0), 1);
+    var length = this.vertices.length;
+    var last = length - 1;
+
+    var a = null;
+    var b = null;
+
+    for (var i = 0, l = this._lengths.length, sum = 0; i < l; i++) {
+
+      if (sum + this._lengths[i] >= target) {
+
+        if (this._closed) {
+          ia = mod(i, length);
+          ib = mod(i - 1, length);
+          if (i === 0) {
+            ia = ib;
+            ib = i;
+          }
+        } else {
+          ia = i;
+          ib = Math.min(Math.max(i - 1, 0), last);
+        }
+
+        a = this.vertices[ia];
+        b = this.vertices[ib];
+        target -= sum;
+        if (this._lengths[i] !== 0) {
+          t = target / this._lengths[i];
+        } else {
+          t = 0;
+        }
+
+        break;
+
+      }
+
+      sum += this._lengths[i];
+
+    }
+
+    if (a === null || b === null) {
+      return null;
+    }
+
+    if (!a) {
+      return b;
+    } else if (!b) {
+      return a;
+    }
+
+    right = b.controls && b.controls.right;
+    left = a.controls && a.controls.left;
+
+    x1 = b.x;
+    y1 = b.y;
+    x2 = (right || b).x;
+    y2 = (right || b).y;
+    x3 = (left || a).x;
+    y3 = (left || a).y;
+    x4 = a.x;
+    y4 = a.y;
+
+    if (right && b.relative) {
+      x2 += b.x;
+      y2 += b.y;
+    }
+
+    if (left && a.relative) {
+      x3 += a.x;
+      y3 += a.y;
+    }
+
+    x = getComponentOnCubicBezier(t, x1, x2, x3, x4);
+    y = getComponentOnCubicBezier(t, y1, y2, y3, y4);
+
+    // Higher order points for control calculation.
+    var t1x = lerp(x1, x2, t);
+    var t1y = lerp(y1, y2, t);
+    var t2x = lerp(x2, x3, t);
+    var t2y = lerp(y2, y3, t);
+    var t3x = lerp(x3, x4, t);
+    var t3y = lerp(y3, y4, t);
+
+    // Calculate the returned points control points.
+    var brx = lerp(t1x, t2x, t);
+    var bry = lerp(t1y, t2y, t);
+    var alx = lerp(t2x, t3x, t);
+    var aly = lerp(t2y, t3y, t);
+
+    if (_.isObject(obj)) {
+
+      obj.x = x;
+      obj.y = y;
+
+      if (!_.isObject(obj.controls)) {
+        Anchor.AppendCurveProperties(obj);
+      }
+
+      obj.controls.left.x = brx;
+      obj.controls.left.y = bry;
+      obj.controls.right.x = alx;
+      obj.controls.right.y = aly;
+
+      if (!typeof obj.relative === 'boolean' || obj.relative) {
+        obj.controls.left.x -= x;
+        obj.controls.left.y -= y;
+        obj.controls.right.x -= x;
+        obj.controls.right.y -= y;
+      }
+
+      obj.t = t;
+
+      return obj;
+
+    }
+
+    result = new Anchor(
+      x, y, brx - x, bry - y, alx - x, aly - y,
+      this._curved ? Commands.curve : Commands.line
+    );
+
+    result.t = t;
+
+    return result;
+
+  },
+
+  /**
+   * @name Two.Path#plot
+   * @function
+   * @description Based on closed / curved and sorting of vertices plot where all points should be and where the respective handles should be too.
+   * @nota-bene While this method is public it is internally called by {@link Two.Path#_update} when `automatic = true`.
+   */
+  plot: function() {
+
+    if (this.curved) {
+      getCurveFromPoints(this._collection, this.closed);
+      return this;
+    }
+
+    for (var i = 0; i < this._collection.length; i++) {
+      this._collection[i].command = i === 0 ? Commands.move : Commands.line;
+    }
+
+    return this;
+
+  },
+
+  /**
+   * @name Two.Path#subdivide
+   * @function
+   * @param {Integer} limit - How many times to recurse subdivisions.
+   * @description Insert a {@link Two.Anchor} at the midpoint between every item in {@link Two.Path#vertices}.
+   */
+  subdivide: function(limit) {
+    //TODO: DRYness (function below)
+    this._update();
+
+    var last = this.vertices.length - 1;
+    var b = this.vertices[last];
+    var closed = this._closed || this.vertices[last]._command === Commands.close;
+    var points = [];
+    _.each(this.vertices, function(a, i) {
+
+      if (i <= 0 && !closed) {
+        b = a;
+        return;
+      }
+
+      if (a.command === Commands.move) {
+        points.push(new Anchor(b.x, b.y));
+        if (i > 0) {
+          points[points.length - 1].command = Commands.line;
+        }
+        b = a;
+        return;
+      }
+
+      var verts = getSubdivisions(a, b, limit);
+      points = points.concat(verts);
+
+      // Assign commands to all the verts
+      _.each(verts, function(v, i) {
+        if (i <= 0 && b.command === Commands.move) {
+          v.command = Commands.move;
+        } else {
+          v.command = Commands.line;
+        }
+      });
+
+      if (i >= last) {
+
+        // TODO: Add check if the two vectors in question are the same values.
+        if (this._closed && this._automatic) {
+
+          b = a;
+
+          verts = getSubdivisions(a, b, limit);
+          points = points.concat(verts);
+
+          // Assign commands to all the verts
+          _.each(verts, function(v, i) {
+            if (i <= 0 && b.command === Commands.move) {
+              v.command = Commands.move;
+            } else {
+              v.command = Commands.line;
+            }
+          });
+
+        } else if (closed) {
+          points.push(new Anchor(a.x, a.y));
+        }
+
+        points[points.length - 1].command = closed
+          ? Commands.close : Commands.line;
+
+      }
+
+      b = a;
+
+    }, this);
+
+    this._automatic = false;
+    this._curved = false;
+    this.vertices = points;
+
+    return this;
+
+  },
+
+  /**
+   * @name Two.Path#_updateLength
+   * @function
+   * @private
+   * @param {Integer} [limit=] -
+   * @param {Boolean} [silent=false] - If set to `true` then the path isn't updated before calculation. Useful for internal use.
+   * @description Recalculate the {@link Two.Path#length} value.
+   */
+  _updateLength: function(limit, silent) {
+    //TODO: DRYness (function above)
+    if (!silent) {
+      this._update();
+    }
+
+    var length = this.vertices.length;
+    var last = length - 1;
+    var b = this.vertices[last];
+    var closed = false;//this._closed || this.vertices[last]._command === Commands.close;
+    var sum = 0;
+
+    if (typeof this._lengths === 'undefined') {
+      this._lengths = [];
+    }
+
+    _.each(this.vertices, function(a, i) {
+
+      if ((i <= 0 && !closed) || a.command === Commands.move) {
+        b = a;
+        this._lengths[i] = 0;
+        return;
+      }
+
+      this._lengths[i] = getCurveLength$1(a, b, limit);
+      sum += this._lengths[i];
+
+      if (i >= last && closed) {
+
+        b = this.vertices[(i + 1) % length];
+
+        this._lengths[i + 1] = getCurveLength$1(a, b, limit);
+        sum += this._lengths[i + 1];
+
+      }
+
+      b = a;
+
+    }, this);
+
+    this._length = sum;
+    this._flagLength = false;
+
+    return this;
+
+  },
+
+  /**
+   * @name Two.Path#_update
+   * @function
+   * @private
+   * @param {Boolean} [bubbles=false] - Force the parent to `_update` as well.
+   * @description This is called before rendering happens by the renderer. This applies all changes necessary so that rendering is up-to-date but not updated more than it needs to be.
+   * @nota-bene Try not to call this method more than once a frame.
+   */
+  _update: function() {
+
+    if (this._flagVertices) {
+
+      if (this._automatic) {
+        this.plot();
+      }
+
+      if (this._flagLength) {
+        this._updateLength(undefined, true);
+      }
+
+      var l = this._collection.length;
+      var closed = this._closed;
+
+      var beginning = Math.min(this._beginning, this._ending);
+      var ending = Math.max(this._beginning, this._ending);
+
+      var bid = getIdByLength(this, beginning * this._length);
+      var eid = getIdByLength(this, ending * this._length);
+
+      var low = ceil(bid);
+      var high = floor(eid);
+
+      var left, right, prev, next, v;
+
+      this._renderer.vertices.length = 0;
+
+      for (var i = 0; i < l; i++) {
+
+        if (this._renderer.collection.length <= i) {
+          // Expected to be `relative` anchor points.
+          this._renderer.collection.push(new Anchor());
+        }
+
+        if (i > high && !right) {
+
+          v = this._renderer.collection[i];
+          v.copy(this._collection[i]);
+          this.getPointAt(ending, v);
+          v.command = this._renderer.collection[i].command;
+          this._renderer.vertices.push(v);
+
+          right = v;
+          prev = this._collection[i - 1];
+
+          // Project control over the percentage `t`
+          // of the in-between point
+          if (prev && prev.controls) {
+
+            v.controls.right.clear();
+
+            this._renderer.collection[i - 1].controls.right
+              .clear()
+              .lerp(prev.controls.right, v.t);
+
+          }
+
+        } else if (i >= low && i <= high) {
+
+          v = this._renderer.collection[i]
+            .copy(this._collection[i]);
+          this._renderer.vertices.push(v);
+
+          if (i === high && contains(this, ending)) {
+            right = v;
+            if (!closed && right.controls) {
+              right.controls.right.clear();
+            }
+          } else if (i === low && contains(this, beginning)) {
+            left = v;
+            left.command = Commands.move;
+            if (!closed && left.controls) {
+              left.controls.left.clear();
+            }
+          }
+
+        }
+
+      }
+
+      // Prepend the trimmed point if necessary.
+      if (low > 0 && !left) {
+
+        i = low - 1;
+
+        v = this._renderer.collection[i];
+        v.copy(this._collection[i]);
+        this.getPointAt(beginning, v);
+        v.command = Commands.move;
+        this._renderer.vertices.unshift(v);
+
+        left = v;
+        next = this._collection[i + 1];
+
+        // Project control over the percentage `t`
+        // of the in-between point
+        if (next && next.controls) {
+
+          v.controls.left.clear();
+
+          this._renderer.collection[i + 1].controls.left
+            .copy(next.controls.left)
+            .lerp(Vector.zero, v.t);
+
+        }
+
+      }
+
+    }
+
+    Shape.prototype._update.apply(this, arguments);
+
+    return this;
+
+  },
+
+  /**
+   * @name Two.Path#flagReset
+   * @function
+   * @private
+   * @description Called internally to reset all flags. Ensures that only properties that change are updated before being sent to the renderer.
+   */
+  flagReset: function() {
+
+    this._flagVertices =  this._flagFill =  this._flagStroke =
+        this._flagLinewidth = this._flagOpacity = this._flagVisible =
+        this._flagCap = this._flagJoin = this._flagMiter =
+        this._flagClip = false;
+
+    Shape.prototype.flagReset.call(this);
+
+    return this;
+
+  }
+
+});
+
+Path.MakeObservable(Path.prototype);
+
+  // Utility functions
+
+function contains(path, t) {
+
+  if (t === 0 || t === 1) {
+    return true;
+  }
+
+  var length = path._length;
+  var target = length * t;
+  var elapsed = 0;
+
+  for (var i = 0; i < path._lengths.length; i++) {
+    var dist = path._lengths[i];
+    if (elapsed >= target) {
+      return target - elapsed >= 0;
+    }
+    elapsed += dist;
+  }
+
+  return false;
+
+}
+
+/**
+ * @protected
+ * @param {Two.Path} path - The path to analyze against.
+ * @param {Number} target - The target length at which to find an anchor.
+ * @returns {Integer}
+ * @description Return the id of an anchor based on a target length.
+ */
+function getIdByLength(path, target) {
+
+  var total = path._length;
+
+  if (target <= 0) {
+    return 0;
+  } else if (target >= total) {
+    return path._lengths.length - 1;
+  }
+
+  for (var i = 0, sum = 0; i < path._lengths.length; i++) {
+
+    if (sum + path._lengths[i] >= target) {
+      target -= sum;
+      return Math.max(i - 1, 0) + target / path._lengths[i];
+    }
+
+    sum += path._lengths[i];
+
+  }
+
+  return - 1;
+
+}
+
+function getCurveLength$1(a, b, limit) {
+  // TODO: DRYness
+  var x1, x2, x3, x4, y1, y2, y3, y4;
+
+  var right = b.controls && b.controls.right;
+  var left = a.controls && a.controls.left;
+
+  x1 = b.x;
+  y1 = b.y;
+  x2 = (right || b).x;
+  y2 = (right || b).y;
+  x3 = (left || a).x;
+  y3 = (left || a).y;
+  x4 = a.x;
+  y4 = a.y;
+
+  if (right && b._relative) {
+    x2 += b.x;
+    y2 += b.y;
+  }
+
+  if (left && a._relative) {
+    x3 += a.x;
+    y3 += a.y;
+  }
+
+  return getCurveLength(x1, y1, x2, y2, x3, y3, x4, y4, limit);
+
+}
+
+function getSubdivisions(a, b, limit) {
+  // TODO: DRYness
+  var x1, x2, x3, x4, y1, y2, y3, y4;
+
+  var right = b.controls && b.controls.right;
+  var left = a.controls && a.controls.left;
+
+  x1 = b.x;
+  y1 = b.y;
+  x2 = (right || b).x;
+  y2 = (right || b).y;
+  x3 = (left || a).x;
+  y3 = (left || a).y;
+  x4 = a.x;
+  y4 = a.y;
+
+  if (right && b._relative) {
+    x2 += b.x;
+    y2 += b.y;
+  }
+
+  if (left && a._relative) {
+    x3 += a.x;
+    y3 += a.y;
+  }
+
+  return subdivide(x1, y1, x2, y2, x3, y3, x4, y4, limit);
+
+}
+
+var TWO_PI$1 = Math.PI * 2, HALF_PI$1 = Math.PI / 2;
+var cos$2 = Math.cos, sin$2 = Math.sin;
+
+/**
+ * @name Two.Circle
+ * @class
+ * @extends Two.Path
+ * @param {Number} [x=0] - The x position of the circle.
+ * @param {Number} [y=0] - The y position of the circle.
+ * @param {Number} radius - The radius value of the circle.
+ * @param {Number} [resolution=4] - The number of vertices used to construct the circle.
+ */
+var Circle = function(ox, oy, r, resolution) {
+
+  // At least 2 vertices are required for proper circlage
+  var amount = resolution ? Math.max(resolution, 2) : 4;
+
+  var points = [];
+  for (var i = 0; i < amount; i++) {
+    points.push(new Anchor());
+  }
+
+  Path.call(this, points, true, true, true);
+
+  /**
+   * @name Two.Circle#radius
+   * @property {Number} - The size of the radius of the circle.
+   */
+  this.radius = r;
+
+  this._update();
+
+  if (typeof ox === 'number') {
+    this.translation.x = ox;
+  }
+  if (typeof oy === 'number') {
+    this.translation.y = oy;
+  }
+
+};
+
+_.extend(Circle, {
+
+  /**
+   * @name Two.Circle.Properties
+   * @property {String[]} - A list of properties that are on every {@link Two.Circle}.
+   */
+  Properties: ['radius'],
+
+  /**
+   * @name Two.Circle.MakeObservable
+   * @function
+   * @param {Object} object - The object to make observable.
+   * @description Convenience function to apply observable qualities of a {@link Two.Circle} to any object. Handy if you'd like to extend the {@link Two.Circle} class on a custom class.
+   */
+  MakeObservable: function(obj) {
+
+    Path.MakeObservable(obj);
+    _.each(Circle.Properties, defineGetterSetter, obj);
+
+  }
+
+});
+
+_.extend(Circle.prototype, Path.prototype, {
+
+  /**
+   * @name Two.Circle#_flagRadius
+   * @private
+   * @property {Boolean} - Determines whether the {@link Two.Circle#radius} needs updating.
+   */
+  _flagRadius: false,
+
+  /**
+   * @name Two.Circle#_radius
+   * @private
+   * @see {@link Two.Circle#radius}
+   */
+  _radius: 0,
+
+  constructor: Circle,
+
+  /**
+   * @name Two.Circle#_update
+   * @function
+   * @private
+   * @param {Boolean} [bubbles=false] - Force the parent to `_update` as well.
+   * @description This is called before rendering happens by the renderer. This applies all changes necessary so that rendering is up-to-date but not updated more than it needs to be.
+   * @nota-bene Try not to call this method more than once a frame.
+   */
+  _update: function() {
+
+    if (this._flagRadius) {
+      // Coefficient for approximating circular arcs with Bezier curves
+      var c = (4 / 3) * Math.tan(Math.PI / (this.vertices.length * 2));
+
+      var radius = this._radius;
+      var rc = radius * c;
+
+      for (var i = 0, numVertices = this.vertices.length; i < numVertices; i++) {
+        var pct = i / numVertices;
+        var theta = pct * TWO_PI$1;
+
+        var x = radius * cos$2(theta);
+        var y = radius * sin$2(theta);
+
+        var lx = rc * cos$2(theta - HALF_PI$1);
+        var ly = rc * sin$2(theta - HALF_PI$1);
+
+        var rx = rc * cos$2(theta + HALF_PI$1);
+        var ry = rc * sin$2(theta + HALF_PI$1);
+
+        var v = this.vertices[i];
+
+        v.command = Commands.curve;
+        v.set(x, y);
+        v.controls.left.set(lx, ly);
+        v.controls.right.set(rx, ry);
+      }
+    }
+
+    Path.prototype._update.call(this);
+    return this;
+
+  },
+
+  /**
+   * @name Two.Circle#flagReset
+   * @function
+   * @private
+   * @description Called internally to reset all flags. Ensures that only properties that change are updated before being sent to the renderer.
+   */
+  flagReset: function() {
+
+    this._flagRadius = false;
+
+    Path.prototype.flagReset.call(this);
+    return this;
+
+  },
+
+  /**
+   * @name Two.Circle#clone
+   * @function
+   * @param {Two.Group} [parent] - The parent group or scene to add the clone to.
+   * @returns {Two.Circle}
+   * @description Create a new instance of {@link Two.Circle} with the same properties of the current path.
+   */
+  clone: function(parent) {
+
+    var clone = new Circle(0, 0, this.radius, this.vertices.length);
+
+    clone.translation.copy(this.translation);
+    clone.rotation = this.rotation;
+    clone.scale = this.scale;
+
+    if (this.matrix.manual) {
+      clone.matrix.copy(this.matrix);
+    }
+
+    _.each(Path.Properties, function(k) {
+      clone[k] = this[k];
+    }, this);
+
+    if (parent) {
+      parent.add(clone);
+    }
+
+    return clone;
+
+  },
+
+  /**
+   * @name Two.Circle#toObject
+   * @function
+   * @returns {Object}
+   * @description Return a JSON compatible plain object that represents the path.
+   */
+  toObject: function() {
+
+    var object = Path.prototype.toObject.call(this);
+
+    _.each(Circle.Properties, function(property) {
+      object[property] = this[property];
+    }, this);
+
+    return object;
+
+  }
+
+});
+
+Circle.MakeObservable(Circle.prototype);
+
+var TWO_PI$2 = Math.PI * 2, HALF_PI$2 = Math.PI / 2;
+var cos$3 = Math.cos, sin$3 = Math.sin;
+
+/**
+ * @name Two.Ellipse
+ * @class
+ * @extends Two.Path
+ * @param {Number} [x=0] - The x position of the ellipse.
+ * @param {Number} [y=0] - The y position of the ellipse.
+ * @param {Number} rx - The radius value of the ellipse in the x direction.
+ * @param {Number} ry - The radius value of the ellipse in the y direction.
+ * @param {Number} [resolution=4] - The number of vertices used to construct the ellipse.
+ */
+var Ellipse = function(ox, oy, rx, ry, resolution) {
+
+  if (typeof ry !== 'number') {
+    ry = rx;
+  }
+
+  // At least 2 vertices are required for proper circlage
+  var amount = resolution ? Math.max(resolution, 2) : 4;
+
+  var points = [];
+  for (var i = 0; i < amount; i++) {
+    points.push(new Anchor());
+  }
+
+  Path.call(this, points, true, true, true);
+
+  /**
+   * @name Two.Ellipse#width
+   * @property {Number} - The width of the ellipse.
+   */
+  this.width = rx * 2;
+  /**
+   * @name Two.Ellipse#height
+   * @property {Number} - The height of the ellipse.
+   */
+  this.height = ry * 2;
+
+  this._update();
+  this.translation.set(ox, oy);
+
+};
+
+_.extend(Ellipse, {
+
+  /**
+   * @name Two.Ellipse.Properties
+   * @property {String[]} - A list of properties that are on every {@link Two.Ellipse}.
+   */
+  Properties: ['width', 'height'],
+
+  /**
+   * @name Two.Ellipse.MakeObservable
+   * @function
+   * @param {Object} object - The object to make observable.
+   * @description Convenience function to apply observable qualities of a {@link Two.Ellipse} to any object. Handy if you'd like to extend the {@link Two.Ellipse} class on a custom class.
+   */
+  MakeObservable: function(obj) {
+
+    Path.MakeObservable(obj);
+    _.each(Ellipse.Properties, defineGetterSetter, obj);
+
+  }
+
+});
+
+_.extend(Ellipse.prototype, Path.prototype, {
+
+  /**
+   * @name Two.Ellipse#_flagWidth
+   * @private
+   * @property {Boolean} - Determines whether the {@link Two.Ellipse#width} needs updating.
+   */
+  _flagWidth: false,
+  /**
+   * @name Two.Ellipse#_flagHeight
+   * @private
+   * @property {Boolean} - Determines whether the {@link Two.Ellipse#height} needs updating.
+   */
+  _flagHeight: false,
+
+  /**
+   * @name Two.Polygon#_width
+   * @private
+   * @see {@link Two.Ellipse#width}
+   */
+  _width: 0,
+  /**
+   * @name Two.Polygon#_height
+   * @private
+   * @see {@link Two.Ellipse#height}
+   */
+  _height: 0,
+
+  constructor: Ellipse,
+
+  /**
+   * @name Two.Ellipse#_update
+   * @function
+   * @private
+   * @param {Boolean} [bubbles=false] - Force the parent to `_update` as well.
+   * @description This is called before rendering happens by the renderer. This applies all changes necessary so that rendering is up-to-date but not updated more than it needs to be.
+   * @nota-bene Try not to call this method more than once a frame.
+   */
+  _update: function() {
+
+    if (this._flagWidth || this._flagHeight) {
+      // Coefficient for approximating circular arcs with Bezier curves
+      var c = (4 / 3) * Math.tan(Math.PI / (this.vertices.length * 2));
+      var radiusX = this._width / 2;
+      var radiusY = this._height / 2;
+
+      for (var i = 0, numVertices = this.vertices.length; i < numVertices; i++) {
+        var pct = i / numVertices;
+        var theta = pct * TWO_PI$2;
+
+        var x = radiusX * cos$3(theta);
+        var y = radiusY * sin$3(theta);
+
+        var lx = radiusX * c * cos$3(theta - HALF_PI$2);
+        var ly = radiusY * c * sin$3(theta - HALF_PI$2);
+
+        var rx = radiusX * c * cos$3(theta + HALF_PI$2);
+        var ry = radiusY * c * sin$3(theta + HALF_PI$2);
+
+        var v = this.vertices[i];
+
+        v.command = Commands.curve;
+        v.set(x, y);
+        v.controls.left.set(lx, ly);
+        v.controls.right.set(rx, ry);
+      }
+    }
+
+    Path.prototype._update.call(this);
+    return this;
+
+  },
+
+  /**
+   * @name Two.Ellipse#flagReset
+   * @function
+   * @private
+   * @description Called internally to reset all flags. Ensures that only properties that change are updated before being sent to the renderer.
+   */
+  flagReset: function() {
+
+    this._flagWidth = this._flagHeight = false;
+
+    Path.prototype.flagReset.call(this);
+    return this;
+
+  },
+
+  /**
+   * @name Two.Ellipse#clone
+   * @function
+   * @param {Two.Group} [parent] - The parent group or scene to add the clone to.
+   * @returns {Two.Polygon}
+   * @description Create a new instance of {@link Two.Polygon} with the same properties of the current path.
+   */
+  clone: function(parent) {
+
+    var rx = this.width / 2;
+    var ry = this.height / 2;
+    var resolution = this.vertices.length;
+    var clone = new Ellipse(0, 0, rx, ry, resolution);
+
+    clone.translation.copy(this.translation);
+    clone.rotation = this.rotation;
+    clone.scale = this.scale;
+
+    if (this.matrix.manual) {
+      clone.matrix.copy(this.matrix);
+    }
+
+    _.each(Path.Properties, function(k) {
+      clone[k] = this[k];
+    }, this);
+
+    if (parent) {
+      parent.add(clone);
+    }
+
+    return clone;
+
+  },
+
+  /**
+   * @name Two.Ellipse#toObject
+   * @function
+   * @returns {Object}
+   * @description Return a JSON compatible plain object that represents the path.
+   */
+  toObject: function() {
+
+    var object = Path.prototype.toObject.call(this);
+
+    _.each(Ellipse.Properties, function(property) {
+      object[property] = this[property];
+    }, this);
+
+    return object;
+
+  }
+
+});
+
+Ellipse.MakeObservable(Ellipse.prototype);
+
+/**
+ * @name Two.Line
+ * @class
+ * @extends Two.Path
+ * @param {Number} [x1=0] - The x position of the first vertex on the line.
+ * @param {Number} [y1=0] - The y position of the first vertex on the line.
+ * @param {Number} [x2=0] - The x position of the second vertex on the line.
+ * @param {Number} [y2=0] - The y position of the second vertex on the line.
+ */
+var Line = function(x1, y1, x2, y2) {
+
+  Path.call(this, [
+      new Anchor(x1, y1),
+      new Anchor(x2, y2)
+  ]);
+
+  this.vertices[0].command = Commands.move;
+  this.vertices[1].command = Commands.line;
+
+  this.automatic = false;
+
+};
+
+_.extend(Line.prototype, Path.prototype);
+Line.prototype.constructor = Line;
+
+Path.MakeObservable(Line.prototype);
+
+/**
+ * @name Two.Rectangle
+ * @class
+ * @extends Two.Path
+ * @param {Number} [x=0] - The x position of the rectangle.
+ * @param {Number} [y=0] - The y position of the rectangle.
+ * @param {Number} width - The width value of the rectangle.
+ * @param {Number} height - The width value of the rectangle.
+ */
+var Rectangle = function(x, y, width, height) {
+
+  Path.call(this, [
+    new Anchor(),
+    new Anchor(),
+    new Anchor(),
+    new Anchor()
+    // new Anchor() // TODO: Figure out how to handle this for `beginning` / `ending` animations
+  ], true, false, true);
+
+  /**
+   * @name Two.Rectangle#width
+   * @property {Number} - The size of the width of the rectangle.
+   */
+  this.width = width;
+  /**
+   * @name Two.Rectangle#height
+   * @property {Number} - The size of the height of the rectangle.
+   */
+  this.height = height;
+
+  /**
+   * @name Two.Rectangle#origin
+   * @property {Number} - A two-component vector describing the origin offset to draw the rectangle. Default is `0, 0`.
+   */
+  this.origin = new Vector();
+  this.translation.set(x, y);
+
+  this._update();
+
+};
+
+_.extend(Rectangle, {
+
+  /**
+   * @name Two.Rectangle.Properties
+   * @property {String[]} - A list of properties that are on every {@link Two.Rectangle}.
+   */
+  Properties: ['width', 'height'],
+
+  /**
+   * @name Two.Rectangle.MakeObservable
+   * @function
+   * @param {Object} object - The object to make observable.
+   * @description Convenience function to apply observable qualities of a {@link Two.Rectangle} to any object. Handy if you'd like to extend the {@link Two.Rectangle} class on a custom class.
+   */
+  MakeObservable: function(object) {
+
+    Path.MakeObservable(object);
+    _.each(Rectangle.Properties, defineGetterSetter, object);
+
+    Object.defineProperty(object, 'origin', {
+      enumerable: true,
+      get: function() {
+        return this._origin;
+      },
+      set: function(v) {
+        if (this._origin) {
+          this._origin.unbind(Events.Types.change, this._renderer.flagVertices);
+        }
+        this._origin = v;
+        this._origin.bind(Events.Types.change, this._renderer.flagVertices);
+        this._renderer.flagVertices();
+      }
+    });
+
+  }
+
+});
+
+_.extend(Rectangle.prototype, Path.prototype, {
+
+  /**
+   * @name Two.Rectangle#_flagWidth
+   * @private
+   * @property {Boolean} - Determines whether the {@link Two.Rectangle#width} needs updating.
+   */
+  _flagWidth: 0,
+  /**
+   * @name Two.Rectangle#_flagHeight
+   * @private
+   * @property {Boolean} - Determines whether the {@link Two.Rectangle#height} needs updating.
+   */
+  _flagHeight: 0,
+
+  /**
+   * @name Two.Rectangle#_width
+   * @private
+   * @see {@link Two.Rectangle#width}
+   */
+  _width: 0,
+  /**
+   * @name Two.Rectangle#_height
+   * @private
+   * @see {@link Two.Rectangle#height}
+   */
+  _height: 0,
+
+  _origin: null,
+
+  constructor: Rectangle,
+
+  /**
+   * @name Two.Rectangle#_update
+   * @function
+   * @private
+   * @param {Boolean} [bubbles=false] - Force the parent to `_update` as well.
+   * @description This is called before rendering happens by the renderer. This applies all changes necessary so that rendering is up-to-date but not updated more than it needs to be.
+   * @nota-bene Try not to call this method more than once a frame.
+   */
+  _update: function() {
+
+    if (this._flagWidth || this._flagHeight) {
+
+      var xr = this._width / 2;
+      var yr = this._height / 2;
+
+      this.vertices[0].set(-xr, -yr).add(this._origin).command = Commands.move;
+      this.vertices[1].set(xr, -yr).add(this._origin).command = Commands.line;
+      this.vertices[2].set(xr, yr).add(this._origin).command = Commands.line;
+      this.vertices[3].set(-xr, yr).add(this._origin).command = Commands.line;
+      // FYI: Two.Sprite and Two.ImageSequence have 4 verts
+      if (this.vertices[4]) {
+        this.vertices[4].set(-xr, -yr).add(this._origin).command = Commands.line;
+      }
+
+    }
+
+    Path.prototype._update.call(this);
+
+    return this;
+
+  },
+
+  /**
+   * @name Two.Rectangle#flagReset
+   * @function
+   * @private
+   * @description Called internally to reset all flags. Ensures that only properties that change are updated before being sent to the renderer.
+   */
+  flagReset: function() {
+
+    this._flagWidth = this._flagHeight = false;
+    Path.prototype.flagReset.call(this);
+
+    return this;
+
+  },
+
+  /**
+   * @name Two.Rectangle#clone
+   * @function
+   * @param {Two.Group} [parent] - The parent group or scene to add the clone to.
+   * @returns {Two.Rectangle}
+   * @description Create a new instance of {@link Two.Rectangle} with the same properties of the current path.
+   */
+  clone: function(parent) {
+
+    var clone = new Rectangle(0, 0, this.width, this.height);
+
+    clone.translation.copy(this.translation);
+    clone.rotation = this.rotation;
+    clone.scale = this.scale;
+
+    if (this.matrix.manual) {
+      clone.matrix.copy(this.matrix);
+    }
+
+    _.each(Path.Properties, function(k) {
+      clone[k] = this[k];
+    }, this);
+
+    if (parent) {
+      parent.add(clone);
+    }
+
+    return clone;
+
+  },
+
+  /**
+   * @name Two.Rectangle#toObject
+   * @function
+   * @returns {Object}
+   * @description Return a JSON compatible plain object that represents the path.
+   */
+  toObject: function() {
+
+    var object = Path.prototype.toObject.call(this);
+    object.width = this.width;
+    object.height = this.height;
+    object.origin = this.origin.toObject();
+    return object;
+
+  }
+
+});
+
+Rectangle.MakeObservable(Rectangle.prototype);
+
+/**
+ * @name Two.RoundedRectangle
+ * @class
+ * @extends Two.Path
+ * @param {Number} [x=0] - The x position of the rounded rectangle.
+ * @param {Number} [y=0] - The y position of the rounded rectangle.
+ * @param {Number} width - The width value of the rounded rectangle.
+ * @param {Number} height - The width value of the rounded rectangle.
+ * @param {Number} radius - The radius value of the rounded rectangle.
+ * @param {Number} [resolution=12] - The number of vertices used to construct the rounded rectangle.
+ */
+var RoundedRectangle = function(ox, oy, width, height, radius) {
+
+  if (typeof radius === 'undefined') {
+    radius = Math.floor(Math.min(width, height) / 12);
+  }
+
+  var amount = 10;
+
+  var points = [];
+  for (var i = 0; i < amount; i++) {
+    points.push(
+      new Anchor(0, 0, 0, 0, 0, 0,
+        i === 0 ? Commands.move : Commands.curve)
+    );
+  }
+
+  // points[points.length - 1].command = Two.Commands.close;
+
+  Path.call(this, points);
+
+  this.closed = true;
+  this.automatic = false;
+
+  this._renderer.flagRadius = RoundedRectangle.FlagRadius.bind(this);
+
+  /**
+   * @name Two.RoundedRectangle#width
+   * @property {Number} - The width of the rounded rectangle.
+   */
+  this.width = width;
+  /**
+   * @name Two.RoundedRectangle#height
+   * @property {Number} - The height of the rounded rectangle.
+   */
+  this.height = height;
+  /**
+   * @name Two.RoundedRectangle#radius
+   * @property {Number} - The size of the radius of the rounded rectangle.
+   */
+  this.radius = radius;
+
+  this._update();
+  this.translation.set(ox, oy);
+
+};
+
+_.extend(RoundedRectangle, {
+
+  /**
+   * @name Two.RoundedRectangle.Properties
+   * @property {String[]} - A list of properties that are on every {@link Two.RoundedRectangle}.
+   */
+  Properties: ['width', 'height'],
+
+  /**
+   * @name Two.RoundedRectangle.FlagRadius
+   * @property {Function} - A convenience function to trigger the flag for radius changing.
+   */
+  FlagRadius: function() {
+    this._flagRadius = true;
+  },
+
+  /**
+   * @name Two.RoundedRectangle.MakeObservable
+   * @function
+   * @param {Object} object - The object to make observable.
+   * @description Convenience function to apply observable qualities of a {@link Two.RoundedRectangle} to any object. Handy if you'd like to extend the {@link Two.RoundedRectangle} class on a custom class.
+   */
+  MakeObservable: function(object) {
+
+    Path.MakeObservable(object);
+    _.each(RoundedRectangle.Properties, defineGetterSetter, object);
+
+    Object.defineProperty(object, 'radius', {
+      enumerable: true,
+      get: function() {
+        return this._radius;
+      },
+      set: function(v) {
+
+        if (this._radius instanceof Vector) {
+          this._radius.unbind(Events.Types.change, this._renderer.flagRadius);
+        }
+
+        this._radius = v;
+
+        if (this._radius instanceof Vector) {
+          this._radius.bind(Events.Types.change, this._renderer.flagRadius);
+        }
+
+        this._flagRadius = true;
+
+      }
+    });
+
+  }
+
+});
+
+_.extend(RoundedRectangle.prototype, Path.prototype, {
+
+  /**
+   * @name Two.RoundedRectangle#_flagWidth
+   * @private
+   * @property {Boolean} - Determines whether the {@link Two.RoundedRectangle#width} needs updating.
+   */
+  _flagWidth: false,
+  /**
+   * @name Two.RoundedRectangle#_flagHeight
+   * @private
+   * @property {Boolean} - Determines whether the {@link Two.RoundedRectangle#height} needs updating.
+   */
+  _flagHeight: false,
+  /**
+   * @name Two.RoundedRectangle#_flagRadius
+   * @private
+   * @property {Boolean} - Determines whether the {@link Two.RoundedRectangle#radius} needs updating.
+   */
+  _flagRadius: false,
+
+  /**
+   * @name Two.RoundedRectangle#_width
+   * @private
+   * @see {@link Two.RoundedRectangle#width}
+   */
+  _width: 0,
+  /**
+   * @name Two.RoundedRectangle#_height
+   * @private
+   * @see {@link Two.RoundedRectangle#height}
+   */
+  _height: 0,
+  /**
+   * @name Two.RoundedRectangle#_radius
+   * @private
+   * @see {@link Two.RoundedRectangle#radius}
+   */
+  _radius: 0,
+
+  constructor: RoundedRectangle,
+
+  /**
+   * @name Two.RoundedRectangle#_update
+   * @function
+   * @private
+   * @param {Boolean} [bubbles=false] - Force the parent to `_update` as well.
+   * @description This is called before rendering happens by the renderer. This applies all changes necessary so that rendering is up-to-date but not updated more than it needs to be.
+   * @nota-bene Try not to call this method more than once a frame.
+   */
+  _update: function() {
+
+    if (this._flagWidth || this._flagHeight || this._flagRadius) {
+
+      var width = this._width;
+      var height = this._height;
+
+      var rx, ry;
+
+      if (this._radius instanceof Vector) {
+        rx = this._radius.x;
+        ry = this._radius.y;
+      } else {
+        rx = this._radius;
+        ry = this._radius;
+      }
+
+      var v;
+      var w = width / 2;
+      var h = height / 2;
+
+      v = this.vertices[0];
+      v.x = - (w - rx);
+      v.y = - h;
+
+      // Upper Right Corner
+
+      v = this.vertices[1];
+      v.x = (w - rx);
+      v.y = - h;
+      v.controls.left.clear();
+      v.controls.right.x = rx;
+      v.controls.right.y = 0;
+
+      v = this.vertices[2];
+      v.x = w;
+      v.y = - (h - ry);
+      v.controls.right.clear();
+      v.controls.left.clear();
+
+      // Bottom Right Corner
+
+      v = this.vertices[3];
+      v.x = w;
+      v.y = (h - ry);
+      v.controls.left.clear();
+      v.controls.right.x = 0;
+      v.controls.right.y = ry;
+
+      v = this.vertices[4];
+      v.x = (w - rx);
+      v.y = h;
+      v.controls.right.clear();
+      v.controls.left.clear();
+
+      // Bottom Left Corner
+
+      v = this.vertices[5];
+      v.x = - (w - rx);
+      v.y = h;
+      v.controls.left.clear();
+      v.controls.right.x = - rx;
+      v.controls.right.y = 0;
+
+      v = this.vertices[6];
+      v.x = - w;
+      v.y = (h - ry);
+      v.controls.left.clear();
+      v.controls.right.clear();
+
+      // Upper Left Corner
+
+      v = this.vertices[7];
+      v.x = - w;
+      v.y = - (h - ry);
+      v.controls.left.clear();
+      v.controls.right.x = 0;
+      v.controls.right.y = - ry;
+
+      v = this.vertices[8];
+      v.x = - (w - rx);
+      v.y = - h;
+      v.controls.left.clear();
+      v.controls.right.clear();
+
+      v = this.vertices[9];
+      v.copy(this.vertices[8]);
+
+    }
+
+    Path.prototype._update.call(this);
+
+    return this;
+
+  },
+
+  /**
+   * @name Two.RoundedRectangle#flagReset
+   * @function
+   * @private
+   * @description Called internally to reset all flags. Ensures that only properties that change are updated before being sent to the renderer.
+   */
+  flagReset: function() {
+
+    this._flagWidth = this._flagHeight = this._flagRadius = false;
+    Path.prototype.flagReset.call(this);
+
+    return this;
+
+  },
+
+  /**
+   * @name Two.RoundedRectangle#clone
+   * @function
+   * @param {Two.Group} [parent] - The parent group or scene to add the clone to.
+   * @returns {Two.RoundedRectangle}
+   * @description Create a new instance of {@link Two.RoundedRectangle} with the same properties of the current path.
+   */
+  clone: function(parent) {
+
+    var width = this.width;
+    var height = this.height;
+    var radius = this.radius;
+
+    var clone = new RoundedRectangle(0, 0, width, height, radius);
+
+    clone.translation.copy(this.translation);
+    clone.rotation = this.rotation;
+    clone.scale = this.scale;
+
+    if (this.matrix.manual) {
+      clone.matrix.copy(this.matrix);
+    }
+
+    _.each(Path.Properties, function(k) {
+      clone[k] = this[k];
+    }, this);
+
+    if (parent) {
+      parent.add(clone);
+    }
+
+    return clone;
+
+  },
+
+  /**
+   * @name Two.RoundedRectangle#toObject
+   * @function
+   * @returns {Object}
+   * @description Return a JSON compatible plain object that represents the path.
+   */
+  toObject: function() {
+
+    var object = Path.prototype.toObject.call(this);
+
+    _.each(RoundedRectangle.Properties, function(property) {
+      object[property] = this[property];
+    }, this);
+
+    object.radius = typeof this.radius === 'number'
+      ? this.radius : this.radius.toObject();
+
+    return object;
+
+  }
+
+});
+
+RoundedRectangle.MakeObservable(RoundedRectangle.prototype);
+
+/**
+ * @name Two.Text
+ * @class
+ * @extends Two.Shape
+ * @param {String} message - The String to be rendered to the scene.
+ * @param {Number} [x=0] - The position in the x direction for the object.
+ * @param {Number} [y=0] - The position in the y direction for the object.
+ * @param {Object} [styles] - An object where styles are applied. Attribute must exist in Two.Text.Properties.
+ * @description This is a primitive class for creating drawable text that can be added to the scenegraph.
+ */
+var Text = function(message, x, y, styles) {
+
+  Shape.call(this);
+
+  this._renderer.type = 'text';
+  this._renderer.flagFill = Text.FlagFill.bind(this);
+  this._renderer.flagStroke = Text.FlagStroke.bind(this);
+
+  this.value = message;
+
+  if (typeof x === 'number') {
+      this.translation.x = x;
+  }
+  if (typeof y === 'number') {
+      this.translation.y = y;
+  }
+
+  /**
+   * @name Two.Text#dashes
+   * @property {Number[]} - Array of numbers. Odd indices represent dash length. Even indices represent dash space.
+   * @description A list of numbers that represent the repeated dash length and dash space applied to the stroke of the text.
+   * @see {@link https://developer.mozilla.org/en-US/docs/Web/SVG/Attribute/stroke-dasharray} for more information on the SVG stroke-dasharray attribute.
+   */
+  this.dashes = [];
+
+  /**
+   * @name Two.Text#dashes#offset
+   * @property {Number} - A number in pixels to offset {@link Two.Text#dashes} display.
+   */
+  this.dashes.offset = 0;
+
+  if (!_.isObject(styles)) {
+    return this;
+  }
+
+  _.each(Text.Properties, function(property) {
+
+    if (property in styles) {
+      this[property] = styles[property];
+    }
+
+  }, this);
+
+};
+
+_.extend(Text, {
+
+  /**
+   * @name Two.Text.Ratio
+   * @property {Number} - Approximate aspect ratio of a typeface's character width to height.
+   */
+  Ratio: 0.6,
+
+  /**
+   * @name Two.Text.Properties
+   * @property {String[]} - A list of properties that are on every {@link Two.Text}.
+   */
+  Properties: [
+    'value', 'family', 'size', 'leading', 'alignment', 'linewidth', 'style',
+    'weight', 'decoration', 'baseline', 'opacity', 'visible', 'className',
+    'fill', 'stroke',
+  ],
+
+  /**
+   * @name Two.Text.FlagFill
+   * @function
+   * @description Cached method to let renderers know the fill property have been updated on a {@link Two.Text}.
+   */
+  FlagFill: function() {
+    this._flagFill = true;
+  },
+
+  /**
+   * @name Two.Text.FlagStroke
+   * @function
+   * @description Cached method to let renderers know the stroke property have been updated on a {@link Two.Text}.
+   */
+  FlagStroke: function() {
+    this._flagStroke = true;
+  },
+
+  MakeObservable: function(object) {
+
+    Shape.MakeObservable(object);
+
+    _.each(Text.Properties.slice(0, 12), defineGetterSetter, object);
+
+    Object.defineProperty(object, 'fill', {
+      enumerable: true,
+      get: function() {
+        return this._fill;
+      },
+      set: function(f) {
+
+        if (this._fill instanceof Gradient
+          || this._fill instanceof LinearGradient
+          || this._fill instanceof RadialGradient
+          || this._fill instanceof Texture) {
+          this._fill.unbind(Events.Types.change, this._renderer.flagFill);
+        }
+
+        this._fill = f;
+        this._flagFill = true;
+
+        if (this._fill instanceof Gradient
+          || this._fill instanceof LinearGradient
+          || this._fill instanceof RadialGradient
+          || this._fill instanceof Texture) {
+          this._fill.bind(Events.Types.change, this._renderer.flagFill);
+        }
+
+      }
+    });
+
+    Object.defineProperty(object, 'stroke', {
+      enumerable: true,
+      get: function() {
+        return this._stroke;
+      },
+      set: function(f) {
+
+        if (this._stroke instanceof Gradient
+          || this._stroke instanceof LinearGradient
+          || this._stroke instanceof RadialGradient
+          || this._stroke instanceof Texture) {
+          this._stroke.unbind(Events.Types.change, this._renderer.flagStroke);
+        }
+
+        this._stroke = f;
+        this._flagStroke = true;
+
+        if (this._stroke instanceof Gradient
+          || this._stroke instanceof LinearGradient
+          || this._stroke instanceof RadialGradient
+          || this._stroke instanceof Texture) {
+          this._stroke.bind(Events.Types.change, this._renderer.flagStroke);
+        }
+
+      }
+    });
+
+    Object.defineProperty(object, 'clip', {
+      enumerable: true,
+      get: function() {
+        return this._clip;
+      },
+      set: function(v) {
+        this._clip = v;
+        this._flagClip = true;
+      }
+    });
+
+    Object.defineProperty(object, 'dashes', {
+      enumerable: true,
+      get: function() {
+        return this._dashes;
+      },
+      set: function(v) {
+        if (typeof v.offset !== 'number') {
+          v.offset = this._dashes.offset || 0;
+        }
+        this._dashes = v;
+      }
+    });
+
+  }
+
+});
+
+_.extend(Text.prototype, Shape.prototype, {
+
+  // Flags
+  // http://en.wikipedia.org/wiki/Flag
+
+  /**
+   * @name Two.Text#_flagValue
+   * @private
+   * @property {Boolean} - Determines whether the {@link Two.Text#value} need updating.
+   */
+  _flagValue: true,
+
+  /**
+   * @name Two.Text#_flagFamily
+   * @private
+   * @property {Boolean} - Determines whether the {@link Two.Text#family} need updating.
+   */
+  _flagFamily: true,
+
+  /**
+   * @name Two.Text#_flagSize
+   * @private
+   * @property {Boolean} - Determines whether the {@link Two.Text#size} need updating.
+   */
+  _flagSize: true,
+
+  /**
+   * @name Two.Text#_flagLeading
+   * @private
+   * @property {Boolean} - Determines whether the {@link Two.Text#leading} need updating.
+   */
+  _flagLeading: true,
+
+  /**
+   * @name Two.Text#_flagAlignment
+   * @private
+   * @property {Boolean} - Determines whether the {@link Two.Text#alignment} need updating.
+   */
+  _flagAlignment: true,
+
+  /**
+   * @name Two.Text#_flagBaseline
+   * @private
+   * @property {Boolean} - Determines whether the {@link Two.Text#baseline} need updating.
+   */
+  _flagBaseline: true,
+
+  /**
+   * @name Two.Text#_flagStyle
+   * @private
+   * @property {Boolean} - Determines whether the {@link Two.Text#style} need updating.
+   */
+  _flagStyle: true,
+
+  /**
+   * @name Two.Text#_flagWeight
+   * @private
+   * @property {Boolean} - Determines whether the {@link Two.Text#weight} need updating.
+   */
+  _flagWeight: true,
+
+  /**
+   * @name Two.Text#_flagDecoration
+   * @private
+   * @property {Boolean} - Determines whether the {@link Two.Text#decoration} need updating.
+   */
+  _flagDecoration: true,
+
+  /**
+   * @name Two.Text#_flagFill
+   * @private
+   * @property {Boolean} - Determines whether the {@link Two.Text#fill} need updating.
+   */
+  _flagFill: true,
+
+  /**
+   * @name Two.Text#_flagStroke
+   * @private
+   * @property {Boolean} - Determines whether the {@link Two.Text#stroke} need updating.
+   */
+  _flagStroke: true,
+
+  /**
+   * @name Two.Text#_flagLinewidth
+   * @private
+   * @property {Boolean} - Determines whether the {@link Two.Text#linewidth} need updating.
+   */
+  _flagLinewidth: true,
+
+  /**
+   * @name Two.Text#_flagOpacity
+   * @private
+   * @property {Boolean} - Determines whether the {@link Two.Text#opacity} need updating.
+   */
+  _flagOpacity: true,
+
+  /**
+   * @name Two.Text#_flagClassName
+   * @private
+   * @property {Boolean} - Determines whether the {@link Two.Text#className} need updating.
+   */
+  _flagClassName: true,
+
+  /**
+   * @name Two.Text#_flagVisible
+   * @private
+   * @property {Boolean} - Determines whether the {@link Two.Text#visible} need updating.
+   */
+  _flagVisible: true,
+
+  /**
+   * @name Two.Text#_flagClip
+   * @private
+   * @property {Boolean} - Determines whether the {@link Two.Text#clip} need updating.
+   */
+  _flagClip: false,
+
+  // Underlying Properties
+
+  /**
+   * @name Two.Text#value
+   * @property {String} - The characters to be rendered to the the screen. Referred to in the documentation sometimes as the `message`.
+   */
+  _value: '',
+
+  /**
+   * @name Two.Text#family
+   * @property {String} - The font family Two.js should attempt to regsiter for rendering. The default value is `'sans-serif'`. Comma separated font names can be supplied as a "stack", similar to the CSS implementation of `font-family`.
+   */
+  _family: 'sans-serif',
+
+  /**
+   * @name Two.Text#size
+   * @property {Number} - The font size in Two.js point space. Defaults to `13`.
+   */
+  _size: 13,
+
+  /**
+   * @name Two.Text#leading
+   * @property {Number} - The height between lines measured from base to base in Two.js point space. Defaults to `17`.
+   */
+  _leading: 17,
+
+  /**
+   * @name Two.Text#alignment
+   * @property {String} - Alignment of text in relation to {@link Two.Text#translation}'s coordinates. Possible values include `'left'`, `'center'`, `'right'`. Defaults to `'center'`.
+   */
+  _alignment: 'center',
+
+  /**
+   * @name Two.Text#baseline
+   * @property {String} - The vertical aligment of the text in relation to {@link Two.Text#translation}'s coordinates. Possible values include `'top'`, `'middle'`, `'bottom'`, and `'baseline'`. Defaults to `'baseline'`.
+   */
+  _baseline: 'middle',
+
+  /**
+   * @name Two.Text#style
+   * @property {String} - The font's style. Possible values include '`normal`', `'italic'`. Defaults to `'normal'`.
+   */
+  _style: 'normal',
+
+  /**
+   * @name Two.Text#weight
+   * @property {Number} - A number at intervals of 100 to describe the font's weight. This compatibility varies with the typeface's variant weights. Larger values are bolder. Smaller values are thinner. Defaults to `'500'`.
+   */
+  _weight: 500,
+
+  /**
+   * @name Two.Text#decoration
+   * @property {String} - String to delineate whether text should be decorated with for instance an `'underline'`. Defaults to `'none'`.
+   */
+  _decoration: 'none',
+
+  /**
+   * @name Two.Text#fill
+   * @property {(CssColor|Two.Gradient|Two.Texture)} - The value of what the text object should be filled in with.
+   * @see {@link https://developer.mozilla.org/en-US/docs/Web/CSS/color_value} for more information on CSS Colors.
+   */
+  _fill: '#000',
+
+  /**
+   * @name Two.Text#stroke
+   * @property {(CssColor|Two.Gradient|Two.Texture)} - The value of what the text object should be filled in with.
+   * @see {@link https://developer.mozilla.org/en-US/docs/Web/CSS/color_value} for more information on CSS Colors.
+   */
+  _stroke: 'transparent',
+
+  /**
+   * @name Two.Text#linewidth
+   * @property {Number} - The thickness in pixels of the stroke.
+   */
+  _linewidth: 1,
+
+  /**
+   * @name Two.Text#opacity
+   * @property {Number} - The opaqueness of the text object.
+   * @nota-bene Can be used in conjunction with CSS Colors that have an alpha value.
+   */
+  _opacity: 1,
+
+  /**
+   * @name Two.Text#className
+   * @property {String} - A class to be applied to the element to be compatible with CSS styling. Only available for the {@link Two.SvgRenderer}.
+   */
+  _className: '',
+
+  /**
+   * @name Two.Text#visible
+   * @property {Boolean} - Display the text object or not.
+   * @nota-bene For {@link Two.CanvasRenderer} and {@link Two.WebGLRenderer} when set to false all updating is disabled improving performance dramatically with many objects in the scene.
+   */
+  _visible: true,
+
+  /**
+   * @name Two.Text#clip
+   * @property {Two.Shape} - Object to define clipping area.
+   * @nota-bene This property is currently not working becuase of SVG spec issues found here {@link https://code.google.com/p/chromium/issues/detail?id=370951}.
+   */
+  _clip: false,
+
+  /**
+   * @name Two.Text#_dashes
+   * @private
+   * @see {@link Two.Text#dashes}
+   */
+  _dashes: [],
+
+  constructor: Text,
+
+  /**
+   * @name Two.Text#remove
+   * @function
+   * @description Remove self from the scene / parent.
+   */
+  remove: function() {
+
+    if (!this.parent) {
+      return this;
+    }
+
+    this.parent.remove(this);
+
+    return this;
+
+  },
+
+  /**
+   * @name Two.Text#clone
+   * @function
+   * @param {Two.Group} [parent] - The parent group or scene to add the clone to.
+   * @returns {Two.Text}
+   * @description Create a new instance of {@link Two.Text} with the same properties of the current text object.
+   */
+  clone: function(parent) {
+
+    var clone = new Text(this.value);
+    clone.translation.copy(this.translation);
+    clone.rotation = this.rotation;
+    clone.scale = this.scale;
+
+    _.each(Text.Properties, function(property) {
+      clone[property] = this[property];
+    }, this);
+
+    if (this.matrix.manual) {
+      clone.matrix.copy(this.matrix);
+    }
+
+    if (parent) {
+      parent.add(clone);
+    }
+
+    return clone._update();
+
+  },
+
+  /**
+   * @name Two.Text#toObject
+   * @function
+   * @returns {Object}
+   * @description Return a JSON compatible plain object that represents the text object.
+   */
+  toObject: function() {
+
+    var result = {
+      translation: this.translation.toObject(),
+      rotation: this.rotation,
+      scale: this.scale
+    };
+
+    if (this.matrix.manual) {
+      result.matrix = this.matrix.toObject();
+    }
+
+    _.each(Text.Properties, function(property) {
+      result[property] = this[property];
+    }, this);
+
+    return result;
+
+  },
+
+  /**
+   * @name Two.Text#noFill
+   * @function
+   * @description Short hand method to set fill to `transparent`.
+   */
+  noFill: function() {
+    this.fill = 'transparent';
+    return this;
+  },
+
+  /**
+   * @name Two.Text#noStroke
+   * @function
+   * @description Short hand method to set stroke to `transparent`.
+   */
+  noStroke: function() {
+    this.stroke = undefined;
+    this.linewidth = undefined;
+    return this;
+  },
+
+  // A shim to not break `getBoundingClientRect` calls.
+  // TODO: Implement a way to calculate proper bounding
+  // boxes of `Two.Text`.
+
+  /**
+   * @name Two.Text#getBoundingClientRect
+   * @function
+   * @param {Boolean} [shallow=false] - Describes whether to calculate off local matrix or world matrix.
+   * @returns {Object} - Returns object with top, left, right, bottom, width, height attributes.
+   * @description Return an object with top, left, right, bottom, width, and height parameters of the text object.
+   */
+  getBoundingClientRect: function(shallow) {
+
+    var matrix, v;
+    var left, right, top, bottom;
+
+    // TODO: Update this to not __always__ update. Just when it needs to.
+    this._update(true);
+
+    matrix = shallow ? this._matrix : getComputedMatrix(this);
+
+    var height = this.leading;
+    var width = this.value.length * this.size * Text.Ratio;
+
+    switch (this.alignment) {
+      case 'left':
+        left = 0;
+        right = width;
+        break;
+      case 'right':
+        left = - width;
+        right = 0;
+        break;
+      default:
+        left = - width / 2;
+        right = width / 2;
+    }
+
+    switch (this.baseline) {
+      case 'top':
+        top = 0;
+        bottom = height;
+        break;
+      case 'bottom':
+        top = - height;
+        bottom = 0;
+        break;
+      default:
+        top = - height / 2;
+        bottom = height / 2;
+    }
+
+    v = matrix.multiply(left, top, 1);
+
+    top = v.y;
+    left = v.x;
+
+    v = matrix.multiply(right, bottom, 1);
+
+    right = v.x;
+    bottom = v.y;
+
+    return {
+      top: top,
+      left: left,
+      right: right,
+      bottom: bottom,
+      width: right - left,
+      height: bottom - top
+    };
+
+  },
+
+  /**
+   * @name Two.Text#flagReset
+   * @function
+   * @private
+   * @description Called internally to reset all flags. Ensures that only properties that change are updated before being sent to the renderer.
+   */
+  flagReset: function() {
+
+    this._flagValue = this._flagFamily = this._flagSize =
+      this._flagLeading = this._flagAlignment = this._flagFill =
+      this._flagStroke = this._flagLinewidth = this._flagOpacity =
+      this._flagVisible = this._flagClip = this._flagDecoration =
+      this._flagClassName = this._flagBaseline = this._flagWeight =
+        this._flagStyle = false;
+
+    Shape.prototype.flagReset.call(this);
+
+    return this;
+
+  }
+
+});
+
+Text.MakeObservable(Text.prototype);
+
+var alignments = {
+  start: 'left',
+  middle: 'center',
+  end: 'right'
+};
+
+/**
+ * @name Utils.getAlignment
+ * @function
+ * @param {AlignmentString}
+ * @see {@link https://developer.mozilla.org/en-US/docs/Web/SVG/Attribute/text-anchor}
+ */
+var getAlignment = function(anchor) {
+  return alignments[anchor];
+};
+
+var getBaseline = function(node) {
+  var a = node.getAttribute('dominant-baseline');
+  var b = node.getAttribute('alignment-baseline');
+  return a || b;
+};
+
+/**
+ * @name Utils.extractCSSText
+ * @function
+ * @param {String} text - The CSS text body to be parsed and extracted.
+ * @param {Object} [styles] - The styles object to apply CSS key values to.
+ * @returns {Object} styles
+ * @description Parse CSS text body and apply them as key value pairs to a JavaScript object.
+ */
+var extractCSSText = function(text, styles) {
+
+  var commands, command, name, value;
+
+  if (!styles) {
+    styles = {};
+  }
+
+  commands = text.split(';');
+
+  for (var i = 0; i < commands.length; i++) {
+    command = commands[i].split(':');
+    name = command[0];
+    value = command[1];
+    if (typeof name === 'undefined' || typeof value === 'undefined') {
+      continue;
+    }
+    styles[name] = value.replace(/\s/, '');
+  }
+
+  return styles;
+
+};
+
+/**
+ * @name Utils.getSvgStyles
+ * @function
+ * @param {SvgNode} node - The SVG node to parse.
+ * @returns {Object} styles
+ * @description Get the CSS comands from the `style` attribute of an SVG node and apply them as key value pairs to a JavaScript object.
+ */
+var getSvgStyles = function(node) {
+
+  var styles = {};
+  var attributes = getSvgAttributes(node);
+  var length = Math.max(attributes.length, node.style.length);
+
+  for (var i = 0; i < length; i++) {
+
+    var command = node.style[i];
+    var attribute = attributes[i];
+
+    if (command) {
+      styles[command] = node.style[command];
+    }
+    if (attribute) {
+      styles[attribute] = node.getAttribute(attribute);
+    }
+
+  }
+
+  return styles;
+
+};
+
+var getSvgAttributes = function(node) {
+
+  var attributes = node.getAttributeNames();
+
+  // Reserved attributes to remove
+  var keywords = ['id', 'class', 'transform', 'xmlns', 'viewBox'];
+
+  for (var i = 0; i < keywords.length; i++) {
+    var keyword = keywords[i];
+    var index = Array.prototype.indexOf.call(attributes, keyword);
+    if (index >= 0) {
+      attributes.splice(index, 1);
+    }
+  }
+
+  return attributes;
+
+};
+
+/**
+ * @name Utils.applySvgViewBox
+ * @function
+ * @param {Two.Shape} node - The Two.js object to apply viewbox matrix to
+ * @param {String} value - The viewBox value from the SVG attribute
+ * @returns {Two.Shape} node
+ * @description Applies the transform of the SVG Viewbox on a given node.
+ */
+var applySvgViewBox = function(node, value) {
+
+  var elements = value.split(/\s/);
+
+  var x = parseFloat(elements[0]);
+  var y = parseFloat(elements[1]);
+  var width = parseFloat(elements[2]);
+  var height = parseFloat(elements[3]);
+
+  var s = Math.min(this.width / width, this.height / height);
+
+  node.translation.x -= x * s;
+  node.translation.y -= y * s;
+  node.scale = s;
+
+  return node;
+
+};
+
+var extrapolateScientificNotation = function(command) {
+  var regex = /[\+\-]?[\d\.]*e[\-\+]?\d*/ig;
+  var matches = command.match(regex);
+  if (matches && matches.length > 0) {
+    for (var i = 0; i < matches.length; i++) {
+      var match = matches[i];
+      var items = match.split(/e/i);
+      var value = parseFloat(items[0]);
+      var coefficient = Math.pow(10, parseFloat(items[1]));
+      if (coefficient < 0) {
+        value /= coefficient;
+      } else {
+        value *= coefficient;
+      }
+      command = command.replace(match, value);
+    }
+  }
+  return command;
+};
+
+/**
+ * @name Utils.applySvgAttributes
+ * @function
+ * @param {SvgNode} node - An SVG Node to extrapolate attributes from.
+ * @param {Two.Shape} elem - The Two.js object to apply extrapolated attributes to.
+ * @returns {Two.Shape} The Two.js object passed now with applied attributes.
+ * @description This function iterates through an SVG Node's properties and stores ones of interest. It tries to resolve styles applied via CSS as well.
+ * @TODO Reverse calculate {@link Two.Gradient}s for fill / stroke of any given path.
+ */
+var applySvgAttributes = function(node, elem, parentStyles) {
+
+  var  styles = {}, attributes = {}, extracted = {}, i, key, value, attr;
+
+  // Not available in non browser environments
+  if (root$1.getComputedStyle) {
+    // Convert CSSStyleDeclaration to a normal object
+    var computedStyles = root$1.getComputedStyle(node);
+    i = computedStyles.length;
+
+    while (i--) {
+      key = computedStyles[i];
+      value = computedStyles[key];
+      // Gecko returns undefined for unset properties
+      // Webkit returns the default value
+      if (typeof value !== 'undefined') {
+        styles[key] = value;
+      }
+    }
+  }
+
+  // Convert NodeMap to a normal object
+  for (i = 0; i < node.attributes.length; i++) {
+    attr = node.attributes[i];
+    if (/style/i.test(attr.nodeName)) {
+      extractCSSText(attr.value, extracted);
+    } else {
+      attributes[attr.nodeName] = attr.value;
+    }
+  }
+
+  // Getting the correct opacity is a bit tricky, since SVG path elements don't
+  // support opacity as an attribute, but you can apply it via CSS.
+  // So we take the opacity and set (stroke/fill)-opacity to the same value.
+  if (typeof styles.opacity !== 'undefined') {
+    styles['stroke-opacity'] = styles.opacity;
+    styles['fill-opacity'] = styles.opacity;
+    delete styles.opacity;
+  }
+
+  // Merge attributes and applied styles (attributes take precedence)
+  if (parentStyles) {
+    _.defaults(styles, parentStyles);
+  }
+  _.extend(styles, extracted, attributes);
+
+  // Similarly visibility is influenced by the value of both display and visibility.
+  // Calculate a unified value here which defaults to `true`.
+  styles.visible = !(typeof styles.display === 'undefined' && /none/i.test(styles.display))
+    || (typeof styles.visibility === 'undefined' && /hidden/i.test(styles.visibility));
+
+  // Now iterate the whole thing
+  for (key in styles) {
+    value = styles[key];
+
+    switch (key) {
+      case 'transform':
+        // TODO: Check this out https://github.com/paperjs/paper.js/blob/develop/src/svg/SvgImport.js#L315
+        if (/none/i.test(value)) break;
+        var m = (node.transform && node.transform.baseVal && node.transform.baseVal.length > 0)
+          ? node.transform.baseVal[0].matrix
+          : (node.getCTM ? node.getCTM() : null);
+
+        // Might happen when transform string is empty or not valid.
+        if (m === null) break;
+
+        if (Constants.AutoCalculateImportedMatrices) {
+
+          // Decompose and infer Two.js related properties.
+          var transforms = decomposeMatrix(m);
+
+          elem.translation.set(transforms.translateX, transforms.translateY);
+          elem.rotation = Math.PI * (transforms.rotation / 180);
+          elem.scale = new Vector(transforms.scaleX, transforms.scaleY);
+
+          var x = parseFloat((styles.x + '').replace('px'));
+          var y = parseFloat((styles.y + '').replace('px'));
+
+          // Override based on attributes.
+          if (x) {
+            elem.translation.x = x;
+          }
+
+          if (y) {
+            elem.translation.y = y;
+          }
+
+        } else {
+
+          // Edit the underlying matrix and don't force an auto calc.
+          var m = node.getCTM();
+          elem._matrix.manual = true;
+          elem._matrix.set(m.a, m.b, m.c, m.d, m.e, m.f);
+
+        }
+
+        break;
+      case 'viewBox':
+        applySvgViewBox.call(this, elem, value);
+        break;
+      case 'visible':
+        if (elem instanceof Group) {
+          elem._visible = value;
+          break;
+        }
+        elem.visible = value;
+        break;
+      case 'stroke-linecap':
+        if (elem instanceof Group) {
+          elem._cap = value;
+          break;
+        }
+        elem.cap = value;
+        break;
+      case 'stroke-linejoin':
+        if (elem instanceof Group) {
+          elem._join = value;
+          break;
+        }
+        elem.join = value;
+        break;
+      case 'stroke-miterlimit':
+        if (elem instanceof Group) {
+          elem._miter = value;
+          break;
+        }
+        elem.miter = value;
+        break;
+      case 'stroke-width':
+        if (elem instanceof Group) {
+          elem._linewidth = parseFloat(value);
+          break;
+        }
+        elem.linewidth = parseFloat(value);
+        break;
+      case 'opacity':
+      case 'stroke-opacity':
+      case 'fill-opacity':
+        // Only apply styles to rendered shapes
+        // in the scene.
+        if (elem instanceof Group) {
+          elem._opacity = parseFloat(value);
+          break;
+        }
+        elem.opacity = parseFloat(value);
+        break;
+      case 'fill':
+      case 'stroke':
+        if (elem instanceof Group) {
+          key = '_' + key;
+        }
+        if (/url\(#.*\)/i.test(value)) {
+          var scene = getScene(this);
+          elem[key] = scene.getById(
+            value.replace(/url\(#(.*)\)/i, '$1'));
+        } else {
+          elem[key] = (/none/i.test(value)) ? 'transparent' : value;
+        }
+        break;
+      case 'id':
+        elem.id = value;
+        // Overwritten id for non-conflicts on same page SVG documents
+        // TODO: Make this non-descructive
+        node.id = value + '-' + Constants.Identifier + 'applied';
+        break;
+      case 'class':
+      case 'className':
+        elem.classList = value.split(' ');
+        break;
+      case 'x':
+      case 'y':
+        var ca = elem instanceof Gradient;
+        var cb = elem instanceof LinearGradient;
+        var cc = elem instanceof RadialGradient;
+        if (ca || cb || cc) {
+          break;
+        }
+        if (value.match('[a-z%]$') && !value.endsWith('px')) {
+          var error = new TwoError(
+            'only pixel values are supported with the ' + key + ' attribute.');
+          console.warn(error.name, error.message);
+        }
+        elem.translation[key] = parseFloat(value);
+        break;
+      case 'font-family':
+        if (elem instanceof Text) {
+          elem.family = value;
+        }
+        break;
+      case 'font-size':
+        if (elem instanceof Text) {
+          elem.size = value;
+        }
+        break;
+      case 'font-weight':
+        if (elem instanceof Text) {
+          elem.weight = value;
+        }
+        break;
+      case 'font-style':
+        if (elem instanceof Text) {
+          elem.style = value;
+        }
+        break;
+      case 'text-decoration':
+        if (elem instanceof Text) {
+          elem.decoration = value;
+        }
+        break;
+      case 'line-height':
+        if (elem instanceof Text) {
+          elem.leading = value;
+        }
+        break;
+    }
+  }
+
+  return styles;
+
+};
+
+/**
+ * @name Utils.updateDefsCache
+ * @function
+ * @param {SvgNode} node - The SVG Node with which to update the defs cache.
+ * @param {Object} Object - The defs cache to be updated.
+ * @description Update the cache of children of <defs /> tags.
+ */
+var updateDefsCache = function(node, defsCache) {
+  for (var i = 0, l = node.childNodes.length; i < l; i++) {
+    var n = node.childNodes[i];
+    if (!n.id) continue;
+
+    var tagName = n.localName;
+    if (tagName === '#text') continue;
+
+    defsCache.add(n.id, n);
+  }
+};
+
+/**
+ * @name Utils.getScene
+ * @param {Two.Shape} node - The currently available object in the scenegraph.
+ * @returns {Group} - The highest order {@link Two.Group} in the scenegraph.
+ * @property {Function}
+ */
+var getScene = function(node) {
+
+  while (node.parent) {
+    node = node.parent;
+  }
+
+  return node.scene;
+
+};
+
+/**
+ * @name Utils.read
+ * @property {Object} read - A map of functions to read any number of SVG node types and create Two.js equivalents of them. Primarily used by the {@link Two#interpret} method.
+ */
+var read = {
+
+  svg: function(node) {
+
+    var defs = read.defs.current = new Registry();
+    var elements = node.getElementsByTagName('defs');
+
+    for (var i = 0; i < elements.length; i++) {
+      updateDefsCache(elements[i], defs);
+    }
+
+    var svg = read.g.call(this, node);
+    var viewBox = node.getAttribute('viewBox');
+
+    svg.defs = defs;  // Export out the <defs /> for later use
+    // Utils.applySvgViewBox(svg, viewBox);
+
+    delete read.defs.current;
+
+    return svg;
+
+  },
+
+  defs: function(node) {
+    return null;
+  },
+
+  use: function(node, styles) {
+
+    var href = node.getAttribute('href') || node.getAttribute('xlink:href');
+    if (!href) {
+      var error = new TwoError('encountered <use /> with no href.');
+      console.warn(error.name, error.message);
+      return null;
+    }
+
+    var id = href.slice(1);
+    if (!read.defs.current.contains(id)) {
+      var error = new TwoError(
+        'unable to find element for reference ' + href + '.');
+      console.warn(error.name, error.message);
+      return null;
+    }
+
+    var template = read.defs.current.get(id);
+    var fullNode = template.cloneNode(true);
+    var overwriteAttrs = ['x', 'y', 'width', 'height', 'href', 'xlink:href'];
+
+    for (var i = 0; i < node.attributes.length; i++) {
+      var attr = node.attributes[i];
+      var ca = overwriteAttrs.includes(attr.nodeName);
+      var cb = !fullNode.hasAttribute(attr.nodeName);
+      if (ca || cb) {
+        fullNode.setAttribute(attr.nodeName, attr.value);
+      }
+    }
+
+    var tagName = fullNode.localName;
+    return read[tagName].call(this, fullNode, styles);
+
+  },
+
+  g: function(node, parentStyles) {
+
+    var styles;
+    var group = new Group();
+
+    applySvgAttributes.call(this, node, group, parentStyles);
+
+    this.add(group);
+
+    // Switched up order to inherit more specific styles
+    styles = getSvgStyles.call(this, node);
+
+    for (var i = 0, l = node.childNodes.length; i < l; i++) {
+      var n = node.childNodes[i];
+      var tag = n.nodeName;
+      if (!tag) return;
+
+      var tagName = tag.replace(/svg:/ig, '').toLowerCase();
+
+      if (tagName in read) {
+        var o = read[tagName].call(group, n, styles);
+        if (!!o && !o.parent) {
+          group.add(o);
+        }
+      }
+    }
+
+    return group;
+
+  },
+
+  polygon: function(node, parentStyles) {
+
+    var points = node.getAttribute('points');
+
+    var verts = [];
+    points.replace(/(-?[\d.?]+)[,|\s](-?[\d.?]+)/g, function(match, p1, p2) {
+      verts.push(new Anchor(parseFloat(p1), parseFloat(p2)));
+    });
+
+    var poly = new Path(verts, true).noStroke();
+    poly.fill = 'black';
+
+    applySvgAttributes.call(this, node, poly, parentStyles);
+
+    return poly;
+
+  },
+
+  polyline: function(node, parentStyles) {
+    var poly = read.polygon.call(this, node, parentStyles);
+    poly.closed = false;
+    return poly;
+  },
+
+  path: function(node, parentStyles) {
+
+    var path = node.getAttribute('d');
+    var points = [];
+    var closed = false, relative = false;
+
+    if (path) {
+
+      // Create a Two.Path from the paths.
+
+      var coord = new Anchor();
+      var control, coords;
+      var commands = path.match(/[a-df-z][^a-df-z]*/ig);
+      var last = commands.length - 1;
+
+      // Split up polybeziers
+
+      _.each(commands.slice(0), function(command, i) {
+
+        var number, fid, lid, numbers, first, s;
+        var j, ct, l, times;
+
+        command = extrapolateScientificNotation(command);
+
+        var type = command[0];
+        var lower = type.toLowerCase();
+        var items = command.slice(1).trim().split(/[\s,]+|(?=\s?[+-])/);
+        var result = [], bin;
+        var hasDoubleDecimals = false;
+
+        // Handle double decimal values e.g: 48.6037.71.8
+        // Like: https://m.abcsofchinese.com/images/svg/亼ji2.svg
+        for (j = 0; j < items.length; j++) {
+
+          number = items[j];
+          fid = number.indexOf('.');
+          lid = number.lastIndexOf('.');
+
+          if (fid !== lid) {
+
+            numbers = number.split('.');
+            first = numbers[0] + '.' + numbers[1];
+
+            items.splice(j, 1, first);
+
+            for (s = 2; s < numbers.length; s++) {
+              items.splice(j + s - 1, 0, '0.' + numbers[s]);
+            }
+
+            hasDoubleDecimals = true;
+
+          }
+
+        }
+
+        if (hasDoubleDecimals) {
+          command = type + items.join(',');
+        }
+
+        if (i <= 0) {
+          commands = [];
+        }
+
+        switch (lower) {
+          case 'h':
+          case 'v':
+            if (items.length > 1) {
+              bin = 1;
+            }
+            break;
+          case 'm':
+          case 'l':
+          case 't':
+            if (items.length > 2) {
+              bin = 2;
+            }
+            break;
+          case 's':
+          case 'q':
+            if (items.length > 4) {
+              bin = 4;
+            }
+            break;
+          case 'c':
+            if (items.length > 6) {
+              bin = 6;
+            }
+            break;
+          case 'a':
+            if (items.length > 7) {
+              bin = 7;
+            }
+            break;
+        }
+
+        // This means we have a polybezier.
+        if (bin) {
+
+          for (j = 0, l = items.length, times = 0; j < l; j+=bin) {
+
+            ct = type;
+            if (times > 0) {
+
+              switch (type) {
+                case 'm':
+                  ct = 'l';
+                  break;
+                case 'M':
+                  ct = 'L';
+                  break;
+              }
+
+            }
+
+            result.push(ct + items.slice(j, j + bin).join(' '));
+            times++;
+
+          }
+
+          commands = Array.prototype.concat.apply(commands, result);
+
+        } else {
+
+          commands.push(command);
+
+        }
+
+      });
+
+      // Create the vertices for our Two.Path
+
+      _.each(commands, function(command, i) {
+
+        var result, x, y;
+        var type = command[0];
+        var lower = type.toLowerCase();
+
+        coords = command.slice(1).trim();
+        coords = coords.replace(/(-?\d+(?:\.\d*)?)[eE]([+-]?\d+)/g, function(match, n1, n2) {
+          return parseFloat(n1) * Math.pow(10, n2);
+        });
+        coords = coords.split(/[\s,]+|(?=\s?[+-])/);
+        relative = type === lower;
+
+        var x1, y1, x2, y2, x3, y3, x4, y4, reflection;
+
+        switch (lower) {
+
+          case 'z':
+            if (i >= last) {
+              closed = true;
+            } else {
+              x = coord.x;
+              y = coord.y;
+              result = new Anchor(
+                x, y,
+                undefined, undefined,
+                undefined, undefined,
+                Commands.close
+              );
+              // Make coord be the last `m` command
+              for (var j = points.length - 1; j >= 0; j--) {
+                var point = points[j];
+                if (/m/i.test(point.command)) {
+                  coord = point;
+                  break;
+                }
+              }
+            }
+            break;
+
+          case 'm':
+          case 'l':
+
+            control = undefined;
+
+            x = parseFloat(coords[0]);
+            y = parseFloat(coords[1]);
+
+            result = new Anchor(
+              x, y,
+              undefined, undefined,
+              undefined, undefined,
+              /m/i.test(lower) ? Commands.move : Commands.line
+            );
+
+            if (relative) {
+              result.addSelf(coord);
+            }
+
+            // result.controls.left.copy(result);
+            // result.controls.right.copy(result);
+
+            coord = result;
+            break;
+
+          case 'h':
+          case 'v':
+
+            var a = /h/i.test(lower) ? 'x' : 'y';
+            var b = /x/i.test(a) ? 'y' : 'x';
+
+            result = new Anchor(
+              undefined, undefined,
+              undefined, undefined,
+              undefined, undefined,
+              Commands.line
+            );
+            result[a] = parseFloat(coords[0]);
+            result[b] = coord[b];
+
+            if (relative) {
+              result[a] += coord[a];
+            }
+
+            // result.controls.left.copy(result);
+            // result.controls.right.copy(result);
+
+            coord = result;
+            break;
+
+          case 'c':
+          case 's':
+
+            x1 = coord.x;
+            y1 = coord.y;
+
+            if (!control) {
+              control = new Vector();//.copy(coord);
+            }
+
+            if (/c/i.test(lower)) {
+
+              x2 = parseFloat(coords[0]);
+              y2 = parseFloat(coords[1]);
+              x3 = parseFloat(coords[2]);
+              y3 = parseFloat(coords[3]);
+              x4 = parseFloat(coords[4]);
+              y4 = parseFloat(coords[5]);
+
+            } else {
+
+              // Calculate reflection control point for proper x2, y2
+              // inclusion.
+
+              reflection = getReflection(coord, control, relative);
+
+              x2 = reflection.x;
+              y2 = reflection.y;
+              x3 = parseFloat(coords[0]);
+              y3 = parseFloat(coords[1]);
+              x4 = parseFloat(coords[2]);
+              y4 = parseFloat(coords[3]);
+
+            }
+
+            if (relative) {
+              x2 += x1;
+              y2 += y1;
+              x3 += x1;
+              y3 += y1;
+              x4 += x1;
+              y4 += y1;
+            }
+
+            if (!_.isObject(coord.controls)) {
+              Anchor.AppendCurveProperties(coord);
+            }
+
+            coord.controls.right.set(x2 - coord.x, y2 - coord.y);
+            result = new Anchor(
+              x4, y4,
+              x3 - x4, y3 - y4,
+              undefined, undefined,
+              Commands.curve
+            );
+
+            coord = result;
+            control = result.controls.left;
+
+            break;
+
+          case 't':
+          case 'q':
+
+            x1 = coord.x;
+            y1 = coord.y;
+
+            if (!control) {
+              control = new Vector();
+            }
+
+            if (/q/i.test(lower)) {
+
+              x2 = parseFloat(coords[0]);
+              y2 = parseFloat(coords[1]);
+              x3 = parseFloat(coords[0]);
+              y3 = parseFloat(coords[1]);
+              x4 = parseFloat(coords[2]);
+              y4 = parseFloat(coords[3]);
+
+            } else {
+
+              reflection = getReflection(coord, control, relative);
+
+              x2 = reflection.x;
+              y2 = reflection.y;
+              x3 = reflection.x;
+              y3 = reflection.y;
+              x4 = parseFloat(coords[0]);
+              y4 = parseFloat(coords[1]);
+
+            }
+
+            if (relative) {
+              x2 += x1;
+              y2 += y1;
+              x3 += x1;
+              y3 += y1;
+              x4 += x1;
+              y4 += y1;
+            }
+
+            if (!_.isObject(coord.controls)) {
+              Anchor.AppendCurveProperties(coord);
+            }
+
+            coord.controls.right.set(
+              (x2 - coord.x) * 0.33, (y2 - coord.y) * 0.33);
+            result = new Anchor(
+              x4, y4,
+              x3 - x4, y3 - y4,
+              undefined, undefined,
+              Commands.curve
+            );
+
+            coord = result;
+            control = result.controls.left;
+
+            break;
+
+          case 'a':
+
+            x1 = coord.x;
+            y1 = coord.y;
+
+            var rx = parseFloat(coords[0]);
+            var ry = parseFloat(coords[1]);
+            var xAxisRotation = parseFloat(coords[2]);// * PI / 180;
+            var largeArcFlag = parseFloat(coords[3]);
+            var sweepFlag = parseFloat(coords[4]);
+
+            x4 = parseFloat(coords[5]);
+            y4 = parseFloat(coords[6]);
+
+            if (relative) {
+              x4 += x1;
+              y4 += y1;
+            }
+
+            var anchor = new Anchor(x4, y4);
+            anchor.command = Commands.arc;
+            anchor.rx = rx;
+            anchor.ry = ry;
+            anchor.xAxisRotation = xAxisRotation;
+            anchor.largeArcFlag = largeArcFlag;
+            anchor.sweepFlag = sweepFlag;
+
+            result = anchor;
+
+            coord = anchor;
+            control = undefined;
+
+            break;
+
+        }
+
+        if (result) {
+          if (Array.isArray(result)) {
+            points = points.concat(result);
+          } else {
+            points.push(result);
+          }
+        }
+
+      });
+
+    }
+
+    path = new Path(points, closed, undefined, true).noStroke();
+    path.fill = 'black';
+
+    var rect = path.getBoundingClientRect(true);
+
+    // Center objects to stay consistent
+    // with the rest of the Two.js API.
+    rect.centroid = {
+      x: rect.left + rect.width / 2,
+      y: rect.top + rect.height / 2
+    };
+
+    _.each(path.vertices, function(v) {
+      v.subSelf(rect.centroid);
+    });
+
+    applySvgAttributes.call(this, node, path, parentStyles);
+
+    path.translation.addSelf(rect.centroid);
+
+    return path;
+
+  },
+
+  circle: function(node, parentStyles) {
+
+    var x = parseFloat(node.getAttribute('cx'));
+    var y = parseFloat(node.getAttribute('cy'));
+    var r = parseFloat(node.getAttribute('r'));
+
+    var circle = new Circle(0, 0, r).noStroke();
+    circle.fill = 'black';
+
+    applySvgAttributes.call(this, node, circle, parentStyles);
+
+    circle.translation.x = x;
+    circle.translation.y = y;
+
+    return circle;
+
+  },
+
+  ellipse: function(node, parentStyles) {
+
+    var x = parseFloat(node.getAttribute('cx'));
+    var y = parseFloat(node.getAttribute('cy'));
+    var width = parseFloat(node.getAttribute('rx'));
+    var height = parseFloat(node.getAttribute('ry'));
+
+    var ellipse = new Ellipse(0, 0, width, height).noStroke();
+    ellipse.fill = 'black';
+
+    applySvgAttributes.call(this, node, ellipse, parentStyles);
+
+    ellipse.translation.x = x;
+    ellipse.translation.y = y;
+
+    return ellipse;
+
+  },
+
+  rect: function(node, parentStyles) {
+
+    var rx = parseFloat(node.getAttribute('rx'));
+    var ry = parseFloat(node.getAttribute('ry'));
+
+    if (!_.isNaN(rx) || !_.isNaN(ry)) {
+      return read['rounded-rect'](node);
+    }
+
+    var x = parseFloat(node.getAttribute('x')) || 0;
+    var y = parseFloat(node.getAttribute('y')) || 0;
+    var width = parseFloat(node.getAttribute('width'));
+    var height = parseFloat(node.getAttribute('height'));
+
+    var w2 = width / 2;
+    var h2 = height / 2;
+
+    var rect = new Rectangle(0, 0, width, height)
+      .noStroke();
+    rect.fill = 'black';
+
+    applySvgAttributes.call(this, node, rect, parentStyles);
+
+    // For rectangles, (x, y) is the center of the shape rather than the top
+    // left corner.
+    rect.translation.x += w2;
+    rect.translation.y += h2;
+
+    return rect;
+
+  },
+
+  'rounded-rect': function(node, parentStyles) {
+
+    var x = parseFloat(node.getAttribute('x')) || 0;
+    var y = parseFloat(node.getAttribute('y')) || 0;
+    var rx = parseFloat(node.getAttribute('rx')) || 0;
+    var ry = parseFloat(node.getAttribute('ry')) || 0;
+
+    var width = parseFloat(node.getAttribute('width'));
+    var height = parseFloat(node.getAttribute('height'));
+
+    var w2 = width / 2;
+    var h2 = height / 2;
+    var radius = new Vector(rx, ry);
+
+    var rect = new RoundedRectangle(0, 0, width, height, radius)
+      .noStroke();
+    rect.fill = 'black';
+
+    applySvgAttributes.call(this, node, rect, parentStyles);
+
+    // For rectangles, (x, y) is the center of the shape rather than the top
+    // left corner.
+    rect.translation.x += w2;
+    rect.translation.y += h2;
+
+    return rect;
+
+  },
+
+  line: function(node, parentStyles) {
+
+    var x1 = parseFloat(node.getAttribute('x1'));
+    var y1 = parseFloat(node.getAttribute('y1'));
+    var x2 = parseFloat(node.getAttribute('x2'));
+    var y2 = parseFloat(node.getAttribute('y2'));
+
+    var line = new Line(x1, y1, x2, y2).noFill();
+
+    applySvgAttributes.call(this, node, line, parentStyles);
+
+    return line;
+
+  },
+
+  lineargradient: function(node, parentStyles) {
+
+    var x1 = parseFloat(node.getAttribute('x1'));
+    var y1 = parseFloat(node.getAttribute('y1'));
+    var x2 = parseFloat(node.getAttribute('x2'));
+    var y2 = parseFloat(node.getAttribute('y2'));
+
+    var ox = (x2 + x1) / 2;
+    var oy = (y2 + y1) / 2;
+
+    var stops = [];
+    for (var i = 0; i < node.children.length; i++) {
+
+      var child = node.children[i];
+
+      var offset = child.getAttribute('offset');
+      if (/%/ig.test(offset)) {
+        offset = parseFloat(offset.replace(/%/ig, '')) / 100;
+      }
+      offset = parseFloat(offset);
+
+      var color = child.getAttribute('stop-color');
+      var opacity = child.getAttribute('stop-opacity');
+      var style = child.getAttribute('style');
+
+      var matches;
+      if (color === null) {
+        matches = style ? style.match(/stop-color:\s?([#a-fA-F0-9]*)/) : false;
+        color = matches && matches.length > 1 ? matches[1] : undefined;
+      }
+
+      if (opacity === null) {
+        matches = style ? style.match(/stop-opacity:\s?([0-9.-]*)/) : false;
+        opacity = matches && matches.length > 1 ? parseFloat(matches[1]) : 1;
+      } else {
+        opacity = parseFloat(opacity);
+      }
+
+      stops.push(new Stop(offset, color, opacity));
+
+    }
+
+    var gradient = new LinearGradient(x1 - ox, y1 - oy, x2 - ox,
+      y2 - oy, stops);
+
+    applySvgAttributes.call(this, node, gradient, parentStyles);
+
+    return gradient;
+
+  },
+
+  radialgradient: function(node, parentStyles) {
+
+    var cx = parseFloat(node.getAttribute('cx')) || 0;
+    var cy = parseFloat(node.getAttribute('cy')) || 0;
+    var r = parseFloat(node.getAttribute('r'));
+
+    var fx = parseFloat(node.getAttribute('fx'));
+    var fy = parseFloat(node.getAttribute('fy'));
+
+    if (_.isNaN(fx)) {
+      fx = cx;
+    }
+
+    if (_.isNaN(fy)) {
+      fy = cy;
+    }
+
+    var ox = Math.abs(cx + fx) / 2;
+    var oy = Math.abs(cy + fy) / 2;
+
+    var stops = [];
+    for (var i = 0; i < node.children.length; i++) {
+
+      var child = node.children[i];
+
+      var offset = child.getAttribute('offset');
+      if (/%/ig.test(offset)) {
+        offset = parseFloat(offset.replace(/%/ig, '')) / 100;
+      }
+      offset = parseFloat(offset);
+
+      var color = child.getAttribute('stop-color');
+      var opacity = child.getAttribute('stop-opacity');
+      var style = child.getAttribute('style');
+
+      var matches;
+      if (color === null) {
+        matches = style ? style.match(/stop-color:\s?([#a-fA-F0-9]*)/) : false;
+        color = matches && matches.length > 1 ? matches[1] : undefined;
+      }
+
+      if (opacity === null) {
+        matches = style ? style.match(/stop-opacity:\s?([0-9.-]*)/) : false;
+        opacity = matches && matches.length > 1 ? parseFloat(matches[1]) : 1;
+      } else {
+        opacity = parseFloat(opacity);
+      }
+
+      stops.push(new Stop(offset, color, opacity));
+
+    }
+
+    var gradient = new RadialGradient(cx - ox, cy - oy, r,
+      stops, fx - ox, fy - oy);
+
+    applySvgAttributes.call(this, node, gradient, parentStyles);
+
+    return gradient;
+
+  },
+
+  text: function(node, parentStyles) {
+
+    var alignment = getAlignment(node.getAttribute('text-anchor')) || 'left';
+    var baseline = getBaseline(node) || 'baseline';
+    var message = node.textContent;
+
+    var text = new Text(message);
+
+    applySvgAttributes.call(this, node, text, parentStyles);
+
+    text.alignment = alignment;
+    text.baseline = baseline;
+
+    return text;
+
+  }
+
+};
+
+/**
+ * @name Utils.xhr
+ * @function
+ * @param {String} path
+ * @param {Function} callback
+ * @returns {XMLHttpRequest} The constructed and called XHR request.
+ * @description Canonical method to initiate `GET` requests in the browser. Mainly used by {@link Two#load} method.
+ */
+var xhr = function(path, callback) {
+
+  var xhr = new XMLHttpRequest();
+  xhr.open('GET', path);
+
+  xhr.onreadystatechange = function() {
+    if (xhr.readyState === 4 && xhr.status === 200) {
+      callback(xhr.responseText);
+    }
+  };
+
+  xhr.send();
+  return xhr;
+
+};
+
+/**
+ * @name Two.ImageSequence
+ * @class
+ * @extends Two.Rectangle
+ * @param {String|String[]|Two.Texture|Two.Texture[]} paths - A list of URLs or {@link Two.Texture}s.
+ * @param {Number} [ox=0] - The initial `x` position of the Two.ImageSequence.
+ * @param {Number} [oy=0] - The initial `y` position of the Two.ImageSequence.
+ * @param {Integer} [frameRate=30] - The frame rate at which the images should playback at.
+ * @description A convenient package to display still or animated images organized as a series of still images.
+ */
+var ImageSequence = function(paths, ox, oy, frameRate) {
+
+  // Not using default constructor of Rectangle due to odd `beginning` / `ending` behavior.
+  // See: https://github.com/jonobr1/two.js/issues/383
+  Path.call(this, [
+    new Anchor(),
+    new Anchor(),
+    new Anchor(),
+    new Anchor()
+  ], true);
+
+  this._renderer.flagTextures = ImageSequence.FlagTextures.bind(this);
+  this._renderer.bindTextures = ImageSequence.BindTextures.bind(this);
+  this._renderer.unbindTextures = ImageSequence.UnbindTextures.bind(this);
+
+  this.noStroke();
+  this.noFill();
+
+  /**
+   * @name Two.ImageSequence#textures
+   * @property {Two.Texture[]} - A list of textures to be used as frames for animating the {@link Two.ImageSequence}.
+   */
+  if (Array.isArray(paths)) {
+    this.textures = paths.map(ImageSequence.GenerateTexture.bind(this));
+  } else {
+    // If just a single path convert into a single Two.Texture
+    this.textures = [ImageSequence.GenerateTexture(paths)];
+  }
+
+  this.origin = new Vector();
+
+  this._update();
+  this.translation.set(ox || 0, oy || 0);
+
+  /**
+   * @name Two.ImageSequence#frameRate
+   * @property {Integer} - The number of frames to animate against per second.
+   */
+  if (typeof frameRate === 'number') {
+    this.frameRate = frameRate;
+  } else {
+    this.frameRate = ImageSequence.DefaultFrameRate;
+  }
+
+  /**
+   * @name Two.ImageSequence#index
+   * @property {Integer} - The index of the current tile of the sprite to display. Defaults to `0`.
+   */
+  this.index = 0;
+
+};
+
+_.extend(ImageSequence, {
+
+  /**
+   * @name Two.ImageSequence.Properties
+   * @property {String[]} - A list of properties that are on every {@link Two.ImageSequence}.
+   */
+  Properties: [
+    'frameRate',
+    'index'
+  ],
+
+  /**
+   * @name Two.ImageSequence.DefaultFrameRate
+   * @property The default frame rate that {@link Two.ImageSequence#frameRate} is set to when instantiated.
+   */
+  DefaultFrameRate: 30,
+
+  /**
+   * @name Two.ImageSequence.FlagTextures
+   * @function
+   * @description Cached method to let renderers know textures have been updated on a {@link Two.ImageSequence}.
+   */
+  FlagTextures: function() {
+    this._flagTextures = true;
+  },
+
+  /**
+   * @name Two.ImageSequence.BindTextures
+   * @function
+   * @description Cached method to let {@link Two.ImageSequence} know textures have been added to the instance.
+   */
+  BindTextures: function(items) {
+
+    var i = items.length;
+    while (i--) {
+      items[i].bind(Events.Types.change, this._renderer.flagTextures);
+    }
+
+    this._renderer.flagTextures();
+
+  },
+
+  /**
+   * @name Two.ImageSequence.UnbindVertices
+   * @function
+   * @description Cached method to let {@link Two.ImageSequence} know textures have been removed from the instance.
+   */
+  UnbindTextures: function(items) {
+
+    var i = items.length;
+    while (i--) {
+      items[i].unbind(Events.Types.change, this._renderer.flagTextures);
+    }
+
+    this._renderer.flagTextures();
+
+  },
+
+  /**
+   * @name Two.ImageSequence.MakeObservable
+   * @function
+   * @param {Object} object - The object to make observable.
+   * @description Convenience function to apply observable qualities of a {@link Two.ImageSequence} to any object. Handy if you'd like to extend or inherit the {@link Two.ImageSequence} class on a custom class.
+   */
+  MakeObservable: function(obj) {
+
+    Rectangle.MakeObservable(obj);
+    _.each(ImageSequence.Properties, defineGetterSetter, obj);
+
+    Object.defineProperty(obj, 'textures', {
+
+      enumerable: true,
+
+      get: function() {
+        return this._textures;
+      },
+
+      set: function(textures) {
+
+        var updateTextures = this._renderer.flagTextures;
+        var bindTextures = this._renderer.bindTextures;
+        var unbindTextures = this._renderer.unbindTextures;
+
+        // Remove previous listeners
+        if (this._textures) {
+          this._textures
+            .unbind(Events.Types.insert, bindTextures)
+            .unbind(Events.Types.remove, unbindTextures);
+        }
+
+        // Create new Collection with copy of vertices
+        this._textures = new Collection((textures || []).slice(0));
+
+        // Listen for Collection changes and bind / unbind
+        this._textures
+          .bind(Events.Types.insert, bindTextures)
+          .bind(Events.Types.remove, unbindTextures);
+
+        // Bind Initial Textures
+        bindTextures(this._textures);
+
+      }
+
+    });
+
+  },
+
+  /**
+   * @name Two.ImageSequence.GenerateTexture
+   * @property {Function} - Shorthand function to prepare source image material into readable format by {@link Two.ImageSequence}.
+   * @param {String|Two.Texture} textureOrString - The texture or string to create a {@link Two.Texture} from.
+   * @description Function used internally by {@link Two.ImageSequence} to parse arguments and return {@link Two.Texture}s.
+   * @returns {Two.Texture}
+   */
+  GenerateTexture: function(obj) {
+    if (obj instanceof Texture) {
+      return obj;
+    } else if (typeof obj === 'string') {
+      return new Texture(obj);
+    }
+  }
+
+});
+
+_.extend(ImageSequence.prototype, Rectangle.prototype, {
+
+  /**
+   * @name Two.ImageSequence#_flagTextures
+   * @private
+   * @property {Boolean} - Determines whether the {@link Two.ImageSequence#textures} need updating.
+   */
+  _flagTextures: false,
+
+  /**
+   * @name Two.ImageSequence#_flagFrameRate
+   * @private
+   * @property {Boolean} - Determines whether the {@link Two.ImageSequence#frameRate} needs updating.
+   */
+  _flagFrameRate: false,
+
+  /**
+   * @name Two.ImageSequence#_flagIndex
+   * @private
+   * @property {Boolean} - Determines whether the {@link Two.ImageSequence#index} needs updating.
+   */
+  _flagIndex: false,
+
+  // Private variables
+
+  /**
+   * @name Two.ImageSequence#_amount
+   * @private
+   * @property {Integer} - Number of frames for a given {@link Two.ImageSequence}.
+   */
+  _amount: 1,
+
+  /**
+   * @name Two.ImageSequence#_duration
+   * @private
+   * @property {Number} - Number of milliseconds a {@link Two.ImageSequence}.
+   */
+  _duration: 0,
+
+  /**
+   * @name Two.ImageSequence#_index
+   * @private
+   * @property {Integer} - The current frame the {@link Two.ImageSequence} is currently displaying.
+   */
+  _index: 0,
+
+  /**
+   * @name Two.ImageSequence#_startTime
+   * @private
+   * @property {Milliseconds} - Epoch time in milliseconds of when the {@link Two.ImageSequence} started.
+   */
+  _startTime: 0,
+
+  /**
+   * @name Two.ImageSequence#_playing
+   * @private
+   * @property {Boolean} - Dictates whether the {@link Two.ImageSequence} is animating or not.
+   */
+  _playing: false,
+
+  /**
+   * @name Two.ImageSequence#_firstFrame
+   * @private
+   * @property {Integer} - The frame the {@link Two.ImageSequence} should start with.
+   */
+  _firstFrame: 0,
+
+  /**
+   * @name Two.ImageSequence#_lastFrame
+   * @private
+   * @property {Integer} - The frame the {@link Two.ImageSequence} should end with.
+   */
+  _lastFrame: 0,
+
+  /**
+   * @name Two.ImageSequence#_playing
+   * @private
+   * @property {Boolean} - Dictates whether the {@link Two.ImageSequence} should loop or not.
+   */
+  _loop: true,
+
+  // Exposed through getter-setter
+
+  /**
+   * @name Two.ImageSequence#_textures
+   * @private
+   * @see {@link Two.ImageSequence#textures}
+   */
+  _textures: null,
+
+  /**
+   * @name Two.ImageSequence#_frameRate
+   * @private
+   * @see {@link Two.ImageSequence#frameRate}
+   */
+  _frameRate: 0,
+
+  /**
+   * @name Two.ImageSequence#_origin
+   * @private
+   * @see {@link Two.ImageSequence#origin}
+   */
+  _origin: null,
+
+  constructor: ImageSequence,
+
+  /**
+   * @name Two.ImageSequence#play
+   * @function
+   * @param {Integer} [firstFrame=0] - The index of the frame to start the animation with.
+   * @param {Integer} [lastFrame] - The index of the frame to end the animation with. Defaults to the last item in the {@link Two.ImageSequence#textures}.
+   * @param {Function} [onLastFrame] - Optional callback function to be triggered after playing the last frame. This fires multiple times when the image sequence is looped.
+   * @description Initiate animation playback of a {@link Two.ImageSequence}.
+   */
+  play: function(firstFrame, lastFrame, onLastFrame) {
+
+    this._playing = true;
+    this._firstFrame = 0;
+    this._lastFrame = this.amount - 1;
+    this._startTime = _.performance.now();
+
+    if (typeof firstFrame === 'number') {
+      this._firstFrame = firstFrame;
+    }
+    if (typeof lastFrame === 'number') {
+      this._lastFrame = lastFrame;
+    }
+    if (typeof onLastFrame === 'function') {
+      this._onLastFrame = onLastFrame;
+    } else {
+      delete this._onLastFrame;
+    }
+
+    if (this._index !== this._firstFrame) {
+      this._startTime -= 1000 * Math.abs(this._index - this._firstFrame)
+        / this._frameRate;
+    }
+
+    return this;
+
+  },
+
+  /**
+   * @name Two.ImageSequence#pause
+   * @function
+   * @description Halt animation playback of a {@link Two.ImageSequence}.
+   */
+  pause: function() {
+
+    this._playing = false;
+    return this;
+
+  },
+
+  /**
+   * @name Two.ImageSequence#stop
+   * @function
+   * @description Halt animation playback of a {@link Two.ImageSequence} and set the current frame back to the first frame.
+   */
+  stop: function() {
+
+    this._playing = false;
+    this._index = this._firstFrame;
+
+    return this;
+
+  },
+
+  /**
+   * @name Two.ImageSequence#clone
+   * @function
+   * @param {Two.Group} [parent] - The parent group or scene to add the clone to.
+   * @returns {Two.ImageSequence}
+   * @description Create a new instance of {@link Two.ImageSequence} with the same properties of the current image sequence.
+   */
+  clone: function(parent) {
+
+    var clone = new ImageSequence(this.textures, this.translation.x,
+      this.translation.y, this.frameRate);
+
+    clone._loop = this._loop;
+
+    if (this._playing) {
+      clone.play();
+    }
+
+    if (parent) {
+      parent.add(clone);
+    }
+
+    return clone;
+
+  },
+
+  /**
+   * @name Two.ImageSequence#toObject
+   * @function
+   * @returns {Object}
+   * @description Return a JSON compatible plain object that represents the path.
+   */
+  toObject: function() {
+    var object = Rectangle.prototype.toObject.call(this);
+    object.textures = this.textures.map(function(texture) {
+      return texture.toObject();
+    });
+    object.frameRate = this.frameRate;
+    object.index = this.index;
+    object._firstFrame = this._firstFrame;
+    object._lastFrame = this._lastFrame;
+    object._loop = this._loop;
+    return object;
+  },
+
+  /**
+   * @name Two.ImageSequence#_update
+   * @function
+   * @private
+   * @param {Boolean} [bubbles=false] - Force the parent to `_update` as well.
+   * @description This is called before rendering happens by the renderer. This applies all changes necessary so that rendering is up-to-date but not updated more than it needs to be.
+   * @nota-bene Try not to call this method more than once a frame.
+   */
+  _update: function() {
+
+    var effects = this._textures;
+    var width, height, elapsed, amount, duration, texture;
+    var index, frames;
+
+    if (this._flagTextures) {
+      this._amount = effects.length;
+    }
+
+    if (this._flagFrameRate) {
+      this._duration = 1000 * this._amount / this._frameRate;
+    }
+
+    if (this._playing && this._frameRate > 0) {
+
+      amount = this._amount;
+
+      if (_.isNaN(this._lastFrame)) {
+        this._lastFrame = amount - 1;
+      }
+
+      // TODO: Offload perf logic to instance of `Two`.
+      elapsed = _.performance.now() - this._startTime;
+      frames = this._lastFrame + 1;
+      duration = 1000 * (frames - this._firstFrame) / this._frameRate;
+
+      if (this._loop) {
+        elapsed = elapsed % duration;
+      } else {
+        elapsed = Math.min(elapsed, duration);
+      }
+
+      index = lerp(this._firstFrame, frames, elapsed / duration);
+      index = Math.floor(index);
+
+      if (index !== this._index) {
+
+        this._index = index;
+        texture = effects[this._index];
+
+        if (texture.loaded) {
+
+          width = texture.image.width;
+          height = texture.image.height;
+
+          if (this.width !== width) {
+            this.width = width;
+          }
+          if (this.height !== height) {
+            this.height = height;
+          }
+
+          this.fill = texture;
+
+          if (index >= this._lastFrame - 1 && this._onLastFrame) {
+            this._onLastFrame();  // Shortcut for chainable sprite animations
+          }
+
+        }
+
+      }
+
+    } else if (this._flagIndex || !(this.fill instanceof Texture)) {
+
+      texture = effects[this._index];
+
+      if (texture.loaded) {
+
+        width = texture.image.width;
+        height = texture.image.height;
+
+        if (this.width !== width) {
+          this.width = width;
+        }
+        if (this.height !== height) {
+          this.height = height;
+        }
+
+      }
+
+      this.fill = texture;
+
+    }
+
+    Rectangle.prototype._update.call(this);
+
+    return this;
+
+  },
+
+  /**
+   * @name Two.ImageSequence#flagReset
+   * @function
+   * @private
+   * @description Called internally to reset all flags. Ensures that only properties that change are updated before being sent to the renderer.
+   */
+  flagReset: function() {
+
+    this._flagTextures = this._flagFrameRate = false;
+    Rectangle.prototype.flagReset.call(this);
+
+    return this;
+
+  }
+
+});
+
+ImageSequence.MakeObservable(ImageSequence.prototype);
+
+/**
+ * @name Two.Sprite
+ * @class
+ * @extends Two.Rectangle
+ * @param {String|Two.Texture} [path] - The URL path or {@link Two.Texture} to be used as the bitmap data displayed on the sprite.
+ * @param {Number} [ox=0] - The initial `x` position of the Two.Sprite.
+ * @param {Number} [oy=0] - The initial `y` position of the Two.Sprite.
+ * @param {Integer} [cols=1] - The number of columns the sprite contains.
+ * @param {Integer} [rows=1] - The number of rows the sprite contains.
+ * @param {Integer} [frameRate=0] - The frame rate at which the partitions of the image should playback at.
+ * @description A convenient package to display still or animated images through a tiled image source. For more information on the principals of animated imagery through tiling see [Texture Atlas](https://en.wikipedia.org/wiki/Texture_atlas) on Wikipedia.
+ */
+var Sprite = function(path, ox, oy, cols, rows, frameRate) {
+
+  // Not using default constructor of Rectangle due to odd `beginning` / `ending` behavior.
+  // See: https://github.com/jonobr1/two.js/issues/383
+  Path.call(this, [
+    new Anchor(),
+    new Anchor(),
+    new Anchor(),
+    new Anchor()
+  ], true);
+
+  this.noStroke();
+  this.noFill();
+
+  /**
+   * @name Two.Sprite#texture
+   * @property {Two.Texture} - The texture to be used as bitmap data to display image in the scene.
+   */
+  if (path instanceof Texture) {
+    this.texture = path;
+  } else if (typeof path === 'string') {
+    this.texture = new Texture(path);
+  }
+
+  this.origin = new Vector();
+
+  this._update();
+  this.translation.set(ox || 0, oy || 0);
+
+  /**
+   * @name Two.Sprite#columns
+   * @property {Integer} - The number of columns to split the texture into. Defaults to `1`.
+   */
+  if (typeof cols === 'number') {
+    this.columns = cols;
+  }
+
+  /**
+   * @name Two.Sprite#rows
+   * @property {Integer} - The number of rows to split the texture into. Defaults to `1`.
+   */
+  if (typeof rows === 'number') {
+    this.rows = rows;
+  }
+
+  /**
+   * @name Two.Sprite#frameRate
+   * @property {Integer} - The number of frames to animate against per second. Defaults to `0` for non-animated sprites.
+   */
+  if (typeof frameRate === 'number') {
+    this.frameRate = frameRate;
+  }
+
+  /**
+   * @name Two.Sprite#index
+   * @property {Integer} - The index of the current tile of the sprite to display. Defaults to `0`.
+   */
+  this.index = 0;
+
+};
+
+_.extend(Sprite, {
+
+  /**
+   * @name Two.Sprite.Properties
+   * @property {String[]} - A list of properties that are on every {@link Two.Sprite}.
+   */
+  Properties: [
+    'texture', 'columns', 'rows', 'frameRate', 'index'
+  ],
+
+  /**
+   * @name Two.Sprite.MakeObservable
+   * @function
+   * @param {Object} object - The object to make observable.
+   * @description Convenience function to apply observable qualities of a {@link Two.Sprite} to any object. Handy if you'd like to extend or inherit the {@link Two.Sprite} class on a custom class.
+   */
+  MakeObservable: function(obj) {
+
+    Rectangle.MakeObservable(obj);
+    _.each(Sprite.Properties, defineGetterSetter, obj);
+
+  }
+
+});
+
+_.extend(Sprite.prototype, Rectangle.prototype, {
+
+  /**
+   * @name Two.Sprite#_flagTexture
+   * @private
+   * @property {Boolean} - Determines whether the {@link Two.Sprite#texture} needs updating.
+   */
+  _flagTexture: false,
+
+  /**
+   * @name Two.Sprite#_flagColumns
+   * @private
+   * @property {Boolean} - Determines whether the {@link Two.Sprite#columns} need updating.
+   */
+  _flagColumns: false,
+
+  /**
+   * @name Two.Sprite#_flagRows
+   * @private
+   * @property {Boolean} - Determines whether the {@link Two.Sprite#rows} need updating.
+   */
+  _flagRows: false,
+
+  /**
+   * @name Two.Sprite#_flagFrameRate
+   * @private
+   * @property {Boolean} - Determines whether the {@link Two.Sprite#flagFrameRate} needs updating.
+   */
+  _flagFrameRate: false,
+
+  /**
+   * @name Two.Sprite#_flagIndex
+   * @private
+   * @property {Boolean} - Determines whether the {@link Two.Sprite#index} needs updating.
+   */
+  flagIndex: false,
+
+  // Private variables
+
+  /**
+   * @name Two.Sprite#_amount
+   * @private
+   * @property {Integer} - Number of frames for a given {@link Two.Sprite}.
+   */
+  _amount: 1,
+
+  /**
+   * @name Two.Sprite#_duration
+   * @private
+   * @property {Number} - Number of milliseconds a {@link Two.Sprite}.
+   */
+  _duration: 0,
+
+  /**
+   * @name Two.Sprite#_startTime
+   * @private
+   * @property {Milliseconds} - Epoch time in milliseconds of when the {@link Two.Sprite} started.
+   */
+  _startTime: 0,
+
+  /**
+   * @name Two.Sprite#_playing
+   * @private
+   * @property {Boolean} - Dictates whether the {@link Two.Sprite} is animating or not.
+   */
+  _playing: false,
+
+  /**
+   * @name Two.Sprite#_firstFrame
+   * @private
+   * @property {Integer} - The frame the {@link Two.Sprite} should start with.
+   */
+  _firstFrame: 0,
+
+  /**
+   * @name Two.Sprite#_lastFrame
+   * @private
+   * @property {Integer} - The frame the {@link Two.Sprite} should end with.
+   */
+  _lastFrame: 0,
+
+  /**
+   * @name Two.Sprite#_playing
+   * @private
+   * @property {Boolean} - Dictates whether the {@link Two.Sprite} should loop or not.
+   */
+  _loop: true,
+
+  // Exposed through getter-setter
+
+  /**
+   * @name Two.Sprite#_texture
+   * @private
+   * @see {@link Two.Sprite#texture}
+   */
+  _texture: null,
+
+  /**
+   * @name Two.Sprite#_columns
+   * @private
+   * @see {@link Two.Sprite#columns}
+   */
+  _columns: 1,
+
+  /**
+   * @name Two.Sprite#_rows
+   * @private
+   * @see {@link Two.Sprite#rows}
+   */
+  _rows: 1,
+
+  /**
+   * @name Two.Sprite#_frameRate
+   * @private
+   * @see {@link Two.Sprite#frameRate}
+   */
+  _frameRate: 0,
+
+  /**
+   * @name Two.Sprite#_index
+   * @private
+   * @property {Integer} - The current frame the {@link Two.Sprite} is currently displaying.
+   */
+  _index: 0,
+
+  /**
+   * @name Two.Sprite#_origin
+   * @private
+   * @see {@link Two.Sprite#origin}
+   */
+  _origin: null,
+
+  constructor: Sprite,
+
+  /**
+   * @name Two.Sprite#play
+   * @function
+   * @param {Integer} [firstFrame=0] - The index of the frame to start the animation with.
+   * @param {Integer} [lastFrame] - The index of the frame to end the animation with. Defaults to the last item in the {@link Two.Sprite#textures}.
+   * @param {Function} [onLastFrame] - Optional callback function to be triggered after playing the last frame. This fires multiple times when the sprite is looped.
+   * @description Initiate animation playback of a {@link Two.Sprite}.
+   */
+  play: function(firstFrame, lastFrame, onLastFrame) {
+
+    this._playing = true;
+    this._firstFrame = 0;
+    this._lastFrame = this.amount - 1;
+    this._startTime = _.performance.now();
+
+    if (typeof firstFrame === 'number') {
+      this._firstFrame = firstFrame;
+    }
+    if (typeof lastFrame === 'number') {
+      this._lastFrame = lastFrame;
+    }
+    if (typeof onLastFrame === 'function') {
+      this._onLastFrame = onLastFrame;
+    } else {
+      delete this._onLastFrame;
+    }
+
+    if (this._index !== this._firstFrame) {
+      this._startTime -= 1000 * Math.abs(this._index - this._firstFrame)
+        / this._frameRate;
+    }
+
+    return this;
+
+  },
+
+  /**
+   * @name Two.Sprite#pause
+   * @function
+   * @description Halt animation playback of a {@link Two.Sprite}.
+   */
+  pause: function() {
+
+    this._playing = false;
+    return this;
+
+  },
+
+  /**
+   * @name Two.Sprite#stop
+   * @function
+   * @description Halt animation playback of a {@link Two.Sprite} and set the current frame back to the first frame.
+   */
+  stop: function() {
+
+    this._playing = false;
+    this._index = 0;
+
+    return this;
+
+  },
+
+  /**
+   * @name Two.Sprite#clone
+   * @function
+   * @param {Two.Group} [parent] - The parent group or scene to add the clone to.
+   * @returns {Two.Sprite}
+   * @description Create a new instance of {@link Two.Sprite} with the same properties of the current sprite.
+   */
+  clone: function(parent) {
+
+    var clone = new Sprite(
+      this.texture, this.translation.x, this.translation.y,
+      this.columns, this.rows, this.frameRate
+    );
+
+    if (this.playing) {
+      clone.play(this._firstFrame, this._lastFrame);
+      clone._loop = this._loop;
+    }
+
+    if (parent) {
+      parent.add(clone);
+    }
+
+    return clone;
+
+  },
+
+  /**
+   * @name Two.Sprite#toObject
+   * @function
+   * @returns {Object}
+   * @description Return a JSON compatible plain object that represents the path.
+   */
+  toObject: function() {
+    var object = Rectangle.prototype.toObject.call(this);
+    object.texture = this.texture.toObject();
+    object.columns = this.columns;
+    object.rows = this.rows;
+    object.frameRate = this.frameRate;
+    object.index = this.index;
+    object._firstFrame = this._firstFrame;
+    object._lastFrame = this._lastFrame;
+    object._loop = this._loop;
+    return object;
+  },
+
+  /**
+   * @name Two.Sprite#_update
+   * @function
+   * @private
+   * @param {Boolean} [bubbles=false] - Force the parent to `_update` as well.
+   * @description This is called before rendering happens by the renderer. This applies all changes necessary so that rendering is up-to-date but not updated more than it needs to be.
+   * @nota-bene Try not to call this method more than once a frame.
+   */
+  _update: function() {
+
+    var effect = this._texture;
+    var cols = this._columns;
+    var rows = this._rows;
+
+    var width, height, elapsed, amount, duration;
+    var index, iw, ih, frames;
+
+    if (this._flagColumns || this._flagRows) {
+      this._amount = this._columns * this._rows;
+    }
+
+    if (this._flagFrameRate) {
+      this._duration = 1000 * this._amount / this._frameRate;
+    }
+
+    if (this._flagTexture) {
+      this.fill = this._texture;
+    }
+
+    if (this._texture.loaded) {
+
+      iw = effect.image.width;
+      ih = effect.image.height;
+
+      width = iw / cols;
+      height = ih / rows;
+      amount = this._amount;
+
+      if (this.width !== width) {
+        this.width = width;
+      }
+      if (this.height !== height) {
+        this.height = height;
+      }
+
+      if (this._playing && this._frameRate > 0) {
+
+        if (_.isNaN(this._lastFrame)) {
+          this._lastFrame = amount - 1;
+        }
+
+        // TODO: Offload perf logic to instance of `Two`.
+        elapsed = _.performance.now() - this._startTime;
+        frames = this._lastFrame + 1;
+        duration = 1000 * (frames - this._firstFrame) / this._frameRate;
+
+        if (this._loop) {
+          elapsed = elapsed % duration;
+        } else {
+          elapsed = Math.min(elapsed, duration);
+        }
+
+        index = lerp(this._firstFrame, frames, elapsed / duration);
+        index = Math.floor(index);
+
+        if (index !== this._index) {
+          this._index = index;
+          if (index >= this._lastFrame - 1 && this._onLastFrame) {
+            this._onLastFrame();  // Shortcut for chainable sprite animations
+          }
+        }
+
+      }
+
+      var col = this._index % cols;
+      var row = Math.floor(this._index / cols);
+
+      var ox = - width * col + (iw - width) / 2;
+      var oy = - height * row + (ih - height) / 2;
+
+      // TODO: Improve performance
+      if (ox !== effect.offset.x) {
+        effect.offset.x = ox;
+      }
+      if (oy !== effect.offset.y) {
+        effect.offset.y = oy;
+      }
+
+    }
+
+    Rectangle.prototype._update.call(this);
+
+    return this;
+
+  },
+
+  /**
+   * @name Two.Sprite#flagReset
+   * @function
+   * @private
+   * @description Called internally to reset all flags. Ensures that only properties that change are updated before being sent to the renderer.
+   */
+  flagReset: function() {
+
+    this._flagTexture = this._flagColumns = this._flagRows
+      = this._flagFrameRate = false;
+
+    Rectangle.prototype.flagReset.call(this);
+
+    return this;
+  }
+
+
+});
+
+Sprite.MakeObservable(Sprite.prototype);
+
+var TWO_PI$3 = Math.PI * 2, HALF_PI$3 = Math.PI / 2;
+
+/**
+ * @name Two.ArcSegment
+ * @class
+ * @extends Two.Path
+ * @param {Number} [x=0] - The x position of the arc segment.
+ * @param {Number} [y=0] - The y position of the arc segment.
+ * @param {Number} innerRadius - The inner radius value of the arc segment.
+ * @param {Number} outerRadius - The outer radius value of the arc segment.
+ * @param {Radians} startAngle - The start angle of the arc segment in radians.
+ * @param {Radians} endAngle - The end angle of the arc segment in radians.
+ * @param {Number} [resolution=24] - The number of vertices used to construct the arc segment.
+ */
+var ArcSegment = function(ox, oy, ir, or, sa, ea, res) {
+
+  var amount = res || (Constants.Resolution * 3);
+  var points = [];
+  for (var i = 0; i < amount; i++) {
+    points.push(new Anchor());
+  }
+
+  Path.call(this, points, true, false, true);
+
+  /**
+   * @name Two.ArcSegment#innerRadius
+   * @property {Number} - The size of the inner radius of the arc segment.
+   */
+  this.innerRadius = ir;
+  /**
+   * @name Two.ArcSegment#outerRadius
+   * @property {Number} - The size of the outer radius of the arc segment.
+   */
+  this.outerRadius = or;
+
+  /**
+   * @name Two.ArcSegment#startRadius
+   * @property {Radians} - The angle of one side for the arc segment.
+   */
+  this.startAngle = sa;
+  /**
+   * @name Two.ArcSegment#endAngle
+   * @property {Radians} - The angle of the other side for the arc segment.
+   */
+  this.endAngle = ea;
+
+  this._update();
+
+  if (typeof ox === 'number') {
+    this.translation.x = ox;
+  }
+  if (typeof oy === 'number') {
+    this.translation.y = oy;
+  }
+
+};
+
+_.extend(ArcSegment, {
+
+  /**
+   * @name Two.ArcSegment.Properties
+   * @property {String[]} - A list of properties that are on every {@link Two.ArcSegment}.
+   */
+  Properties: ['startAngle', 'endAngle', 'innerRadius', 'outerRadius'],
+
+  /**
+   * @name Two.ArcSegment.MakeObservable
+   * @function
+   * @param {Object} object - The object to make observable.
+   * @description Convenience function to apply observable qualities of a {@link Two.ArcSegment} to any object. Handy if you'd like to extend the {@link Two.ArcSegment} class on a custom class.
+   */
+  MakeObservable: function(obj) {
+
+    Path.MakeObservable(obj);
+    _.each(ArcSegment.Properties, defineGetterSetter, obj);
+
+  }
+
+});
+
+_.extend(ArcSegment.prototype, Path.prototype, {
+
+  /**
+   * @name Two.ArcSegment#_flagStartAngle
+   * @private
+   * @property {Boolean} - Determines whether the {@link Two.ArcSegment#startAngle} needs updating.
+   */
+  _flagStartAngle: false,
+  /**
+   * @name Two.ArcSegment#_flagEndAngle
+   * @private
+   * @property {Boolean} - Determines whether the {@link Two.ArcSegment#endAngle} needs updating.
+   */
+  _flagEndAngle: false,
+  /**
+   * @name Two.ArcSegment#_flagInnerRadius
+   * @private
+   * @property {Boolean} - Determines whether the {@link Two.ArcSegment#innerRadius} needs updating.
+   */
+  _flagInnerRadius: false,
+  /**
+   * @name Two.ArcSegment#_flagOuterRadius
+   * @private
+   * @property {Boolean} - Determines whether the {@link Two.ArcSegment#outerRadius} needs updating.
+   */
+  _flagOuterRadius: false,
+
+  /**
+   * @name Two.ArcSegment#_startAngle
+   * @private
+   * @see {@link Two.ArcSegment#startAngle}
+   */
+  _startAngle: 0,
+  /**
+   * @name Two.ArcSegment#_endAngle
+   * @private
+   * @see {@link Two.ArcSegment#endAngle}
+   */
+  _endAngle: TWO_PI$3,
+  /**
+   * @name Two.ArcSegment#_innerRadius
+   * @private
+   * @see {@link Two.ArcSegment#innerRadius}
+   */
+  _innerRadius: 0,
+  /**
+   * @name Two.ArcSegment#_outerRadius
+   * @private
+   * @see {@link Two.ArcSegment#outerRadius}
+   */
+  _outerRadius: 0,
+
+  constructor: ArcSegment,
+
+  /**
+   * @name Two.ArcSegment#_update
+   * @function
+   * @private
+   * @param {Boolean} [bubbles=false] - Force the parent to `_update` as well.
+   * @description This is called before rendering happens by the renderer. This applies all changes necessary so that rendering is up-to-date but not updated more than it needs to be.
+   * @nota-bene Try not to call this method more than once a frame.
+   */
+  _update: function() {
+
+    if (this._flagStartAngle || this._flagEndAngle || this._flagInnerRadius
+      || this._flagOuterRadius) {
+
+      var sa = this._startAngle;
+      var ea = this._endAngle;
+
+      var ir = this._innerRadius;
+      var or = this._outerRadius;
+
+      var connected = mod(sa, TWO_PI$3) === mod(ea, TWO_PI$3);
+      var punctured = ir > 0;
+
+      var vertices = this.vertices;
+      var length = (punctured ? vertices.length / 2 : vertices.length);
+      var command, id = 0;
+
+      if (connected) {
+        length--;
+      } else if (!punctured) {
+        length -= 2;
+      }
+
+      /**
+       * Outer Circle
+       */
+      for (var i = 0, last = length - 1; i < length; i++) {
+
+        var pct = i / last;
+        var v = vertices[id];
+        var theta = pct * (ea - sa) + sa;
+        var step = (ea - sa) / length;
+
+        var x = or * Math.cos(theta);
+        var y = or * Math.sin(theta);
+
+        switch (i) {
+          case 0:
+            command = Commands.move;
+            break;
+          default:
+            command = Commands.curve;
+        }
+
+        v.command = command;
+        v.x = x;
+        v.y = y;
+        v.controls.left.clear();
+        v.controls.right.clear();
+
+        if (v.command === Commands.curve) {
+          var amp = or * step / Math.PI;
+          v.controls.left.x = amp * Math.cos(theta - HALF_PI$3);
+          v.controls.left.y = amp * Math.sin(theta - HALF_PI$3);
+          v.controls.right.x = amp * Math.cos(theta + HALF_PI$3);
+          v.controls.right.y = amp * Math.sin(theta + HALF_PI$3);
+          if (i === 1) {
+            v.controls.left.multiplyScalar(2);
+          }
+          if (i === last) {
+            v.controls.right.multiplyScalar(2);
+          }
+        }
+
+        id++;
+
+      }
+
+      if (punctured) {
+
+        if (connected) {
+          vertices[id].command = Commands.close;
+          id++;
+        } else {
+          length--;
+          last = length - 1;
+        }
+
+        /**
+         * Inner Circle
+         */
+        for (i = 0; i < length; i++) {
+
+          pct = i / last;
+          v = vertices[id];
+          theta = (1 - pct) * (ea - sa) + sa;
+          step = (ea - sa) / length;
+
+          x = ir * Math.cos(theta);
+          y = ir * Math.sin(theta);
+          command = Commands.curve;
+          if (i <= 0) {
+            command = connected ? Commands.move : Commands.line;
+          }
+
+          v.command = command;
+          v.x = x;
+          v.y = y;
+          v.controls.left.clear();
+          v.controls.right.clear();
+
+          if (v.command === Commands.curve) {
+            amp = ir * step / Math.PI;
+            v.controls.left.x = amp * Math.cos(theta + HALF_PI$3);
+            v.controls.left.y = amp * Math.sin(theta + HALF_PI$3);
+            v.controls.right.x = amp * Math.cos(theta - HALF_PI$3);
+            v.controls.right.y = amp * Math.sin(theta - HALF_PI$3);
+            if (i === 1) {
+              v.controls.left.multiplyScalar(2);
+            }
+            if (i === last) {
+              v.controls.right.multiplyScalar(2);
+            }
+          }
+
+          id++;
+
+        }
+
+        // Final Point
+        vertices[id].copy(vertices[0]);
+        vertices[id].command = Commands.line;
+
+      } else if (!connected) {
+
+        vertices[id].command = Commands.line;
+        vertices[id].x = 0;
+        vertices[id].y = 0;
+        id++;
+
+        // Final Point
+        vertices[id].copy(vertices[0]);
+        vertices[id].command = Commands.line;
+
+      }
+
+    }
+
+    Path.prototype._update.call(this);
+
+    return this;
+
+  },
+
+  /**
+   * @name Two.ArcSegment#flagReset
+   * @function
+   * @private
+   * @description Called internally to reset all flags. Ensures that only properties that change are updated before being sent to the renderer.
+   */
+  flagReset: function() {
+
+    Path.prototype.flagReset.call(this);
+
+    this._flagStartAngle = this._flagEndAngle
+      = this._flagInnerRadius = this._flagOuterRadius = false;
+
+    return this;
+
+  },
+
+  /**
+   * @name Two.ArcSegment#clone
+   * @function
+   * @param {Two.Group} [parent] - The parent group or scene to add the clone to.
+   * @returns {Two.ArcSegment}
+   * @description Create a new instance of {@link Two.ArcSegment} with the same properties of the current path.
+   */
+  clone: function(parent) {
+
+    var ir = this.innerRadius;
+    var or = this.outerradius;
+    var sa = this.startAngle;
+    var ea = this.endAngle;
+    var resolution = this.vertices.length;
+
+    var clone = new ArcSegment(0, 0, ir, or, sa, ea, resolution);
+
+    clone.translation.copy(this.translation);
+    clone.rotation = this.rotation;
+    clone.scale = this.scale;
+
+    if (this.matrix.manual) {
+      clone.matrix.copy(this.matrix);
+    }
+
+    _.each(Path.Properties, function(k) {
+      clone[k] = this[k];
+    }, this);
+
+    if (parent) {
+      parent.add(clone);
+    }
+
+    return clone;
+
+  },
+
+  /**
+   * @name Two.ArcSegment#toObject
+   * @function
+   * @returns {Object}
+   * @description Return a JSON compatible plain object that represents the path.
+   */
+  toObject: function() {
+
+    var object = Path.prototype.toObject.call(this);
+
+    _.each(ArcSegment.Properties, function(property) {
+      object[property] = this[property];
+    }, this);
+
+    return object;
+
+  }
+
+});
+
+ArcSegment.MakeObservable(ArcSegment.prototype);
+
+var TWO_PI$4 = Math.PI * 2, cos$4 = Math.cos, sin$4 = Math.sin;
+
+/**
+ * @name Two.Polygon
+ * @class
+ * @extends Two.Path
+ * @param {Number} [x=0] - The x position of the polygon.
+ * @param {Number} [y=0] - The y position of the polygon.
+ * @param {Number} radius - The radius value of the polygon.
+ * @param {Number} [sides=12] - The number of vertices used to construct the polygon.
+ */
+var Polygon = function(ox, oy, r, sides) {
+
+  sides = Math.max(sides || 0, 3);
+
+  Path.call(this);
+
+  this.closed = true;
+  this.automatic = false;
+
+  /**
+   * @name Two.Polygon#width
+   * @property {Number} - The size of the width of the polygon.
+   */
+  this.width = r * 2;
+  /**
+   * @name Two.Polygon#height
+   * @property {Number} - The size of the height of the polygon.
+   */
+  this.height = r * 2;
+  /**
+   * @name Two.Polygon#sides
+   * @property {Number} - The amount of sides the polyogn has.
+   */
+  this.sides = sides;
+
+  this._update();
+  this.translation.set(ox, oy);
+
+};
+
+_.extend(Polygon, {
+
+  /**
+   * @name Two.Polygon.Properties
+   * @property {String[]} - A list of properties that are on every {@link Two.Polygon}.
+   */
+  Properties: ['width', 'height', 'sides'],
+
+  /**
+   * @name Two.Polygon.MakeObservable
+   * @function
+   * @param {Object} object - The object to make observable.
+   * @description Convenience function to apply observable qualities of a {@link Two.Polygon} to any object. Handy if you'd like to extend the {@link Two.Polygon} class on a custom class.
+   */
+  MakeObservable: function(obj) {
+
+    Path.MakeObservable(obj);
+    _.each(Polygon.Properties, defineGetterSetter, obj);
+
+  }
+
+});
+
+_.extend(Polygon.prototype, Path.prototype, {
+
+  /**
+   * @name Two.Polygon#_flagWidth
+   * @private
+   * @property {Boolean} - Determines whether the {@link Two.Polygon#width} needs updating.
+   */
+  _flagWidth: false,
+  /**
+   * @name Two.Polygon#_flagHeight
+   * @private
+   * @property {Boolean} - Determines whether the {@link Two.Polygon#height} needs updating.
+   */
+  _flagHeight: false,
+  /**
+   * @name Two.Polygon#_flagSides
+   * @private
+   * @property {Boolean} - Determines whether the {@link Two.Polygon#sides} needs updating.
+   */
+  _flagSides: false,
+
+  /**
+   * @name Two.Polygon#_width
+   * @private
+   * @see {@link Two.Polygon#width}
+   */
+  _width: 0,
+  /**
+   * @name Two.Polygon#_height
+   * @private
+   * @see {@link Two.Polygon#height}
+   */
+  _height: 0,
+  /**
+   * @name Two.Polygon#_sides
+   * @private
+   * @see {@link Two.Polygon#sides}
+   */
+  _sides: 0,
+
+  constructor: Polygon,
+
+  /**
+   * @name Two.Polygon#_update
+   * @function
+   * @private
+   * @param {Boolean} [bubbles=false] - Force the parent to `_update` as well.
+   * @description This is called before rendering happens by the renderer. This applies all changes necessary so that rendering is up-to-date but not updated more than it needs to be.
+   * @nota-bene Try not to call this method more than once a frame.
+   */
+  _update: function() {
+
+    if (this._flagWidth || this._flagHeight || this._flagSides) {
+
+      var sides = this._sides;
+      var amount = sides + 1;
+      var length = this.vertices.length;
+
+      if (length > sides) {
+        this.vertices.splice(sides - 1, length - sides);
+        length = sides;
+      }
+
+      for (var i = 0; i < amount; i++) {
+
+        var pct = (i + 0.5) / sides;
+        var theta = TWO_PI$4 * pct + Math.PI / 2;
+        var x = this._width * cos$4(theta) / 2;
+        var y = this._height * sin$4(theta) / 2;
+
+        if (i >= length) {
+          this.vertices.push(new Anchor(x, y));
+        } else {
+          this.vertices[i].set(x, y);
+        }
+
+        this.vertices[i].command = i === 0
+          ? Commands.move : Commands.line;
+
+      }
+
+    }
+
+    Path.prototype._update.call(this);
+    return this;
+
+  },
+
+  /**
+   * @name Two.Polygon#flagReset
+   * @function
+   * @private
+   * @description Called internally to reset all flags. Ensures that only properties that change are updated before being sent to the renderer.
+   */
+  flagReset: function() {
+
+    this._flagWidth = this._flagHeight = this._flagSides = false;
+    Path.prototype.flagReset.call(this);
+
+    return this;
+
+  },
+
+  /**
+   * @name Two.Polygon#clone
+   * @function
+   * @param {Two.Group} [parent] - The parent group or scene to add the clone to.
+   * @returns {Two.Polygon}
+   * @description Create a new instance of {@link Two.Polygon} with the same properties of the current path.
+   */
+  clone: function(parent) {
+
+    var clone = new Polygon(0, 0, this.radius, this.sides);
+
+    clone.translation.copy(this.translation);
+    clone.rotation = this.rotation;
+    clone.scale = this.scale;
+
+    if (this.matrix.manual) {
+      clone.matrix.copy(this.matrix);
+    }
+
+    _.each(Path.Properties, function(k) {
+      clone[k] = this[k];
+    }, this);
+
+    if (parent) {
+      parent.add(clone);
+    }
+
+    return clone;
+
+  },
+
+  /**
+   * @name Two.Polygon#toObject
+   * @function
+   * @returns {Object}
+   * @description Return a JSON compatible plain object that represents the path.
+   */
+  toObject: function() {
+
+    var object = Path.prototype.toObject.call(this);
+
+    _.each(Polygon.Properties, function(property) {
+      object[property] = this[property];
+    }, this);
+
+    return object;
+
+  }
+
+});
+
+Polygon.MakeObservable(Polygon.prototype);
+
+var TWO_PI$5 = Math.PI * 2, cos$5 = Math.cos, sin$5 = Math.sin;
+
+/**
+ * @name Two.Star
+ * @class
+ * @extends Two.Path
+ * @param {Number} [x=0] - The x position of the star.
+ * @param {Number} [y=0] - The y position of the star.
+ * @param {Number} innerRadius - The inner radius value of the star.
+ * @param {Number} outerRadius - The outer radius value of the star.
+ * @param {Number} [sides=5] - The number of sides used to construct the star.
+ */
+var Star = function(ox, oy, ir, or, sides) {
+
+  if (arguments.length <= 3) {
+    or = ir;
+    ir = or / 2;
+  }
+
+  if (typeof sides !== 'number' || sides <= 0) {
+    sides = 5;
+  }
+
+  Path.call(this);
+  this.closed = true;
+  this.automatic = false;
+
+  /**
+   * @name Two.Star#innerRadius
+   * @property {Number} - The size of the inner radius of the star.
+   */
+  this.innerRadius = ir;
+  /**
+   * @name Two.Star#outerRadius
+   * @property {Number} - The size of the outer radius of the star.
+   */
+  this.outerRadius = or;
+  /**
+   * @name Two.Star#sides
+   * @property {Number} - The amount of sides the star has.
+   */
+  this.sides = sides;
+
+  this._update();
+  this.translation.set(ox, oy);
+
+};
+
+_.extend(Star, {
+
+  /**
+   * @name Two.Star.Properties
+   * @property {String[]} - A list of properties that are on every {@link Two.Star}.
+   */
+  Properties: ['innerRadius', 'outerRadius', 'sides'],
+
+  /**
+   * @name Two.Star.MakeObservable
+   * @function
+   * @param {Object} object - The object to make observable.
+   * @description Convenience function to apply observable qualities of a {@link Two.Star} to any object. Handy if you'd like to extend the {@link Two.Star} class on a custom class.
+   */
+  MakeObservable: function(obj) {
+
+    Path.MakeObservable(obj);
+    _.each(Star.Properties, defineGetterSetter, obj);
+
+  }
+
+});
+
+_.extend(Star.prototype, Path.prototype, {
+
+  /**
+   * @name Two.Star#_flagInnerRadius
+   * @private
+   * @property {Boolean} - Determines whether the {@link Two.Star#innerRadius} needs updating.
+   */
+  _flagInnerRadius: false,
+  /**
+   * @name Two.Star#_flagOuterRadius
+   * @private
+   * @property {Boolean} - Determines whether the {@link Two.Star#outerRadius} needs updating.
+   */
+  _flagOuterRadius: false,
+  /**
+   * @name Two.Star#_flagSides
+   * @private
+   * @property {Boolean} - Determines whether the {@link Two.Star#sides} needs updating.
+   */
+  _flagSides: false,
+
+  /**
+   * @name Two.Star#_innerRadius
+   * @private
+   * @see {@link Two.Star#innerRadius}
+   */
+  _innerRadius: 0,
+  /**
+   * @name Two.Star#_outerRadius
+   * @private
+   * @see {@link Two.Star#outerRadius}
+   */
+  _outerRadius: 0,
+  /**
+   * @name Two.Star#_sides
+   * @private
+   * @see {@link Two.Star#sides}
+   */
+  _sides: 0,
+
+  constructor: Star,
+
+  /**
+   * @name Two.Star#_update
+   * @function
+   * @private
+   * @param {Boolean} [bubbles=false] - Force the parent to `_update` as well.
+   * @description This is called before rendering happens by the renderer. This applies all changes necessary so that rendering is up-to-date but not updated more than it needs to be.
+   * @nota-bene Try not to call this method more than once a frame.
+   */
+  _update: function() {
+
+    if (this._flagInnerRadius || this._flagOuterRadius || this._flagSides) {
+
+      var sides = this._sides * 2;
+      var amount = sides + 1;
+      var length = this.vertices.length;
+
+      if (length > sides) {
+        this.vertices.splice(sides - 1, length - sides);
+        length = sides;
+      }
+
+      for (var i = 0; i < amount; i++) {
+
+        var pct = (i + 0.5) / sides;
+        var theta = TWO_PI$5 * pct;
+        var r = (!(i % 2) ? this._innerRadius : this._outerRadius) / 2;
+        var x = r * cos$5(theta);
+        var y = r * sin$5(theta);
+
+        if (i >= length) {
+          this.vertices.push(new Anchor(x, y));
+        } else {
+          this.vertices[i].set(x, y);
+        }
+
+        this.vertices[i].command = i === 0
+          ? Commands.move : Commands.line;
+
+      }
+
+    }
+
+    Path.prototype._update.call(this);
+
+    return this;
+
+  },
+
+  /**
+   * @name Two.Star#flagReset
+   * @function
+   * @private
+   * @description Called internally to reset all flags. Ensures that only properties that change are updated before being sent to the renderer.
+   */
+  flagReset: function() {
+
+    this._flagInnerRadius = this._flagOuterRadius = this._flagSides = false;
+    Path.prototype.flagReset.call(this);
+
+    return this;
+
+  },
+
+  /**
+   * @name Two.Star#clone
+   * @function
+   * @param {Two.Group} [parent] - The parent group or scene to add the clone to.
+   * @returns {Two.Star}
+   * @description Create a new instance of {@link Two.Star} with the same properties of the current path.
+   */
+  clone: function(parent) {
+
+    var ir = this.innerRadius;
+    var or = this.outerRadius;
+    var sides = this.sides;
+
+    var clone = new Star(0, 0, ir, or, sides);
+
+    clone.translation.copy(this.translation);
+    clone.rotation = this.rotation;
+    clone.scale = this.scale;
+
+    if (this.matrix.manual) {
+      clone.matrix.copy(this.matrix);
+    }
+
+    _.each(Path.Properties, function(k) {
+      clone[k] = this[k];
+    }, this);
+
+    if (parent) {
+      parent.add(clone);
+    }
+
+    return clone;
+
+  },
+
+  /**
+   * @name Two.Star#toObject
+   * @function
+   * @returns {Object}
+   * @description Return a JSON compatible plain object that represents the path.
+   */
+  toObject: function() {
+
+    var object = Path.prototype.toObject.call(this);
+
+    _.each(Star.Properties, function(property) {
+      object[property] = this[property];
+    }, this);
+
+    return object;
+
+  }
+
+});
+
+Star.MakeObservable(Star.prototype);
+
+var svg = {
+
+  version: 1.1,
+
+  ns: 'http://www.w3.org/2000/svg',
+  xlink: 'http://www.w3.org/1999/xlink',
+
+  alignments: {
+    left: 'start',
+    center: 'middle',
+    right: 'end'
+  },
+
+  // Create an svg namespaced element.
+  createElement: function(name, attrs) {
+    var tag = name;
+    var elem = document.createElementNS(svg.ns, tag);
+    if (tag === 'svg') {
+      attrs = _.defaults(attrs || {}, {
+        version: svg.version
+      });
+    }
+    if (attrs && Object.keys(attrs).length > 0) {
+      svg.setAttributes(elem, attrs);
+    }
+    return elem;
+  },
+
+  // Add attributes from an svg element.
+  setAttributes: function(elem, attrs) {
+    var keys = Object.keys(attrs);
+    for (var i = 0; i < keys.length; i++) {
+      if (/href/.test(keys[i])) {
+        elem.setAttributeNS(svg.xlink, keys[i], attrs[keys[i]]);
+      } else {
+        elem.setAttribute(keys[i], attrs[keys[i]]);
+      }
+    }
+    return this;
+  },
+
+  // Remove attributes from an svg element.
+  removeAttributes: function(elem, attrs) {
+    for (var key in attrs) {
+      elem.removeAttribute(key);
+    }
+    return this;
+  },
+
+  // Turn a set of vertices into a string for the d property of a path
+  // element. It is imperative that the string collation is as fast as
+  // possible, because this call will be happening multiple times a
+  // second.
+  toString: function(points, closed) {
+
+    var l = points.length,
+      last = l - 1,
+      d, // The elusive last Commands.move point
+      string = '';
+
+    for (var i = 0; i < l; i++) {
+      var b = points[i];
+      var command;
+      var prev = closed ? mod(i - 1, l) : Math.max(i - 1, 0);
+      var next = closed ? mod(i + 1, l) : Math.min(i + 1, last);
+
+      var a = points[prev];
+      var c = points[next];
+
+      var vx, vy, ux, uy, ar, bl, br, cl;
+      var rx, ry, xAxisRotation, largeArcFlag, sweepFlag;
+
+      // Access x and y directly,
+      // bypassing the getter
+      var x = toFixed(b.x);
+      var y = toFixed(b.y);
+
+      switch (b.command) {
+
+        case Commands.close:
+          command = Commands.close;
+          break;
+
+        case Commands.arc:
+
+          rx = b.rx;
+          ry = b.ry;
+          xAxisRotation = b.xAxisRotation;
+          largeArcFlag = b.largeArcFlag;
+          sweepFlag = b.sweepFlag;
+
+          command = Commands.arc + ' ' + rx + ' ' + ry + ' '
+            + xAxisRotation + ' ' + largeArcFlag + ' ' + sweepFlag + ' '
+            + x + ' ' + y;
+          break;
+
+        case Commands.curve:
+
+          ar = (a.controls && a.controls.right) || Vector.zero;
+          bl = (b.controls && b.controls.left) || Vector.zero;
+
+          if (a.relative) {
+            vx = toFixed((ar.x + a.x));
+            vy = toFixed((ar.y + a.y));
+          } else {
+            vx = toFixed(ar.x);
+            vy = toFixed(ar.y);
+          }
+
+          if (b.relative) {
+            ux = toFixed((bl.x + b.x));
+            uy = toFixed((bl.y + b.y));
+          } else {
+            ux = toFixed(bl.x);
+            uy = toFixed(bl.y);
+          }
+
+          command = ((i === 0) ? Commands.move : Commands.curve) +
+            ' ' + vx + ' ' + vy + ' ' + ux + ' ' + uy + ' ' + x + ' ' + y;
+          break;
+
+        case Commands.move:
+          d = b;
+          command = Commands.move + ' ' + x + ' ' + y;
+          break;
+
+        default:
+          command = b.command + ' ' + x + ' ' + y;
+
+      }
+
+      // Add a final point and close it off
+
+      if (i >= last && closed) {
+
+        if (b.command === Commands.curve) {
+
+          // Make sure we close to the most previous Commands.move
+          c = d;
+
+          br = (b.controls && b.controls.right) || b;
+          cl = (c.controls && c.controls.left) || c;
+
+          if (b.relative) {
+            vx = toFixed((br.x + b.x));
+            vy = toFixed((br.y + b.y));
+          } else {
+            vx = toFixed(br.x);
+            vy = toFixed(br.y);
+          }
+
+          if (c.relative) {
+            ux = toFixed((cl.x + c.x));
+            uy = toFixed((cl.y + c.y));
+          } else {
+            ux = toFixed(cl.x);
+            uy = toFixed(cl.y);
+          }
+
+          x = toFixed(c.x);
+          y = toFixed(c.y);
+
+          command +=
+            ' C ' + vx + ' ' + vy + ' ' + ux + ' ' + uy + ' ' + x + ' ' + y;
+
+        }
+
+        if (b.command !== Commands.close) {
+          command += ' Z';
+        }
+
+      }
+
+      string += command + ' ';
+
+    }
+
+    return string;
+
+  },
+
+  getClip: function(shape) {
+
+    var clip = shape._renderer.clip;
+
+    if (!clip) {
+
+      var root = shape;
+
+      while (root.parent) {
+        root = root.parent;
+      }
+
+      clip = shape._renderer.clip = svg.createElement('clipPath');
+      root.defs.appendChild(clip);
+
+    }
+
+    return clip;
+
+  },
+
+  group: {
+
+    // TODO: Can speed up.
+    // TODO: How does this effect a f
+    appendChild: function(object) {
+
+      var elem = object._renderer.elem;
+
+      if (!elem) {
+        return;
+      }
+
+      var tag = elem.nodeName;
+
+      if (!tag || /(radial|linear)gradient/i.test(tag) || object._clip) {
+        return;
+      }
+
+      this.elem.appendChild(elem);
+
+    },
+
+    removeChild: function(object) {
+
+      var elem = object._renderer.elem;
+
+      if (!elem || elem.parentNode != this.elem) {
+        return;
+      }
+
+      var tag = elem.nodeName;
+
+      if (!tag) {
+        return;
+      }
+
+      // Defer subtractions while clipping.
+      if (object._clip) {
+        return;
+      }
+
+      this.elem.removeChild(elem);
+
+    },
+
+    orderChild: function(object) {
+      this.elem.appendChild(object._renderer.elem);
+    },
+
+    renderChild: function(child) {
+      svg[child._renderer.type].render.call(child, this);
+    },
+
+    render: function(domElement) {
+
+      this._update();
+
+      // Shortcut for hidden objects.
+      // Doesn't reset the flags, so changes are stored and
+      // applied once the object is visible again
+      if (this._opacity === 0 && !this._flagOpacity) {
+        return this;
+      }
+
+      if (!this._renderer.elem) {
+        this._renderer.elem = svg.createElement('g', {
+          id: this.id
+        });
+        domElement.appendChild(this._renderer.elem);
+      }
+
+      // _Update styles for the <g>
+      var flagMatrix = this._matrix.manual || this._flagMatrix;
+      var context = {
+        domElement: domElement,
+        elem: this._renderer.elem
+      };
+
+      if (flagMatrix) {
+        this._renderer.elem.setAttribute('transform', 'matrix(' + this._matrix.toString() + ')');
+      }
+
+      for (var i = 0; i < this.children.length; i++) {
+        var child = this.children[i];
+        svg[child._renderer.type].render.call(child, domElement);
+      }
+
+      if (this._flagOpacity) {
+        this._renderer.elem.setAttribute('opacity', this._opacity);
+      }
+
+      if (this._flagClassName) {
+        this._renderer.elem.setAttribute('class', this.classList.join(' '));
+      }
+
+      if (this._flagAdditions) {
+        this.additions.forEach(svg.group.appendChild, context);
+      }
+
+      if (this._flagSubtractions) {
+        this.subtractions.forEach(svg.group.removeChild, context);
+      }
+
+      if (this._flagOrder) {
+        this.children.forEach(svg.group.orderChild, context);
+      }
+
+      // Commented two-way functionality of clips / masks with groups and
+      // polygons. Uncomment when this bug is fixed:
+      // https://code.google.com/p/chromium/issues/detail?id=370951
+
+      // if (this._flagClip) {
+
+      //   clip = svg.getClip(this);
+      //   elem = this._renderer.elem;
+
+      //   if (this._clip) {
+      //     elem.removeAttribute('id');
+      //     clip.setAttribute('id', this.id);
+      //     clip.appendChild(elem);
+      //   } else {
+      //     clip.removeAttribute('id');
+      //     elem.setAttribute('id', this.id);
+      //     this.parent._renderer.elem.appendChild(elem); // TODO: should be insertBefore
+      //   }
+
+      // }
+
+      if (this._flagMask) {
+        if (this._mask) {
+          this._renderer.elem.setAttribute('clip-path', 'url(#' + this._mask.id + ')');
+        } else {
+          this._renderer.elem.removeAttribute('clip-path');
+        }
+      }
+
+      return this.flagReset();
+
+    }
+
+  },
+
+  path: {
+
+    render: function(domElement) {
+
+      this._update();
+
+      // Shortcut for hidden objects.
+      // Doesn't reset the flags, so changes are stored and
+      // applied once the object is visible again
+      if (this._opacity === 0 && !this._flagOpacity) {
+        return this;
+      }
+
+      // Collect any attribute that needs to be changed here
+      var changed = {};
+
+      var flagMatrix = this._matrix.manual || this._flagMatrix;
+
+      if (flagMatrix) {
+        changed.transform = 'matrix(' + this._matrix.toString() + ')';
+      }
+
+      if (this._flagVertices) {
+        var vertices = svg.toString(this._renderer.vertices, this._closed);
+        changed.d = vertices;
+      }
+
+      if (this._fill && this._fill._renderer) {
+        this._fill._update();
+        svg[this._fill._renderer.type].render.call(this._fill, domElement, true);
+      }
+
+      if (this._flagFill) {
+        changed.fill = this._fill && this._fill.id
+          ? 'url(#' + this._fill.id + ')' : this._fill;
+      }
+
+      if (this._stroke && this._stroke._renderer) {
+        this._stroke._update();
+        svg[this._stroke._renderer.type].render.call(this._stroke, domElement, true);
+      }
+
+      if (this._flagStroke) {
+        changed.stroke = this._stroke && this._stroke.id
+          ? 'url(#' + this._stroke.id + ')' : this._stroke;
+      }
+
+      if (this._flagLinewidth) {
+        changed['stroke-width'] = this._linewidth;
+      }
+
+      if (this._flagOpacity) {
+        changed['stroke-opacity'] = this._opacity;
+        changed['fill-opacity'] = this._opacity;
+      }
+
+      if (this._flagClassName) {
+        changed['class'] = this.classList.join(' ');
+      }
+
+      if (this._flagVisible) {
+        changed.visibility = this._visible ? 'visible' : 'hidden';
+      }
+
+      if (this._flagCap) {
+        changed['stroke-linecap'] = this._cap;
+      }
+
+      if (this._flagJoin) {
+        changed['stroke-linejoin'] = this._join;
+      }
+
+      if (this._flagMiter) {
+        changed['stroke-miterlimit'] = this._miter;
+      }
+
+      if (this.dashes && this.dashes.length > 0) {
+        changed['stroke-dasharray'] = this.dashes.join(' ');
+        changed['stroke-dashoffset'] = this.dashes.offset || 0;
+      }
+
+      // If there is no attached DOM element yet,
+      // create it with all necessary attributes.
+      if (!this._renderer.elem) {
+
+        changed.id = this.id;
+        this._renderer.elem = svg.createElement('path', changed);
+        domElement.appendChild(this._renderer.elem);
+
+      // Otherwise apply all pending attributes
+      } else {
+        svg.setAttributes(this._renderer.elem, changed);
+      }
+
+      if (this._flagClip) {
+
+        var clip = svg.getClip(this);
+        var elem = this._renderer.elem;
+
+        if (this._clip) {
+          elem.removeAttribute('id');
+          clip.setAttribute('id', this.id);
+          clip.appendChild(elem);
+        } else {
+          clip.removeAttribute('id');
+          elem.setAttribute('id', this.id);
+          this.parent._renderer.elem.appendChild(elem); // TODO: should be insertBefore
+        }
+
+      }
+
+      // Commented two-way functionality of clips / masks with groups and
+      // polygons. Uncomment when this bug is fixed:
+      // https://code.google.com/p/chromium/issues/detail?id=370951
+
+      // if (this._flagMask) {
+      //   if (this._mask) {
+      //     elem.setAttribute('clip-path', 'url(#' + this._mask.id + ')');
+      //   } else {
+      //     elem.removeAttribute('clip-path');
+      //   }
+      // }
+
+      return this.flagReset();
+
+    }
+
+  },
+
+  text: {
+
+    render: function(domElement) {
+
+      this._update();
+
+      var changed = {};
+
+      var flagMatrix = this._matrix.manual || this._flagMatrix;
+
+      if (flagMatrix) {
+        changed.transform = 'matrix(' + this._matrix.toString() + ')';
+      }
+
+      if (this._flagFamily) {
+        changed['font-family'] = this._family;
+      }
+      if (this._flagSize) {
+        changed['font-size'] = this._size;
+      }
+      if (this._flagLeading) {
+        changed['line-height'] = this._leading;
+      }
+      if (this._flagAlignment) {
+        changed['text-anchor'] = svg.alignments[this._alignment] || this._alignment;
+      }
+      if (this._flagBaseline) {
+        changed['alignment-baseline'] = changed['dominant-baseline'] = this._baseline;
+      }
+      if (this._flagStyle) {
+        changed['font-style'] = this._style;
+      }
+      if (this._flagWeight) {
+        changed['font-weight'] = this._weight;
+      }
+      if (this._flagDecoration) {
+        changed['text-decoration'] = this._decoration;
+      }
+      if (this._fill && this._fill._renderer) {
+        this._fill._update();
+        svg[this._fill._renderer.type].render.call(this._fill, domElement, true);
+      }
+      if (this._flagFill) {
+        changed.fill = this._fill && this._fill.id
+          ? 'url(#' + this._fill.id + ')' : this._fill;
+      }
+      if (this._stroke && this._stroke._renderer) {
+        this._stroke._update();
+        svg[this._stroke._renderer.type].render.call(this._stroke, domElement, true);
+      }
+      if (this._flagStroke) {
+        changed.stroke = this._stroke && this._stroke.id
+          ? 'url(#' + this._stroke.id + ')' : this._stroke;
+      }
+      if (this._flagLinewidth) {
+        changed['stroke-width'] = this._linewidth;
+      }
+      if (this._flagOpacity) {
+        changed.opacity = this._opacity;
+      }
+      if (this._flagClassName) {
+        changed['class'] = this.classList.join(' ');
+      }
+      if (this._flagVisible) {
+        changed.visibility = this._visible ? 'visible' : 'hidden';
+      }
+      if (this.dashes && this.dashes.length > 0) {
+        changed['stroke-dasharray'] = this.dashes.join(' ');
+        changed['stroke-dashoffset'] = this.dashes.offset || 0;
+      }
+
+      if (!this._renderer.elem) {
+
+        changed.id = this.id;
+
+        this._renderer.elem = svg.createElement('text', changed);
+        domElement.defs.appendChild(this._renderer.elem);
+
+      } else {
+
+        svg.setAttributes(this._renderer.elem, changed);
+
+      }
+
+      if (this._flagClip) {
+
+        var clip = svg.getClip(this);
+        var elem = this._renderer.elem;
+
+        if (this._clip) {
+          elem.removeAttribute('id');
+          clip.setAttribute('id', this.id);
+          clip.appendChild(elem);
+        } else {
+          clip.removeAttribute('id');
+          elem.setAttribute('id', this.id);
+          this.parent._renderer.elem.appendChild(elem); // TODO: should be insertBefore
+        }
+
+      }
+
+      if (this._flagValue) {
+        this._renderer.elem.textContent = this._value;
+      }
+
+      return this.flagReset();
+
+    }
+
+  },
+
+  'linear-gradient': {
+
+    render: function(domElement, silent) {
+
+      if (!silent) {
+        this._update();
+      }
+
+      var changed = {};
+
+      if (this._flagEndPoints) {
+        changed.x1 = this.left._x;
+        changed.y1 = this.left._y;
+        changed.x2 = this.right._x;
+        changed.y2 = this.right._y;
+      }
+
+      if (this._flagSpread) {
+        changed.spreadMethod = this._spread;
+      }
+
+      // If there is no attached DOM element yet,
+      // create it with all necessary attributes.
+      if (!this._renderer.elem) {
+
+        changed.id = this.id;
+        changed.gradientUnits = 'userSpaceOnUse';
+        this._renderer.elem = svg.createElement('linearGradient', changed);
+        domElement.defs.appendChild(this._renderer.elem);
+
+      // Otherwise apply all pending attributes
+      } else {
+
+        svg.setAttributes(this._renderer.elem, changed);
+
+      }
+
+      if (this._flagStops) {
+
+        var lengthChanged = this._renderer.elem.childNodes.length
+          !== this.stops.length;
+
+        if (lengthChanged) {
+          while (this._renderer.elem.lastChild) {
+            this._renderer.elem.removeChild(this._renderer.elem.lastChild);
+          }
+        }
+
+        for (var i = 0; i < this.stops.length; i++) {
+
+          var stop = this.stops[i];
+          var attrs = {};
+
+          if (stop._flagOffset) {
+            attrs.offset = 100 * stop._offset + '%';
+          }
+          if (stop._flagColor) {
+            attrs['stop-color'] = stop._color;
+          }
+          if (stop._flagOpacity) {
+            attrs['stop-opacity'] = stop._opacity;
+          }
+
+          if (!stop._renderer.elem) {
+            stop._renderer.elem = svg.createElement('stop', attrs);
+          } else {
+            svg.setAttributes(stop._renderer.elem, attrs);
+          }
+
+          if (lengthChanged) {
+            this._renderer.elem.appendChild(stop._renderer.elem);
+          }
+          stop.flagReset();
+
+        }
+
+      }
+
+      return this.flagReset();
+
+    }
+
+  },
+
+  'radial-gradient': {
+
+    render: function(domElement, silent) {
+
+      if (!silent) {
+        this._update();
+      }
+
+      var changed = {};
+
+      if (this._flagCenter) {
+        changed.cx = this.center._x;
+        changed.cy = this.center._y;
+      }
+      if (this._flagFocal) {
+        changed.fx = this.focal._x;
+        changed.fy = this.focal._y;
+      }
+
+      if (this._flagRadius) {
+        changed.r = this._radius;
+      }
+
+      if (this._flagSpread) {
+        changed.spreadMethod = this._spread;
+      }
+
+      // If there is no attached DOM element yet,
+      // create it with all necessary attributes.
+      if (!this._renderer.elem) {
+
+        changed.id = this.id;
+        changed.gradientUnits = 'userSpaceOnUse';
+        this._renderer.elem = svg.createElement('radialGradient', changed);
+        domElement.defs.appendChild(this._renderer.elem);
+
+      // Otherwise apply all pending attributes
+      } else {
+
+        svg.setAttributes(this._renderer.elem, changed);
+
+      }
+
+      if (this._flagStops) {
+
+        var lengthChanged = this._renderer.elem.childNodes.length
+          !== this.stops.length;
+
+        if (lengthChanged) {
+          while (this._renderer.elem.lastChild) {
+            this._renderer.elem.removeChild(this._renderer.elem.lastChild);
+          }
+        }
+
+        for (var i = 0; i < this.stops.length; i++) {
+
+          var stop = this.stops[i];
+          var attrs = {};
+
+          if (stop._flagOffset) {
+            attrs.offset = 100 * stop._offset + '%';
+          }
+          if (stop._flagColor) {
+            attrs['stop-color'] = stop._color;
+          }
+          if (stop._flagOpacity) {
+            attrs['stop-opacity'] = stop._opacity;
+          }
+
+          if (!stop._renderer.elem) {
+            stop._renderer.elem = svg.createElement('stop', attrs);
+          } else {
+            svg.setAttributes(stop._renderer.elem, attrs);
+          }
+
+          if (lengthChanged) {
+            this._renderer.elem.appendChild(stop._renderer.elem);
+          }
+          stop.flagReset();
+
+        }
+
+      }
+
+      return this.flagReset();
+
+    }
+
+  },
+
+  texture: {
+
+    render: function(domElement, silent) {
+
+      if (!silent) {
+        this._update();
+      }
+
+      var changed = {};
+      var styles = { x: 0, y: 0 };
+      var image = this.image;
+
+      if (this._flagLoaded && this.loaded) {
+
+        switch (image.nodeName.toLowerCase()) {
+
+          case 'canvas':
+            styles.href = styles['xlink:href'] = image.toDataURL('image/png');
+            break;
+          case 'img':
+          case 'image':
+            styles.href = styles['xlink:href'] = this.src;
+            break;
+
+        }
+
+      }
+
+      if (this._flagOffset || this._flagLoaded || this._flagScale) {
+
+        changed.x = this._offset.x;
+        changed.y = this._offset.y;
+
+        if (image) {
+
+          changed.x -= image.width / 2;
+          changed.y -= image.height / 2;
+
+          if (this._scale instanceof Vector) {
+            changed.x *= this._scale.x;
+            changed.y *= this._scale.y;
+          } else {
+            changed.x *= this._scale;
+            changed.y *= this._scale;
+          }
+        }
+
+        if (changed.x > 0) {
+          changed.x *= - 1;
+        }
+        if (changed.y > 0) {
+          changed.y *= - 1;
+        }
+
+      }
+
+      if (this._flagScale || this._flagLoaded || this._flagRepeat) {
+
+        changed.width = 0;
+        changed.height = 0;
+
+        if (image) {
+
+          styles.width = changed.width = image.width;
+          styles.height = changed.height = image.height;
+
+          // TODO: Hack / Band-aid
+          switch (this._repeat) {
+            case 'no-repeat':
+              changed.width += 1;
+              changed.height += 1;
+              break;
+          }
+
+          if (this._scale instanceof Vector) {
+            changed.width *= this._scale.x;
+            changed.height *= this._scale.y;
+          } else {
+            changed.width *= this._scale;
+            changed.height *= this._scale;
+          }
+        }
+
+      }
+
+      if (this._flagScale || this._flagLoaded) {
+        if (!this._renderer.image) {
+          this._renderer.image = svg.createElement('image', styles);
+        } else {
+          svg.setAttributes(this._renderer.image, styles);
+        }
+      }
+
+      if (!this._renderer.elem) {
+
+        changed.id = this.id;
+        changed.patternUnits = 'userSpaceOnUse';
+        this._renderer.elem = svg.createElement('pattern', changed);
+        domElement.defs.appendChild(this._renderer.elem);
+
+      } else if (Object.keys(changed).length !== 0) {
+
+        svg.setAttributes(this._renderer.elem, changed);
+
+      }
+
+      if (this._renderer.elem && this._renderer.image && !this._renderer.appended) {
+        this._renderer.elem.appendChild(this._renderer.image);
+        this._renderer.appended = true;
+      }
+
+      return this.flagReset();
+
+    }
+
+  }
+
+};
+
+/**
+ * @name Two.SVGRenderer
+ * @class
+ * @extends Two.Events
+ * @param {Object} [parameters] - This object is inherited when constructing a new instance of {@link Two}.
+ * @param {Element} [parameters.domElement] - The `<svg />` to draw to. If none given a new one will be constructed.
+ * @description This class is used by {@link Two} when constructing with `type` of `Two.Types.svg` (the default type). It takes Two.js' scenegraph and renders it to a `<svg />`.
+ */
+var Renderer$1 = function(params) {
+
+  /**
+   * @name Two.SVGRenderer#domElement
+   * @property {Element} - The `<svg />` associated with the Two.js scene.
+   */
+  this.domElement = params.domElement || svg.createElement('svg');
+
+  /**
+   * @name Two.SVGRenderer#scene
+   * @property {Two.Group} - The root group of the scenegraph.
+   */
+  this.scene = new Group();
+  this.scene.parent = this;
+
+  /**
+   * @name Two.SVGRenderer#defs
+   * @property {SvgDefintionsElement} - The `<defs />` to apply gradients, patterns, and bitmap imagery.
+   */
+  this.defs = svg.createElement('defs');
+  this.domElement.appendChild(this.defs);
+  this.domElement.defs = this.defs;
+  this.domElement.style.overflow = 'hidden';
+
+};
+
+_.extend(Renderer$1, {
+
+  /**
+   * @name Two.SVGRenderer.Utils
+   * @property {Object} - A massive object filled with utility functions and properties to render Two.js objects to a `<svg />`.
+   */
+  Utils: svg
+
+});
+
+_.extend(Renderer$1.prototype, Events, {
+
+  constructor: Renderer$1,
+
+  /**
+   * @name Two.SVGRenderer#setSize
+   * @function
+   * @param {Number} width - The new width of the renderer.
+   * @param {Number} height - The new height of the renderer.
+   * @description Change the size of the renderer.
+   * @nota-bene Triggers a `Two.Events.resize`.
+   */
+  setSize: function(width, height) {
+
+    this.width = width;
+    this.height = height;
+
+    svg.setAttributes(this.domElement, {
+      width: width,
+      height: height
+    });
+
+    return this.trigger(Events.Types.resize, width, height);
+
+  },
+
+  /**
+   * @name Two.SVGRenderer#render
+   * @function
+   * @description Render the current scene to the `<svg />`.
+   */
+  render: function() {
+
+    svg.group.render.call(this.scene, this.domElement);
+
+    return this;
+
+  }
+
+});
+
+// Constants
+
+var multiplyMatrix = Matrix$1.Multiply,
+  identity = [1, 0, 0, 0, 1, 0, 0, 0, 1],
+  transformation = new NumArray(9),
+  CanvasUtils = Renderer.Utils;
+
+var webgl = {
+
+  isHidden: /(undefined|none|transparent)/i,
+
+  canvas: (root$1.document ? root$1.document.createElement('canvas') : { getContext: function() {} }),
+
+  alignments: {
+    left: 'start',
+    middle: 'center',
+    right: 'end'
+  },
+
+  matrix: new Matrix$1(),
+
+  group: {
+
+    removeChild: function(child, gl) {
+      if (child.children) {
+        for (var i = 0; i < child.children.length; i++) {
+          webgl.group.removeChild(child.children[i], gl);
+        }
+        return;
+      }
+      // Deallocate texture to free up gl memory.
+      gl.deleteTexture(child._renderer.texture);
+      delete child._renderer.texture;
+    },
+
+    render: function(gl, program) {
+
+      this._update();
+
+      var parent = this.parent;
+      var flagParentMatrix = (parent._matrix && parent._matrix.manual) || parent._flagMatrix;
+      var flagMatrix = this._matrix.manual || this._flagMatrix;
+
+      if (flagParentMatrix || flagMatrix) {
+
+        if (!this._renderer.matrix) {
+          this._renderer.matrix = new NumArray(9);
+        }
+
+        // Reduce amount of object / array creation / deletion
+        this._matrix.toTransformArray(true, transformation);
+
+        multiplyMatrix(transformation, parent._renderer.matrix, this._renderer.matrix);
+
+        if (!(this._renderer.scale instanceof Vector)) {
+          this._renderer.scale = new Vector();
+        }
+
+        if (this._scale instanceof Vector) {
+          this._renderer.scale.x = this._scale.x;
+          this._renderer.scale.y = this._scale.y;
+        } else {
+          this._renderer.scale.x = this._scale;
+          this._renderer.scale.y = this._scale;
+        }
+
+        if (!(/renderer/i.test(parent._renderer.type))) {
+          this._renderer.scale.x *= parent._renderer.scale.x;
+          this._renderer.scale.y *= parent._renderer.scale.y;
+        }
+
+        if (flagParentMatrix) {
+          this._flagMatrix = true;
+        }
+
+      }
+
+      if (this._mask) {
+
+        // Stencil away everything that isn't rendered by the mask
+        gl.clear(gl.STENCIL_BUFFER_BIT);
+        gl.enable(gl.STENCIL_TEST);
+
+        gl.stencilFunc(gl.ALWAYS, 1, 0);
+        gl.stencilOp(gl.KEEP, gl.KEEP, gl.REPLACE);
+        // Don't draw the element onto the canvas, only onto the stencil buffer
+        gl.colorMask(false, false, false, false);
+
+        webgl[this._mask._renderer.type].render.call(this._mask, gl, program, this);
+
+        gl.stencilFunc(gl.EQUAL, 1, 0xff);
+        gl.stencilOp(gl.KEEP, gl.KEEP, gl.KEEP);
+        gl.colorMask(true, true, true, true);
+
+      }
+
+      this._flagOpacity = parent._flagOpacity || this._flagOpacity;
+
+      this._renderer.opacity = this._opacity
+        * (parent && parent._renderer ? parent._renderer.opacity : 1);
+
+      var i;
+      if (this._flagSubtractions) {
+        for (i = 0; i < this.subtractions.length; i++) {
+          webgl.group.removeChild(this.subtractions[i], gl);
+        }
+      }
+
+      for (i = 0; i < this.children.length; i++) {
+        var child = this.children[i];
+        webgl[child._renderer.type].render.call(child, gl, program);
+      }
+
+      if (this._mask) {
+        gl.disable(gl.STENCIL_TEST);
+      }
+
+      return this.flagReset();
+
+    }
+
+  },
+
+  path: {
+
+    updateCanvas: function(elem) {
+
+      var next, prev, a, c, ux, uy, vx, vy, ar, bl, br, cl, x, y;
+      var isOffset;
+
+      var commands = elem._renderer.vertices;
+      var canvas = this.canvas;
+      var ctx = this.ctx;
+
+      // Styles
+      var scale = elem._renderer.scale;
+      var stroke = elem._stroke;
+      var linewidth = elem._linewidth;
+      var fill = elem._fill;
+      var opacity = elem._renderer.opacity || elem._opacity;
+      var cap = elem._cap;
+      var join = elem._join;
+      var miter = elem._miter;
+      var closed = elem._closed;
+      var dashes = elem.dashes;
+      var length = commands.length;
+      var last = length - 1;
+
+      canvas.width = Math.max(Math.ceil(elem._renderer.rect.width * scale.x), 1);
+      canvas.height = Math.max(Math.ceil(elem._renderer.rect.height * scale.y), 1);
+
+      var centroid = elem._renderer.rect.centroid;
+      var cx = centroid.x;
+      var cy = centroid.y;
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      if (fill) {
+        if (typeof fill === 'string') {
+          ctx.fillStyle = fill;
+        } else {
+          webgl[fill._renderer.type].render.call(fill, ctx, elem);
+          ctx.fillStyle = fill._renderer.effect;
+        }
+      }
+      if (stroke) {
+        if (typeof stroke === 'string') {
+          ctx.strokeStyle = stroke;
+        } else {
+          webgl[stroke._renderer.type].render.call(stroke, ctx, elem);
+          ctx.strokeStyle = stroke._renderer.effect;
+        }
+        if (linewidth) {
+          ctx.lineWidth = linewidth;
+        }
+        if (miter) {
+          ctx.miterLimit = miter;
+        }
+        if (join) {
+          ctx.lineJoin = join;
+        }
+        if (!closed && cap) {
+          ctx.lineCap = cap;
+        }
+      }
+      if (typeof opacity === 'number') {
+        ctx.globalAlpha = opacity;
+      }
+
+      if (dashes && dashes.length > 0) {
+        ctx.lineDashOffset = dashes.offset || 0;
+        ctx.setLineDash(dashes);
+      }
+
+      var d;
+      ctx.save();
+      ctx.scale(scale.x, scale.y);
+
+      ctx.translate(cx, cy);
+
+      ctx.beginPath();
+      for (var i = 0; i < commands.length; i++) {
+
+        var b = commands[i];
+
+        x = b.x;
+        y = b.y;
+
+        switch (b.command) {
+
+          case Commands.close:
+            ctx.closePath();
+            break;
+
+          case Commands.arc:
+
+            var rx = b.rx;
+            var ry = b.ry;
+            var xAxisRotation = b.xAxisRotation;
+            var largeArcFlag = b.largeArcFlag;
+            var sweepFlag = b.sweepFlag;
+
+            prev = closed ? mod(i - 1, length) : Math.max(i - 1, 0);
+            a = commands[prev];
+
+            var ax = a.x;
+            var ay = a.y;
+
+            CanvasUtils.renderSvgArcCommand(ctx, ax, ay, rx, ry, largeArcFlag, sweepFlag, xAxisRotation, x, y);
+            break;
+
+          case Commands.curve:
+
+            prev = closed ? mod(i - 1, length) : Math.max(i - 1, 0);
+            next = closed ? mod(i + 1, length) : Math.min(i + 1, last);
+
+            a = commands[prev];
+            c = commands[next];
+            ar = (a.controls && a.controls.right) || Vector.zero;
+            bl = (b.controls && b.controls.left) || Vector.zero;
+
+            if (a._relative) {
+              vx = ar.x + a.x;
+              vy = ar.y + a.y;
+            } else {
+              vx = ar.x;
+              vy = ar.y;
+            }
+
+            if (b._relative) {
+              ux = bl.x + b.x;
+              uy = bl.y + b.y;
+            } else {
+              ux = bl.x;
+              uy = bl.y;
+            }
+
+            ctx.bezierCurveTo(vx, vy, ux, uy, x, y);
+
+            if (i >= last && closed) {
+
+              c = d;
+
+              br = (b.controls && b.controls.right) || Vector.zero;
+              cl = (c.controls && c.controls.left) || Vector.zero;
+
+              if (b._relative) {
+                vx = br.x + b.x;
+                vy = br.y + b.y;
+              } else {
+                vx = br.x;
+                vy = br.y;
+              }
+
+              if (c._relative) {
+                ux = cl.x + c.x;
+                uy = cl.y + c.y;
+              } else {
+                ux = cl.x;
+                uy = cl.y;
+              }
+
+              x = c.x;
+              y = c.y;
+
+              ctx.bezierCurveTo(vx, vy, ux, uy, x, y);
+
+            }
+
+            break;
+
+          case Commands.line:
+            ctx.lineTo(x, y);
+            break;
+
+          case Commands.move:
+            d = b;
+            ctx.moveTo(x, y);
+            break;
+
+        }
+
+      }
+
+      // Loose ends
+
+      if (closed) {
+        ctx.closePath();
+      }
+
+      if (!webgl.isHidden.test(fill)) {
+        isOffset = fill._renderer && fill._renderer.offset;
+        if (isOffset) {
+          ctx.save();
+          ctx.translate(
+            - fill._renderer.offset.x, - fill._renderer.offset.y);
+          ctx.scale(fill._renderer.scale.x, fill._renderer.scale.y);
+        }
+        ctx.fill();
+        if (isOffset) {
+          ctx.restore();
+        }
+      }
+
+      if (!webgl.isHidden.test(stroke)) {
+        isOffset = stroke._renderer && stroke._renderer.offset;
+        if (isOffset) {
+          ctx.save();
+          ctx.translate(
+            - stroke._renderer.offset.x, - stroke._renderer.offset.y);
+          ctx.scale(stroke._renderer.scale.x, stroke._renderer.scale.y);
+          ctx.lineWidth = linewidth / stroke._renderer.scale.x;
+        }
+        ctx.stroke();
+        if (isOffset) {
+          ctx.restore();
+        }
+      }
+
+      ctx.restore();
+
+    },
+
+    // Returns the rect of a set of verts. Typically takes vertices that are
+    // "centered" around 0 and returns them to be anchored upper-left.
+    getBoundingClientRect: function(vertices, border, rect) {
+
+      var left = Infinity, right = -Infinity,
+          top = Infinity, bottom = -Infinity,
+          width, height;
+
+      vertices.forEach(function(v) {
+
+        var x = v.x, y = v.y, controls = v.controls;
+        var a, b, c, d, cl, cr;
+
+        top = Math.min(y, top);
+        left = Math.min(x, left);
+        right = Math.max(x, right);
+        bottom = Math.max(y, bottom);
+
+        if (!v.controls) {
+          return;
+        }
+
+        cl = controls.left;
+        cr = controls.right;
+
+        if (!cl || !cr) {
+          return;
+        }
+
+        a = v._relative ? cl.x + x : cl.x;
+        b = v._relative ? cl.y + y : cl.y;
+        c = v._relative ? cr.x + x : cr.x;
+        d = v._relative ? cr.y + y : cr.y;
+
+        if (!a || !b || !c || !d) {
+          return;
+        }
+
+        top = Math.min(b, d, top);
+        left = Math.min(a, c, left);
+        right = Math.max(a, c, right);
+        bottom = Math.max(b, d, bottom);
+
+      });
+
+      // Expand borders
+
+      if (typeof border === 'number') {
+        top -= border;
+        left -= border;
+        right += border;
+        bottom += border;
+      }
+
+      width = right - left;
+      height = bottom - top;
+
+      rect.top = top;
+      rect.left = left;
+      rect.right = right;
+      rect.bottom = bottom;
+      rect.width = width;
+      rect.height = height;
+
+      if (!rect.centroid) {
+        rect.centroid = {};
+      }
+
+      rect.centroid.x = - left;
+      rect.centroid.y = - top;
+
+    },
+
+    render: function(gl, program, forcedParent) {
+
+      if (!this._visible || !this._opacity) {
+        return this;
+      }
+
+      this._update();
+
+      // Calculate what changed
+
+      var parent = forcedParent || this.parent;
+      var flagParentMatrix = parent._matrix.manual || parent._flagMatrix;
+      var flagMatrix = this._matrix.manual || this._flagMatrix;
+      var parentChanged = this._renderer.parent !== parent;
+      var flagTexture = this._flagVertices || this._flagFill
+        || (this._fill instanceof LinearGradient && (this._fill._flagSpread || this._fill._flagStops || this._fill._flagEndPoints))
+        || (this._fill instanceof RadialGradient && (this._fill._flagSpread || this._fill._flagStops || this._fill._flagRadius || this._fill._flagCenter || this._fill._flagFocal))
+        || (this._fill instanceof Texture && (this._fill._flagLoaded && this._fill.loaded || this._fill._flagImage || this._fill._flagVideo || this._fill._flagRepeat || this._fill._flagOffset || this._fill._flagScale))
+        || (this._stroke instanceof LinearGradient && (this._stroke._flagSpread || this._stroke._flagStops || this._stroke._flagEndPoints))
+        || (this._stroke instanceof RadialGradient && (this._stroke._flagSpread || this._stroke._flagStops || this._stroke._flagRadius || this._stroke._flagCenter || this._stroke._flagFocal))
+        || (this._stroke instanceof Texture && (this._stroke._flagLoaded && this._stroke.loaded || this._stroke._flagImage || this._stroke._flagVideo || this._stroke._flagRepeat || this._stroke._flagOffset || this._fill._flagScale))
+        || this._flagStroke || this._flagLinewidth || this._flagOpacity
+        || parent._flagOpacity || this._flagVisible || this._flagCap
+        || this._flagJoin || this._flagMiter || this._flagScale
+        || (this.dashes && this.dashes.length > 0)
+        || !this._renderer.texture;
+
+      if (flagParentMatrix || flagMatrix || parentChanged) {
+
+        if (!this._renderer.matrix) {
+          this._renderer.matrix = new NumArray(9);
+        }
+
+        // Reduce amount of object / array creation / deletion
+
+        this._matrix.toTransformArray(true, transformation);
+
+        multiplyMatrix(transformation, parent._renderer.matrix, this._renderer.matrix);
+
+        if (!(this._renderer.scale instanceof Vector)) {
+          this._renderer.scale = new Vector();
+        }
+        if (this._scale instanceof Vector) {
+          this._renderer.scale.x = this._scale.x * parent._renderer.scale.x;
+          this._renderer.scale.y = this._scale.y * parent._renderer.scale.y;
+        } else {
+          this._renderer.scale.x = this._scale * parent._renderer.scale.x;
+          this._renderer.scale.y = this._scale * parent._renderer.scale.y;
+        }
+
+        if (parentChanged) {
+          this._renderer.parent = parent;
+        }
+      }
+
+      if (flagTexture) {
+
+        if (!this._renderer.rect) {
+          this._renderer.rect = {};
+        }
+
+        this._renderer.opacity = this._opacity * parent._renderer.opacity;
+
+        webgl.path.getBoundingClientRect(this._renderer.vertices, this._linewidth, this._renderer.rect);
+
+        webgl.updateTexture.call(webgl, gl, this);
+
+      } else {
+
+        // We still need to update child Two elements on the fill and
+        // stroke properties.
+        if (this._fill && this._fill._update) {
+          this._fill._update();
+        }
+        if (this._stroke && this._stroke._update) {
+          this._stroke._update();
+        }
+
+      }
+
+      // if (this._mask) {
+      //   webgl[this._mask._renderer.type].render.call(mask, gl, program, this);
+      // }
+
+      if (this._clip && !forcedParent) {
+        return;
+      }
+
+      // Draw Texture
+      gl.bindTexture(gl.TEXTURE_2D, this._renderer.texture);
+
+      // Draw Rect
+      var rect = this._renderer.rect;
+      gl.uniformMatrix3fv(program.matrix, false, this._renderer.matrix);
+      gl.uniform4f(program.rect, rect.left, rect.top, rect.right, rect.bottom);
+      gl.drawArrays(gl.TRIANGLES, 0, 6);
+
+      return this.flagReset();
+
+    }
+
+  },
+
+  text: {
+
+    updateCanvas: function(elem) {
+
+      var canvas = this.canvas;
+      var ctx = this.ctx;
+
+      // Styles
+      var scale = elem._renderer.scale;
+      var stroke = elem._stroke;
+      var linewidth = elem._linewidth * scale;
+      var fill = elem._fill;
+      var opacity = elem._renderer.opacity || elem._opacity;
+      var dashes = elem.dashes;
+      var decoration = elem._decoration;
+      var alignment = CanvasUtils.alignments[elem._alignment] || elem._alignment;
+      var baseline = elem._baseline;
+
+      canvas.width = Math.max(Math.ceil(elem._renderer.rect.width * scale.x), 1);
+      canvas.height = Math.max(Math.ceil(elem._renderer.rect.height * scale.y), 1);
+
+      var centroid = elem._renderer.rect.centroid;
+      var cx = centroid.x;
+      var cy = centroid.y;
+
+      var a, b, c, d, e, sx, sy, x1, y1, x2, y2;
+      var isOffset = fill._renderer && fill._renderer.offset
+        && stroke._renderer && stroke._renderer.offset;
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      if (!isOffset) {
+        ctx.font = [elem._style, elem._weight, elem._size + 'px/' +
+          elem._leading + 'px', elem._family].join(' ');
+      }
+
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+
+      // Styles
+      if (fill) {
+        if (typeof fill === 'string') {
+          ctx.fillStyle = fill;
+        } else {
+          webgl[fill._renderer.type].render.call(fill, ctx, elem);
+          ctx.fillStyle = fill._renderer.effect;
+        }
+      }
+      if (stroke) {
+        if (typeof stroke === 'string') {
+          ctx.strokeStyle = stroke;
+        } else {
+          webgl[stroke._renderer.type].render.call(stroke, ctx, elem);
+          ctx.strokeStyle = stroke._renderer.effect;
+        }
+        if (linewidth) {
+          ctx.lineWidth = linewidth;
+        }
+      }
+      if (typeof opacity === 'number') {
+        ctx.globalAlpha = opacity;
+      }
+      if (dashes && dashes.length > 0) {
+        ctx.lineDashOffset = dashes.offset || 0;
+        ctx.setLineDash(dashes);
+      }
+
+      ctx.save();
+      ctx.scale(scale.x, scale.y);
+      ctx.translate(cx, cy);
+
+      if (!webgl.isHidden.test(fill)) {
+
+        if (fill._renderer && fill._renderer.offset) {
+
+          sx = fill._renderer.scale.x;
+          sy = fill._renderer.scale.y;
+
+          ctx.save();
+          ctx.translate( - fill._renderer.offset.x,
+            - fill._renderer.offset.y);
+          ctx.scale(sx, sy);
+
+          a = elem._size / fill._renderer.scale.y;
+          b = elem._leading / fill._renderer.scale.y;
+          ctx.font = [elem._style, elem._weight, a + 'px/',
+            b + 'px', elem._family].join(' ');
+
+          c = fill._renderer.offset.x / fill._renderer.scale.x;
+          d = fill._renderer.offset.y / fill._renderer.scale.y;
+
+          ctx.fillText(elem.value, c, d);
+          ctx.restore();
+
+        } else {
+          ctx.fillText(elem.value, 0, 0);
+        }
+
+      }
+
+      if (!webgl.isHidden.test(stroke)) {
+
+        if (stroke._renderer && stroke._renderer.offset) {
+
+          sx = stroke._renderer.scale.x;
+          sy = stroke._renderer.scale.y;
+
+          ctx.save();
+          ctx.translate(- stroke._renderer.offset.x,
+            - stroke._renderer.offset.y);
+          ctx.scale(sx, sy);
+
+          a = elem._size / stroke._renderer.scale.y;
+          b = elem._leading / stroke._renderer.scale.y;
+          ctx.font = [elem._style, elem._weight, a + 'px/',
+            b + 'px', elem._family].join(' ');
+
+          c = stroke._renderer.offset.x / stroke._renderer.scale.x;
+          d = stroke._renderer.offset.y / stroke._renderer.scale.y;
+          e = linewidth / stroke._renderer.scale.x;
+
+          ctx.lineWidth = e;
+          ctx.strokeText(elem.value, c, d);
+          ctx.restore();
+
+        } else {
+          ctx.strokeText(elem.value, 0, 0);
+        }
+
+      }
+
+      // Handle text-decoration
+      if (/(underline|strikethrough)/i.test(decoration)) {
+
+        var metrics = ctx.measureText(elem.value);
+
+        switch (decoration) {
+          case 'underline':
+            y1 = metrics.actualBoundingBoxAscent;
+            y2 = metrics.actualBoundingBoxAscent;
+            break;
+          case 'strikethrough':
+            y1 = 0;
+            y2 = 0;
+            break;
+        }
+
+        x1 = - metrics.width / 2;
+        x2 = metrics.width / 2;
+
+        ctx.lineWidth = Math.max(Math.floor(elem._size / 15), 1);
+        ctx.strokeStyle = ctx.fillStyle;
+
+        ctx.beginPath();
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(x2, y2);
+        ctx.stroke();
+
+      }
+
+      ctx.restore();
+
+    },
+
+    getBoundingClientRect: function(elem, rect) {
+
+      var ctx = webgl.ctx;
+
+      ctx.font = [elem._style, elem._weight, elem._size + 'px/' +
+        elem._leading + 'px', elem._family].join(' ');
+
+      ctx.textAlign = 'center';
+      ctx.textBaseline = elem._baseline;
+
+      // TODO: Estimate this better
+      var width = ctx.measureText(elem._value).width * 1.25;
+      var height = Math.max(elem._size, elem._leading) * 1.25;
+
+      if (this._linewidth && !webgl.isHidden.test(this._stroke)) {
+        width += this._linewidth * 2;
+        height += this._linewidth * 2;
+      }
+
+      var w = width / 2;
+      var h = height / 2;
+
+      switch (webgl.alignments[elem._alignment] || elem._alignment) {
+
+        case webgl.alignments.left:
+          rect.left = 0;
+          rect.right = width;
+          break;
+        case webgl.alignments.right:
+          rect.left = - width;
+          rect.right = 0;
+          break;
+        default:
+          rect.left = - w;
+          rect.right = w;
+      }
+
+      // TODO: Gradients aren't inherited...
+      switch (elem._baseline) {
+        case 'bottom':
+          rect.top = - height;
+          rect.bottom = 0;
+          break;
+        case 'top':
+          rect.top = 0;
+          rect.bottom = height;
+          break;
+        default:
+          rect.top = - h;
+          rect.bottom = h;
+      }
+
+      rect.width = width;
+      rect.height = height;
+
+      if (!rect.centroid) {
+        rect.centroid = {};
+      }
+
+      // TODO:
+      rect.centroid.x = w;
+      rect.centroid.y = h;
+
+    },
+
+    render: function(gl, program, forcedParent) {
+
+      if (!this._visible || !this._opacity) {
+        return this;
+      }
+
+      this._update();
+
+      // Calculate what changed
+
+      var parent = forcedParent || this.parent;
+      var flagParentMatrix = parent._matrix.manual || parent._flagMatrix;
+      var flagMatrix = this._matrix.manual || this._flagMatrix;
+      var parentChanged = this._renderer.parent !== parent;
+      var flagTexture = this._flagVertices || this._flagFill
+        || (this._fill instanceof LinearGradient && (this._fill._flagSpread || this._fill._flagStops || this._fill._flagEndPoints))
+        || (this._fill instanceof RadialGradient && (this._fill._flagSpread || this._fill._flagStops || this._fill._flagRadius || this._fill._flagCenter || this._fill._flagFocal))
+        || (this._fill instanceof Texture && (this._fill._flagLoaded && this._fill.loaded || this._fill._flagImage || this._fill._flagVideo || this._fill._flagRepeat || this._fill._flagOffset || this._fill._flagScale))
+        || (this._stroke instanceof LinearGradient && (this._stroke._flagSpread || this._stroke._flagStops || this._stroke._flagEndPoints))
+        || (this._stroke instanceof RadialGradient && (this._stroke._flagSpread || this._stroke._flagStops || this._stroke._flagRadius || this._stroke._flagCenter || this._stroke._flagFocal))
+        || (this._stroke instanceof Texture && (this._stroke._flagLoaded && this._stroke.loaded || this._stroke._flagImage || this._stroke._flagVideo || this._stroke._flagRepeat || this._stroke._flagOffset || this._fill._flagScale))
+        || this._flagStroke || this._flagLinewidth || this._flagOpacity
+        || parent._flagOpacity || this._flagVisible || this._flagScale
+        || this._flagValue || this._flagFamily || this._flagSize
+        || this._flagLeading || this._flagAlignment || this._flagBaseline
+        || this._flagStyle || this._flagWeight || this._flagDecoration
+        || (this.dashes && this.dashes.length > 0)
+        || !this._renderer.texture;
+
+      if (flagParentMatrix || flagMatrix || parentChanged) {
+
+        if (!this._renderer.matrix) {
+          this._renderer.matrix = new NumArray(9);
+        }
+
+        // Reduce amount of object / array creation / deletion
+
+        this._matrix.toTransformArray(true, transformation);
+
+        multiplyMatrix(transformation, parent._renderer.matrix, this._renderer.matrix);
+
+        if (!(this._renderer.scale instanceof Vector)) {
+          this._renderer.scale = new Vector();
+        }
+        if (this._scale instanceof Vector) {
+          this._renderer.scale.x = this._scale.x * parent._renderer.scale.x;
+          this._renderer.scale.y = this._scale.y * parent._renderer.scale.y;
+        } else {
+          this._renderer.scale.x = this._scale * parent._renderer.scale.x;
+          this._renderer.scale.y = this._scale * parent._renderer.scale.y;
+        }
+
+        if (parentChanged) {
+          this._renderer.parent = parent;
+        }
+      }
+
+      if (flagTexture) {
+
+        if (!this._renderer.rect) {
+          this._renderer.rect = {};
+        }
+
+        this._renderer.opacity = this._opacity * parent._renderer.opacity;
+
+        webgl.text.getBoundingClientRect(this, this._renderer.rect);
+
+        webgl.updateTexture.call(webgl, gl, this);
+
+      } else {
+
+        // We still need to update child Two elements on the fill and
+        // stroke properties.
+        if (this._fill && this._fill._update) {
+          this._fill._update();
+        }
+        if (this._stroke && this._stroke._update) {
+          this._stroke._update();
+        }
+
+      }
+
+      // if (this._mask) {
+      //   webgl[this._mask._renderer.type].render.call(mask, gl, program, this);
+      // }
+
+      if (this._clip && !forcedParent) {
+        return;
+      }
+
+      // Draw Texture
+      gl.bindTexture(gl.TEXTURE_2D, this._renderer.texture);
+
+      // Draw Rect
+      var rect = this._renderer.rect;
+      gl.uniformMatrix3fv(program.matrix, false, this._renderer.matrix);
+      gl.uniform4f(program.rect, rect.left, rect.top, rect.right, rect.bottom);
+      gl.drawArrays(gl.TRIANGLES, 0, 6);
+
+      return this.flagReset();
+
+    }
+
+  },
+
+  'linear-gradient': {
+
+    render: function(ctx, elem) {
+
+      if (!ctx.canvas.getContext('2d')) {
+        return;
+      }
+
+      this._update();
+
+      if (!this._renderer.effect || this._flagEndPoints || this._flagStops) {
+
+        this._renderer.effect = ctx.createLinearGradient(
+          this.left._x, this.left._y,
+          this.right._x, this.right._y
+        );
+
+        for (var i = 0; i < this.stops.length; i++) {
+          var stop = this.stops[i];
+          this._renderer.effect.addColorStop(stop._offset, stop._color);
+        }
+
+      }
+
+      return this.flagReset();
+
+    }
+
+  },
+
+  'radial-gradient': {
+
+    render: function(ctx, elem) {
+
+      if (!ctx.canvas.getContext('2d')) {
+        return;
+      }
+
+      this._update();
+
+      if (!this._renderer.effect || this._flagCenter || this._flagFocal
+          || this._flagRadius || this._flagStops) {
+
+        this._renderer.effect = ctx.createRadialGradient(
+          this.center._x, this.center._y, 0,
+          this.focal._x, this.focal._y, this._radius
+        );
+
+        for (var i = 0; i < this.stops.length; i++) {
+          var stop = this.stops[i];
+          this._renderer.effect.addColorStop(stop._offset, stop._color);
+        }
+
+      }
+
+      return this.flagReset();
+
+    }
+
+  },
+
+  texture: {
+
+    render: function(ctx, elem) {
+
+      if (!ctx.canvas.getContext('2d')) {
+        return;
+      }
+
+      this._update();
+
+      var image = this.image;
+
+      if (((this._flagLoaded || this._flagImage || this._flagVideo || this._flagRepeat) && this.loaded)) {
+        this._renderer.effect = ctx.createPattern(image, this._repeat);
+      } else if (!this._renderer.effect) {
+        return this.flagReset();
+      }
+
+      if (this._flagOffset || this._flagLoaded || this._flagScale) {
+
+        if (!(this._renderer.offset instanceof Vector)) {
+          this._renderer.offset = new Vector();
+        }
+
+        this._renderer.offset.x = - this._offset.x;
+        this._renderer.offset.y = - this._offset.y;
+
+        if (image) {
+
+          this._renderer.offset.x += image.width / 2;
+          this._renderer.offset.y += image.height / 2;
+
+          if (this._scale instanceof Vector) {
+            this._renderer.offset.x *= this._scale.x;
+            this._renderer.offset.y *= this._scale.y;
+          } else {
+            this._renderer.offset.x *= this._scale;
+            this._renderer.offset.y *= this._scale;
+          }
+        }
+
+      }
+
+      if (this._flagScale || this._flagLoaded) {
+
+        if (!(this._renderer.scale instanceof Vector)) {
+          this._renderer.scale = new Vector();
+        }
+
+        if (this._scale instanceof Vector) {
+          this._renderer.scale.copy(this._scale);
+        } else {
+          this._renderer.scale.set(this._scale, this._scale);
+        }
+
+      }
+
+      return this.flagReset();
+
+    }
+
+  },
+
+  updateTexture: function(gl, elem) {
+
+    this[elem._renderer.type].updateCanvas.call(webgl, elem);
+
+    if (!elem._renderer.texture) {
+      elem._renderer.texture = gl.createTexture();
+    }
+
+    gl.bindTexture(gl.TEXTURE_2D, elem._renderer.texture);
+
+    // Set the parameters so we can render any size image.
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    // gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    // gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    // gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+
+    if (this.canvas.width <= 0 || this.canvas.height <= 0) {
+      return;
+    }
+
+    // Upload the image into the texture.
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, this.canvas);
+
+  },
+
+  program: {
+
+    create: function(gl, shaders) {
+      var program, linked, error;
+      program = gl.createProgram();
+      _.each(shaders, function(s) {
+        gl.attachShader(program, s);
+      });
+
+      gl.linkProgram(program);
+      linked = gl.getProgramParameter(program, gl.LINK_STATUS);
+      if (!linked) {
+        error = gl.getProgramInfoLog(program);
+        gl.deleteProgram(program);
+        throw new TwoError('unable to link program: ' + error);
+      }
+
+      return program;
+
+    }
+
+  },
+
+  shaders: {
+
+    create: function(gl, source, type) {
+      var shader, compiled, error;
+      shader = gl.createShader(gl[type]);
+      gl.shaderSource(shader, source);
+      gl.compileShader(shader);
+
+      compiled = gl.getShaderParameter(shader, gl.COMPILE_STATUS);
+      if (!compiled) {
+        error = gl.getShaderInfoLog(shader);
+        gl.deleteShader(shader);
+        throw new TwoError('unable to compile shader ' + shader + ': ' + error);
+      }
+
+      return shader;
+
+    },
+
+    types: {
+      vertex: 'VERTEX_SHADER',
+      fragment: 'FRAGMENT_SHADER'
+    },
+
+    vertex: [
+      'precision mediump float;',
+      'attribute vec2 a_position;',
+      '',
+      'uniform mat3 u_matrix;',
+      'uniform vec2 u_resolution;',
+      'uniform vec4 u_rect;',
+      '',
+      'varying vec2 v_textureCoords;',
+      '',
+      'void main() {',
+      '   vec2 rectCoords = (a_position * (u_rect.zw - u_rect.xy)) + u_rect.xy;',
+      '   vec2 projected = (u_matrix * vec3(rectCoords, 1.0)).xy;',
+      '   vec2 normal = projected / u_resolution;',
+      '   vec2 clipspace = (normal * 2.0) - 1.0;',
+      '',
+      '   gl_Position = vec4(clipspace * vec2(1.0, -1.0), 0.0, 1.0);',
+      '   v_textureCoords = a_position;',
+      '}'
+    ].join('\n'),
+
+    fragment: [
+      'precision mediump float;',
+      '',
+      'uniform sampler2D u_image;',
+      'varying vec2 v_textureCoords;',
+      '',
+      'void main() {',
+      '  vec4 texel = texture2D(u_image, v_textureCoords);',
+      '  if (texel.a == 0.0) {',
+      '    discard;',
+      '  }',
+      '  gl_FragColor = texel;',
+      '}'
+    ].join('\n')
+
+  },
+
+  TextureRegistry: new Registry()
+
+};
+
+webgl.ctx = webgl.canvas.getContext('2d');
+
+/**
+ * @name Two.WebGLRenderer
+ * @class
+ * @extends Two.Events
+ * @param {Object} [parameters] - This object is inherited when constructing a new instance of {@link Two}.
+ * @param {Element} [parameters.domElement] - The `<canvas />` to draw to. If none given a new one will be constructed.
+ * @param {CanvasElement} [parameters.offscreenElement] - The offscreen two dimensional `<canvas />` to render each element on WebGL texture updates.
+ * @param {Boolean} [parameters.antialias] - Determines whether the canvas should clear render with antialias on.
+ * @description This class is used by {@link Two} when constructing with `type` of `Two.Types.webgl`. It takes Two.js' scenegraph and renders it to a `<canvas />` through the WebGL api.
+ * @see {@link https://www.khronos.org/registry/webgl/specs/latest/1.0/}
+ */
+var Renderer$2 = function(params) {
+
+  var gl, vs, fs;
+
+  /**
+   * @name Two.WebGLRenderer#domElement
+   * @property {Element} - The `<canvas />` associated with the Two.js scene.
+   */
+  this.domElement = params.domElement || document.createElement('canvas');
+
+  if (typeof params.offscreenElement !== 'undefined') {
+    webgl.canvas = params.offscreenElement;
+    webgl.ctx = webgl.canvas.getContext('2d');
+  }
+
+  /**
+   * @name Two.WebGLRenderer#scene
+   * @property {Two.Group} - The root group of the scenegraph.
+   */
+  this.scene = new Group();
+  this.scene.parent = this;
+
+  this._renderer = {
+    type: 'renderer',
+    matrix: new NumArray(identity),
+    scale: 1,
+    opacity: 1
+  };
+  this._flagMatrix = true;
+
+  // http://games.greggman.com/game/webgl-and-alpha/
+  // http://www.khronos.org/registry/webgl/specs/latest/#5.2
+  params = _.defaults(params || {}, {
+    antialias: false,
+    alpha: true,
+    premultipliedAlpha: true,
+    stencil: true,
+    preserveDrawingBuffer: true,
+    overdraw: false
+  });
+
+  /**
+   * @name Two.WebGLRenderer#overdraw
+   * @property {Boolean} - Determines whether the canvas clears the background each draw call.
+   * @default true
+   */
+  this.overdraw = params.overdraw;
+
+  /**
+   * @name Two.WebGLRenderer#ctx
+   * @property {WebGLContext} - Associated two dimensional context to render on the `<canvas />`.
+   */
+  gl = this.ctx = this.domElement.getContext('webgl', params) ||
+    this.domElement.getContext('experimental-webgl', params);
+
+  if (!this.ctx) {
+    throw new TwoError(
+      'unable to create a webgl context. Try using another renderer.');
+  }
+
+  // Compile Base Shaders to draw in pixel space.
+  vs = webgl.shaders.create(
+    gl, webgl.shaders.vertex, webgl.shaders.types.vertex);
+  fs = webgl.shaders.create(
+    gl, webgl.shaders.fragment, webgl.shaders.types.fragment);
+
+  /**
+   * @name Two.WebGLRenderer#program
+   * @property {WebGLProgram} - Associated WebGL program to render all elements from the scenegraph.
+   */
+  this.program = webgl.program.create(gl, [vs, fs]);
+  gl.useProgram(this.program);
+
+  // Create and bind the drawing buffer
+
+  // look up where the vertex data needs to go.
+  this.program.position = gl.getAttribLocation(this.program, 'a_position');
+  this.program.matrix = gl.getUniformLocation(this.program, 'u_matrix');
+  this.program.rect = gl.getUniformLocation(this.program, 'u_rect');
+
+  // Bind the vertex buffer
+  var positionBuffer = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+  gl.vertexAttribPointer(this.program.position, 2, gl.FLOAT, false, 0, 0);
+  gl.enableVertexAttribArray(this.program.position);
+  gl.bufferData(
+    gl.ARRAY_BUFFER,
+    new NumArray([
+      0, 0,
+      1, 0,
+      0, 1,
+      0, 1,
+      1, 0,
+      1, 1
+    ]),
+    gl.STATIC_DRAW);
+
+  // Setup some initial statements of the gl context
+  gl.enable(gl.BLEND);
+
+  gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
+
+  gl.blendEquation(gl.FUNC_ADD);
+  gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+};
+
+_.extend(Renderer$2, {
+
+  /**
+   * @name Two.WebGLRenderer.Utils
+   * @property {Object} - A massive object filled with utility functions and properties to render Two.js objects to a `<canvas />` through the WebGL API.
+   */
+  Utils: webgl
+
+});
+
+_.extend(Renderer$2.prototype, Events, {
+
+  constructor: Renderer$2,
+
+  /**
+   * @name Two.WebGLRenderer#setSize
+   * @function
+   * @fires resize
+   * @param {Number} width - The new width of the renderer.
+   * @param {Number} height - The new height of the renderer.
+   * @param {Number} [ratio] - The new pixel ratio (pixel density) of the renderer. Defaults to calculate the pixel density of the user's screen.
+   * @description Change the size of the renderer.
+   */
+  setSize: function(width, height, ratio) {
+
+    this.width = width;
+    this.height = height;
+
+    this.ratio = typeof ratio === 'undefined' ? getRatio(this.ctx) : ratio;
+
+    this.domElement.width = width * this.ratio;
+    this.domElement.height = height * this.ratio;
+
+    if (_.isObject(this.domElement.style)) {
+      _.extend(this.domElement.style, {
+        width: width + 'px',
+        height: height + 'px'
+      });
+    }
+
+    // Set for this.stage parent scaling to account for HDPI
+    this._renderer.matrix[0] = this._renderer.matrix[4] = this._renderer.scale = this.ratio;
+
+    this._flagMatrix = true;
+
+    this.ctx.viewport(0, 0, width * this.ratio, height * this.ratio);
+
+    var resolutionLocation = this.ctx.getUniformLocation(
+      this.program, 'u_resolution');
+    this.ctx.uniform2f(resolutionLocation, width * this.ratio, height * this.ratio);
+
+    return this.trigger(Events.Types.resize, width, height, ratio);
+
+  },
+
+  /**
+   * @name Two.WebGLRenderer#render
+   * @function
+   * @description Render the current scene to the `<canvas />`.
+   */
+  render: function() {
+
+    var gl = this.ctx;
+
+    if (!this.overdraw) {
+      gl.clear(gl.COLOR_BUFFER_BIT);
+    }
+
+    webgl.group.render.call(this.scene, gl, this.program);
+    this._flagMatrix = false;
+
+    return this;
+
+  }
+
+});
+
+// Utils
+
+/**
+ * @name Two
+ * @class
+ * @global
+ * @param {Object} [options]
+ * @param {Boolean} [options.fullscreen=false] - Set to `true` to automatically make the stage adapt to the width and height of the parent document. This parameter overrides `width` and `height` parameters if set to `true`. This overrides `options.fitted` as well.
+ * @param {Boolean} [options.fitted=false] = Set to `true` to automatically make the stage adapt to the width and height of the parent element. This parameter overrides `width` and `height` parameters if set to `true`.
+ * @param {Number} [options.width=640] - The width of the stage on construction. This can be set at a later time.
+ * @param {Number} [options.height=480] - The height of the stage on construction. This can be set at a later time.
+ * @param {String} [options.type=Two.Types.svg] - The type of renderer to setup drawing with. See {@link Two.Types} for available options.
+ * @param {Boolean} [options.autostart=false] - Set to `true` to add the instance to draw on `requestAnimationFrame`. This is a convenient substitute for {@link Two#play}.
+ * @param {Element} [options.domElement] - The canvas or SVG element to draw into. This overrides the `options.type` argument.
+ * @description The entrypoint for Two.js. Instantiate a `new Two` in order to setup a scene to render to. `Two` is also the publicly accessible namespace that all other sub-classes, functions, and utilities attach to.
+ */
+var Two = function(options) {
+
+  // Determine what Renderer to use and setup a scene.
+
+  var params = _.defaults(options || {}, {
+    fullscreen: false,
+    fitted: false,
+    width: 640,
+    height: 480,
+    type: Two.Types.svg,
+    autostart: false
+  });
+
+  _.each(params, function(v, k) {
+    if (/fullscreen/i.test(k) || /autostart/i.test(k)) {
+      return;
+    }
+    this[k] = v;
+  }, this);
+
+  // Specified domElement overrides type declaration only if the element does not support declared renderer type.
+  if (_.isElement(params.domElement)) {
+    var tagName = params.domElement.tagName.toLowerCase();
+    // TODO: Reconsider this if statement's logic.
+    if (!/^(CanvasRenderer-canvas|WebGLRenderer-canvas|SVGRenderer-svg)$/.test(this.type+'-'+tagName)) {
+      this.type = Two.Types[tagName];
+    }
+  }
+
+  this.renderer = new Two[this.type](this);
+  this.setPlaying(params.autostart);
+  this.frameCount = 0;
+
+  /**
+   * @name Two#fit
+   * @function
+   * @description If `options.fullscreen` or `options.fitted` in construction create this function. It sets the `width` and `height` of the instance to its respective parent `window` or `element` depending on the `options` passed.
+   */
+  if (params.fullscreen) {
+
+    this.fit = fitToWindow.bind(this);
+    this.fit.domElement = window;
+    this.fit.attached = true;
+    _.extend(document.body.style, {
+      overflow: 'hidden',
+      margin: 0,
+      padding: 0,
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      position: 'fixed'
+    });
+    _.extend(this.renderer.domElement.style, {
+      display: 'block',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      position: 'fixed'
+    });
+    dom.bind(this.fit.domElement, 'resize', this.fit);
+    this.fit();
+
+  } else if (params.fitted) {
+
+    this.fit = fitToParent.bind(this);
+    _.extend(this.renderer.domElement.style, {
+      display: 'block'
+    });
+
+  } else if (!_.isElement(params.domElement)) {
+
+    this.renderer.setSize(params.width, params.height, this.ratio);
+    this.width = params.width;
+    this.height = params.height;
+
+  }
+
+  this.renderer.bind(Events.Types.resize, updateDimensions.bind(this));
+  this.scene = this.renderer.scene;
+
+  Two.Instances.push(this);
+  if (params.autostart) {
+    raf.init();
+  }
+
+};
+
+_.extend(Two, Constants);
+
+_.extend(Two.prototype, Events, {
+
+  constructor: Two,
+
+  /**
+   * @name Two#appendTo
+   * @function
+   * @param {Element} elem - The DOM element to append the Two.js stage to.
+   * @description Shorthand method to append your instance of Two.js to the `document`.
+   */
+  appendTo: function(elem) {
+
+    elem.appendChild(this.renderer.domElement);
+
+    if (this.fit) {
+      if (this.fit.domElement !== window) {
+        this.fit.domElement = elem;
+        this.fit.attached = false;
+      }
+      this.update();
+    }
+
+    return this;
+
+  },
+
+  /**
+   * @name Two#play
+   * @function
+   * @fires Two.Events.Types.play event
+   * @description Call to start an internal animation loop.
+   * @nota-bene This function initiates a `requestAnimationFrame` loop.
+   */
+  play: function() {
+
+    this.playing = true;
+    raf.init();
+    return this.trigger(Events.Types.play);
+
+  },
+
+  /**
+   * @name Two#pause
+   * @function
+   * @fires Two.Events.Types.pause event
+   * @description Call to stop the internal animation loop for a specific instance of Two.js.
+   */
+  pause: function() {
+
+    this.playing = false;
+    return this.trigger(Events.Types.pause);
+
+  },
+
+  setPlaying: function(p) {
+    this.playing = p;
+  },
+
+  /**
+   * @name Two#release
+   * @function
+   * @param {Object} obj
+   * @returns {Object} The object passed for event deallocation.
+   * @description Release an arbitrary class' events from the Two.js corpus and recurse through its children and or vertices.
+   */
+  release: function(obj) {
+
+    var i, v, child;
+
+    if (!_.isObject(obj)) {
+      return;
+    }
+
+    if (typeof obj.unbind === 'function') {
+      obj.unbind();
+    }
+
+    if (obj.vertices) {
+      if (typeof obj.vertices.unbind === 'function') {
+        obj.vertices.unbind();
+      }
+      for (i = 0; i < obj.vertices.length; i++) {
+        v = obj.vertices[i];
+        if (typeof v.unbind === 'function') {
+          v.unbind();
+        }
+      }
+    }
+
+    if (obj.children) {
+      for (i = 0; i < obj.children.length; i++) {
+        child = obj.children[i];
+        this.release(child);
+      }
+    }
+
+    return obj;
+
+  },
+
+  /**
+   * @name Two#update
+   * @fires Two.Events.Types.update event
+   * @description Update positions and calculations in one pass before rendering. Then render to the canvas.
+   * @nota-bene This function is called automatically if using {@link Two#play} or the `autostart` parameter in construction.
+   */
+  update: function() {
+
+    var animated = !!this._lastFrame;
+    var now = _.performance.now();
+
+    if (animated) {
+      this.timeDelta = parseFloat((now - this._lastFrame).toFixed(3));
+    }
+    this._lastFrame = now;
+
+    if (this.fit && !this.fit.attached) {
+
+        dom.bind(this.fit.domElement, 'resize', this.fit);
+        this.fit.attached = true;
+        this.fit();
+
+    }
+
+    var width = this.width;
+    var height = this.height;
+    var renderer = this.renderer;
+
+    // Update width / height for the renderer
+    if (width !== renderer.width || height !== renderer.height) {
+      renderer.setSize(width, height, this.ratio);
+    }
+
+    this.trigger(Events.Types.update, this.frameCount, this.timeDelta);
+
+    return this.render();
+
+  },
+
+  /**
+   * @name Two#render
+   * @fires render
+   * @description Render all drawable and visible objects of the scene.
+   */
+  render: function() {
+
+    this.renderer.render();
+    return this.trigger(Events.Types.render, this.frameCount++);
+
+  },
+
+  // Convenience Methods
+
+  /**
+   * @name Two#add
+   * @function
+   * @param {(Two.Shape[]|...Two.Shape)} [objects] - An array of Two.js objects. Alternatively can add objects as individual arguments.
+   * @description A shorthand method to add specific Two.js objects to the scene.
+   */
+  add: function(o) {
+
+    var objects = o;
+    if (!(objects instanceof Array)) {
+      objects = Array.prototype.slice.call(arguments);
+    }
+
+    this.scene.add(objects);
+    return this;
+
+  },
+
+  /**
+   * @name Two#remove
+   * @function
+   * @param {(Two.Shape[]|...Two.Shape)} [objects] - An array of Two.js objects.
+   * @description A shorthand method to remove specific Two.js objects from the scene.
+   */
+  remove: function(o) {
+
+    var objects = o;
+    if (!(objects instanceof Array)) {
+      objects = Array.prototype.slice.call(arguments);
+    }
+
+    this.scene.remove(objects);
+
+    return this;
+
+  },
+
+  /**
+   * @name Two#clear
+   * @function
+   * @description Remove all all Two.js objects from the scene.
+   */
+  clear: function() {
+
+    this.scene.remove(this.scene.children);
+    return this;
+
+  },
+
+  /**
+   * @name Two#makeLine
+   * @function
+   * @param {Number} x1
+   * @param {Number} y1
+   * @param {Number} x2
+   * @param {Number} y2
+   * @returns {Two.Line}
+   * @description Creates a Two.js line and adds it to the scene.
+   */
+  makeLine: function(x1, y1, x2, y2) {
+
+    var line = new Line(x1, y1, x2, y2);
+    this.scene.add(line);
+
+    return line;
+
+  },
+
+  /**
+   * @name Two#makeArrow
+   * @function
+   * @param {Number} x1
+   * @param {Number} y1
+   * @param {Number} x2
+   * @param {Number} y2
+   * @returns {Two.Path}
+   * @description Creates a Two.js arrow and adds it to the scene.
+   */
+  makeArrow: function(x1, y1, x2, y2, size) {
+
+    var headlen = typeof size === 'number' ? size : 10;
+
+    var angle = Math.atan2(y2 - y1, x2 - x1);
+
+    var vertices = [
+
+      new Anchor(x1, y1, undefined, undefined, undefined, undefined, Commands.move),
+      new Anchor(x2, y2, undefined, undefined, undefined, undefined, Commands.line),
+      new Anchor(
+        x2 - headlen * Math.cos(angle - Math.PI / 4),
+        y2 - headlen * Math.sin(angle - Math.PI / 4),
+        undefined, undefined, undefined, undefined, Commands.line
+      ),
+
+      new Anchor(x2, y2, undefined, undefined, undefined, undefined, Commands.move),
+      new Anchor(
+        x2 - headlen * Math.cos(angle + Math.PI / 4),
+        y2 - headlen * Math.sin(angle + Math.PI / 4),
+        undefined, undefined, undefined, undefined, Commands.line
+      )
+
+    ];
+
+    var path = new Path(vertices, false, false, true);
+    path.noFill();
+    path.cap = 'round';
+    path.join = 'round';
+
+    this.scene.add(path);
+
+    return path;
+  },
+
+  /**
+   * @name Two#makeRectangle
+   * @function
+   * @param {Number} x
+   * @param {Number} y
+   * @param {Number} width
+   * @param {Number} height
+   * @returns {Two.Rectangle}
+   * @description Creates a Two.js rectangle and adds it to the scene.
+   */
+  makeRectangle: function(x, y, width, height) {
+
+    var rect = new Rectangle(x, y, width, height);
+    this.scene.add(rect);
+
+    return rect;
+
+  },
+
+  /**
+   * @name Two#makeRoundedRectangle
+   * @function
+   * @param {Number} x
+   * @param {Number} y
+   * @param {Number} width
+   * @param {Number} height
+   * @param {Number} sides
+   * @returns {Two.Rectangle}
+   * @description Creates a Two.js rounded rectangle and adds it to the scene.
+   */
+  makeRoundedRectangle: function(x, y, width, height, sides) {
+
+    var rect = new RoundedRectangle(x, y, width, height, sides);
+    this.scene.add(rect);
+
+    return rect;
+
+  },
+
+  /**
+   * @name Two#makeCircle
+   * @function
+   * @param {Number} x
+   * @param {Number} y
+   * @param {Number} radius
+   * @param {Number} [resolution=4]
+   * @returns {Two.Circle}
+   * @description Creates a Two.js circle and adds it to the scene.
+   */
+  makeCircle: function(x, y, radius, resolution) {
+
+    var circle = new Circle(x, y, radius, resolution);
+    this.scene.add(circle);
+
+    return circle;
+
+  },
+
+  /**
+   * @name Two#makeEllipse
+   * @function
+   * @param {Number} x
+   * @param {Number} y
+   * @param {Number} rx
+   * @param {Number} ry
+   * @param {Number} [resolution=4]
+   * @returns {Two.Ellipse}
+   * @description Creates a Two.js ellipse and adds it to the scene.
+   */
+  makeEllipse: function(x, y, rx, ry, resolution) {
+
+    var ellipse = new Ellipse(x, y, rx, ry, resolution);
+    this.scene.add(ellipse);
+
+    return ellipse;
+
+  },
+
+  /**
+   * @name Two#makeStar
+   * @function
+   * @param {Number} x
+   * @param {Number} y
+   * @param {Number} outerRadius
+   * @param {Number} innerRadius
+   * @param {Number} sides
+   * @returns {Two.Star}
+   * @description Creates a Two.js star and adds it to the scene.
+   */
+  makeStar: function(ox, oy, outerRadius, innerRadius, sides) {
+
+    var star = new Star(ox, oy, outerRadius, innerRadius, sides);
+    this.scene.add(star);
+
+    return star;
+
+  },
+
+  /**
+   * @name Two#makeCurve
+   * @function
+   * @param {Two.Anchor[]} [points] - An array of {@link Two.Anchor} points.
+   * @param {...Number} - Alternatively you can pass alternating `x` / `y` coordinate values as individual arguments. These will be combined into {@link Two.Anchor}s for use in the path.
+   * @returns {Two.Path} - Where `path.curved` is set to `true`.
+   * @description Creates a Two.js path that is curved and adds it to the scene.
+   * @nota-bene In either case of passing an array or passing numbered arguments the last argument is an optional `Boolean` that defines whether the path should be open or closed.
+   */
+  makeCurve: function(p) {
+
+    var l = arguments.length, points = p;
+    if (!Array.isArray(p)) {
+      points = [];
+      for (var i = 0; i < l; i+=2) {
+        var x = arguments[i];
+        if (typeof x !== 'number') {
+          break;
+        }
+        var y = arguments[i + 1];
+        points.push(new Anchor(x, y));
+      }
+    }
+
+    var last = arguments[l - 1];
+    var curve = new Path(points, !(typeof last === 'boolean' ? last : undefined), true);
+    var rect = curve.getBoundingClientRect();
+    curve.center().translation
+      .set(rect.left + rect.width / 2, rect.top + rect.height / 2);
+
+    this.scene.add(curve);
+
+    return curve;
+
+  },
+
+  /**
+   * @name Two#makePolygon
+   * @function
+   * @param {Number} x
+   * @param {Number} y
+   * @param {Number} radius
+   * @param {Number} sides
+   * @returns {Two.Polygon}
+   * @description Creates a Two.js polygon and adds it to the scene.
+   */
+  makePolygon: function(x, y, radius, sides) {
+
+    var poly = new Polygon(x, y, radius, sides);
+    this.scene.add(poly);
+
+    return poly;
+
+  },
+
+  /**
+   * @name Two#makeArcSegment
+   * @function
+   * @param {Number} x
+   * @param {Number} y
+   * @param {Number} innerRadius
+   * @param {Number} outerRadius
+   * @param {Number} startAngle
+   * @param {Number} endAngle
+   * @param {Number} [resolution=Two.Resolution] - The number of vertices that should comprise the arc segment.
+   */
+  makeArcSegment: function(ox, oy, ir, or, sa, ea, res) {
+    var arcSegment = new ArcSegment(ox, oy, ir, or, sa, ea, res);
+    this.scene.add(arcSegment);
+    return arcSegment;
+  },
+
+  /**
+   * @name Two#makePath
+   * @function
+   * @param {Two.Anchor[]} [points] - An array of {@link Two.Anchor} points.
+   * @param {...Number} - Alternatively you can pass alternating `x` / `y` coordinate values as individual arguments. These will be combined into {@link Two.Anchor}s for use in the path.
+   * @returns {Two.Path}
+   * @description Creates a Two.js path and adds it to the scene.
+   * @nota-bene In either case of passing an array or passing numbered arguments the last argument is an optional `Boolean` that defines whether the path should be open or closed.
+   */
+  makePath: function(p) {
+
+    var l = arguments.length, points = p;
+    if (!Array.isArray(p)) {
+      points = [];
+      for (var i = 0; i < l; i+=2) {
+        var x = arguments[i];
+        if (typeof x !== 'number') {
+          break;
+        }
+        var y = arguments[i + 1];
+        points.push(new Anchor(x, y));
+      }
+    }
+
+    var last = arguments[l - 1];
+    var path = new Path(points, !(typeof last === 'boolean' ? last : undefined));
+    var rect = path.getBoundingClientRect();
+    if (typeof rect.top === 'number'   && typeof rect.left === 'number' &&
+        typeof rect.right === 'number' && typeof rect.bottom === 'number') {
+      path.center().translation
+        .set(rect.left + rect.width / 2, rect.top + rect.height / 2);
+    }
+
+    this.scene.add(path);
+
+    return path;
+
+  },
+
+  /**
+   * @name Two#makeText
+   * @function
+   * @param {String} message
+   * @param {Number} x
+   * @param {Number} y
+   * @param {Object} [styles] - An object to describe any of the {@link Two.Text.Properties} including `fill`, `stroke`, `linewidth`, `family`, `alignment`, `leading`, `opacity`, etc..
+   * @returns {Two.Text}
+   * @description Creates a Two.js text object and adds it to the scene.
+   */
+  makeText: function(message, x, y, styles) {
+    var text = new Text(message, x, y, styles);
+    this.add(text);
+    return text;
+  },
+
+  /**
+   * @name Two#makeLinearGradient
+   * @function
+   * @param {Number} x1
+   * @param {Number} y1
+   * @param {Number} x2
+   * @param {Number} y2
+   * @param {...Two.Stop} [stops] - Any number of color stops sometimes reffered to as ramp stops. If none are supplied then the default black-to-white two stop gradient is applied.
+   * @returns {Two.LinearGradient}
+   * @description Creates a Two.js linear gradient and ads it to the scene. In the case of an effect it's added to an invisible "definitions" group.
+   */
+  makeLinearGradient: function(x1, y1, x2, y2 /* stops */) {
+
+    var stops = Array.prototype.slice.call(arguments, 4);
+    var gradient = new LinearGradient(x1, y1, x2, y2, stops);
+
+    this.add(gradient);
+
+    return gradient;
+
+  },
+
+  /**
+   * @name Two#makeRadialGradient
+   * @function
+   * @param {Number} x1
+   * @param {Number} y1
+   * @param {Number} radius
+   * @param {...Two.Stop} [stops] - Any number of color stops sometimes reffered to as ramp stops. If none are supplied then the default black-to-white two stop gradient is applied.
+   * @returns {Two.RadialGradient}
+   * @description Creates a Two.js linear-gradient object and ads it to the scene. In the case of an effect it's added to an invisible "definitions" group.
+   */
+  makeRadialGradient: function(x1, y1, r /* stops */) {
+
+    var stops = Array.prototype.slice.call(arguments, 3);
+    var gradient = new RadialGradient(x1, y1, r, stops);
+
+    this.add(gradient);
+
+    return gradient;
+
+  },
+
+  /**
+   * @name Two#makeSprite
+   * @function
+   * @param {(String|Two.Texture)} pathOrTexture - The URL path to an image or an already created {@link Two.Texture}.
+   * @param {Number} x
+   * @param {Number} y
+   * @param {Number} [columns=1]
+   * @param {Number} [rows=1]
+   * @param {Integer} [frameRate=0]
+   * @param {Boolean} [autostart=false]
+   * @returns {Two.Sprite}
+   * @description Creates a Two.js sprite object and adds it to the scene. Sprites can be used for still images as well as animations.
+   */
+  makeSprite: function(path, x, y, cols, rows, frameRate, autostart) {
+
+    var sprite = new Sprite(path, x, y, cols, rows, frameRate);
+    if (autostart) {
+      sprite.play();
+    }
+    this.add(sprite);
+
+    return sprite;
+
+  },
+
+  /**
+   * @name Two#makeImageSequence
+   * @function
+   * @param {(String[]|Two.Texture[])} pathsOrTextures - An array of paths or of {@link Two.Textures}.
+   * @param {Number} x
+   * @param {Number} y
+   * @param {Number} [frameRate=0]
+   * @param {Boolean} [autostart=false]
+   * @returns {Two.ImageSequence}
+   * @description Creates a Two.js image sequence object and adds it to the scene.
+   */
+  makeImageSequence: function(paths, x, y, frameRate, autostart) {
+
+    var imageSequence = new ImageSequence(paths, x, y, frameRate);
+    if (autostart) {
+      imageSequence.play();
+    }
+    this.add(imageSequence);
+
+    return imageSequence;
+
+  },
+
+  /**
+   * @name Two#makeTexture
+   * @function
+   * @param {(String|Image|Canvas|Video)} [pathOrSource] - The URL path to an image or a DOM image-like element.
+   * @param {Function} [callback] - Function to be invoked when the image is loaded.
+   * @returns {Two.Texture}
+   * @description Creates a Two.js texture object.
+   */
+  makeTexture: function(path, callback) {
+
+    var texture = new Texture(path, callback);
+    return texture;
+
+  },
+
+  /**
+   * @name Two#makeGroup
+   * @function
+   * @param {(Two.Shape[]|...Two.Shape)} [objects] - Two.js objects to be added to the group in the form of an array or as individual arguments.
+   * @returns {Two.Group}
+   * @description Creates a Two.js group object and adds it to the scene.
+   */
+  makeGroup: function(o) {
+
+    var objects = o;
+    if (!(objects instanceof Array)) {
+      objects = Array.prototype.slice.call(arguments);
+    }
+
+    var group = new Group();
+    this.scene.add(group);
+    group.add(objects);
+
+    return group;
+
+  },
+
+  /**
+   * @name Two#interpret
+   * @function
+   * @param {SvgNode} svgNode - The SVG node to be parsed.
+   * @param {Boolean} shallow - Don't create a top-most group but append all content directly.
+   * @param {Boolean} add – Automatically add the reconstructed SVG node to scene.
+   * @returns {Two.Group}
+   * @description Interpret an SVG Node and add it to this instance's scene. The distinction should be made that this doesn't `import` svg's, it solely interprets them into something compatible for Two.js - this is slightly different than a direct transcription.
+   */
+  interpret: function(svgNode, shallow, add) {
+
+    var tag = svgNode.tagName.toLowerCase();
+
+    add = (typeof add !== 'undefined') ? add : true;
+
+    if (!(tag in read)) {
+      return null;
+    }
+
+    var node = read[tag].call(this, svgNode);
+
+    if (add) {
+      this.add(shallow && node instanceof Group ? node.children : node);
+    } else if (node.parent) {
+      // Remove `g` tags that have been added to scenegraph / DOM
+      // in order to be compatible with `getById` methods.
+      node.remove();
+    }
+
+    return node;
+
+  },
+
+  /**
+   * @name Two#load
+   * @function
+   * @param {String|SvgNode} pathOrSVGContent - The URL path of an SVG file or an SVG document as text.
+   * @param {Function} callback - Function to call once loading has completed.
+   * @returns {Two.Group}
+   * @description Load an SVG file or SVG text and interpret it into Two.js legible objects.
+   */
+  load: function(text, callback) {
+
+    var group = new Group();
+    var elem, i, j;
+
+    var attach = (function(data) {
+
+      dom.temp.innerHTML = data;
+
+      for (i = 0; i < dom.temp.children.length; i++) {
+        elem = dom.temp.children[i];
+        if (/svg/i.test(elem.nodeName)) {
+          // Two.Utils.applySvgViewBox.call(this, group, elem.getAttribute('viewBox'));
+          for (j = 0; j < elem.children.length; j++) {
+            group.add(this.interpret(elem.children[j]));
+          }
+        } else {
+          group.add(this.interpret(elem));
+        }
+      }
+
+      if (typeof callback === 'function') {
+        var svg = dom.temp.children.length <= 1
+          ? dom.temp.children[0] : dom.temp.children;
+        callback(group, svg);
+      }
+
+    }).bind(this);
+
+    if (/.*\.svg/ig.test(text)) {
+
+      xhr(text, attach);
+
+      return group;
+
+    }
+
+    attach(text);
+
+    return group;
+
+  }
+
+});
+
+function fitToWindow() {
+
+  var wr = document.body.getBoundingClientRect();
+
+  var width = this.width = wr.width;
+  var height = this.height = wr.height;
+
+  this.renderer.setSize(width, height, this.ratio);
+
+}
+
+function fitToParent() {
+
+  var parent = this.renderer.domElement.parentElement;
+  if (!parent) {
+    console.warn('Two.js: Attempting to fit to parent, but no parent found.');
+    return;
+  }
+  var wr = parent.getBoundingClientRect();
+
+  var width = this.width = wr.width;
+  var height = this.height = wr.height;
+
+  this.renderer.setSize(width, height, this.ratio);
+
+}
+
+function updateDimensions(width, height) {
+  this.width = width;
+  this.height = height;
+  this.trigger(Events.Types.resize, width, height);
+}
+
+// Request Animation Frame
+
+var raf = dom.getRequestAnimationFrame();
+
+function loop() {
+
+  for (var i = 0; i < Two.Instances.length; i++) {
+    var t = Two.Instances[i];
+    if (t.playing) {
+      t.update();
+    }
+  }
+
+  Two.nextFrameID = raf(loop);
+
+}
+
+raf.init = function() {
+  loop();
+  raf.init = function() {};
+};
+
+_.extend(Two, {
+  Anchor: Anchor,
+  Collection: Collection,
+  Events: Events,
+  Group: Group,
+  Matrix: Matrix$1,
+  Path: Path,
+  Registry: Registry,
+  Shape: Shape,
+  Text: Text,
+  Vector: Vector,
+
+  Gradient: Gradient,
+  ImageSequence: ImageSequence,
+  LinearGradient: LinearGradient,
+  RadialGradient: RadialGradient,
+  Sprite: Sprite,
+  Stop: Stop,
+  Texture: Texture,
+
+  ArcSegment: ArcSegment,
+  Circle: Circle,
+  Ellipse: Ellipse,
+  Line: Line,
+  Polygon: Polygon,
+  Rectangle: Rectangle,
+  RoundedRectangle: RoundedRectangle,
+  Star: Star,
+
+  CanvasRenderer: Renderer,
+  SVGRenderer: Renderer$1,
+  WebGLRenderer: Renderer$2,
+
+  /**
+   * @name Two.Commands
+   * @property {Object} - Map of possible path commands. Taken from the SVG specification.
+   */
+  Commands: Commands,
+
+  Utils: _.extend({
+
+    Error: TwoError,
+    getRatio: getRatio,
+    defineGetterSetter: defineGetterSetter,
+    read: read,
+    xhr: xhr
+
+  }, _, CanvasShim, Curves, math)
+
+});
+
+/* harmony default export */ __webpack_exports__["default"] = (Two);
+
+/* WEBPACK VAR INJECTION */}.call(this, __webpack_require__(4)))
+
+/***/ }),
+/* 4 */
+/***/ (function(module, exports) {
+
+var g;
+
+// This works in non-strict mode
+g = (function() {
+	return this;
+})();
+
+try {
+	// This works if eval is allowed (see CSP)
+	g = g || new Function("return this")();
+} catch (e) {
+	// This works if the window reference is available
+	if (typeof window === "object") g = window;
+}
+
+// g can still be undefined, but nothing to do about it...
+// We return undefined, instead of nothing here, so it's
+// easier to handle this case. if(!global) { ...}
+
+module.exports = g;
+
+
+/***/ }),
+/* 5 */
+/***/ (function(module, exports, __webpack_require__) {
+
+var __WEBPACK_AMD_DEFINE_ARRAY__, __WEBPACK_AMD_DEFINE_RESULT__;/*!
+ * jQuery JavaScript Library v3.3.1
+ * https://jquery.com/
+ *
+ * Includes Sizzle.js
+ * https://sizzlejs.com/
+ *
+ * Copyright JS Foundation and other contributors
+ * Released under the MIT license
+ * https://jquery.org/license
+ *
+ * Date: 2018-01-20T17:24Z
+ */
+( function( global, factory ) {
+
+	"use strict";
+
+	if (  true && typeof module.exports === "object" ) {
+
+		// For CommonJS and CommonJS-like environments where a proper `window`
+		// is present, execute the factory and get jQuery.
+		// For environments that do not have a `window` with a `document`
+		// (such as Node.js), expose a factory as module.exports.
+		// This accentuates the need for the creation of a real `window`.
+		// e.g. var jQuery = require("jquery")(window);
+		// See ticket #14549 for more info.
+		module.exports = global.document ?
+			factory( global, true ) :
+			function( w ) {
+				if ( !w.document ) {
+					throw new Error( "jQuery requires a window with a document" );
+				}
+				return factory( w );
+			};
+	} else {
+		factory( global );
+	}
+
+// Pass this if window is not defined yet
+} )( typeof window !== "undefined" ? window : this, function( window, noGlobal ) {
+
+// Edge <= 12 - 13+, Firefox <=18 - 45+, IE 10 - 11, Safari 5.1 - 9+, iOS 6 - 9.1
+// throw exceptions when non-strict code (e.g., ASP.NET 4.5) accesses strict mode
+// arguments.callee.caller (trac-13335). But as of jQuery 3.0 (2016), strict mode should be common
+// enough that all such attempts are guarded in a try block.
+"use strict";
+
+var arr = [];
+
+var document = window.document;
+
+var getProto = Object.getPrototypeOf;
+
+var slice = arr.slice;
+
+var concat = arr.concat;
+
+var push = arr.push;
+
+var indexOf = arr.indexOf;
+
+var class2type = {};
+
+var toString = class2type.toString;
+
+var hasOwn = class2type.hasOwnProperty;
+
+var fnToString = hasOwn.toString;
+
+var ObjectFunctionString = fnToString.call( Object );
+
+var support = {};
+
+var isFunction = function isFunction( obj ) {
+
+      // Support: Chrome <=57, Firefox <=52
+      // In some browsers, typeof returns "function" for HTML <object> elements
+      // (i.e., `typeof document.createElement( "object" ) === "function"`).
+      // We don't want to classify *any* DOM node as a function.
+      return typeof obj === "function" && typeof obj.nodeType !== "number";
+  };
+
+
+var isWindow = function isWindow( obj ) {
+		return obj != null && obj === obj.window;
+	};
+
+
+
+
+	var preservedScriptAttributes = {
+		type: true,
+		src: true,
+		noModule: true
+	};
+
+	function DOMEval( code, doc, node ) {
+		doc = doc || document;
+
+		var i,
+			script = doc.createElement( "script" );
+
+		script.text = code;
+		if ( node ) {
+			for ( i in preservedScriptAttributes ) {
+				if ( node[ i ] ) {
+					script[ i ] = node[ i ];
+				}
+			}
+		}
+		doc.head.appendChild( script ).parentNode.removeChild( script );
+	}
+
+
+function toType( obj ) {
+	if ( obj == null ) {
+		return obj + "";
+	}
+
+	// Support: Android <=2.3 only (functionish RegExp)
+	return typeof obj === "object" || typeof obj === "function" ?
+		class2type[ toString.call( obj ) ] || "object" :
+		typeof obj;
+}
+/* global Symbol */
+// Defining this global in .eslintrc.json would create a danger of using the global
+// unguarded in another place, it seems safer to define global only for this module
+
+
+
+var
+	version = "3.3.1",
+
+	// Define a local copy of jQuery
+	jQuery = function( selector, context ) {
+
+		// The jQuery object is actually just the init constructor 'enhanced'
+		// Need init if jQuery is called (just allow error to be thrown if not included)
+		return new jQuery.fn.init( selector, context );
+	},
+
+	// Support: Android <=4.0 only
+	// Make sure we trim BOM and NBSP
+	rtrim = /^[\s\uFEFF\xA0]+|[\s\uFEFF\xA0]+$/g;
+
+jQuery.fn = jQuery.prototype = {
+
+	// The current version of jQuery being used
+	jquery: version,
+
+	constructor: jQuery,
+
+	// The default length of a jQuery object is 0
+	length: 0,
+
+	toArray: function() {
+		return slice.call( this );
+	},
+
+	// Get the Nth element in the matched element set OR
+	// Get the whole matched element set as a clean array
+	get: function( num ) {
+
+		// Return all the elements in a clean array
+		if ( num == null ) {
+			return slice.call( this );
+		}
+
+		// Return just the one element from the set
+		return num < 0 ? this[ num + this.length ] : this[ num ];
+	},
+
+	// Take an array of elements and push it onto the stack
+	// (returning the new matched element set)
+	pushStack: function( elems ) {
+
+		// Build a new jQuery matched element set
+		var ret = jQuery.merge( this.constructor(), elems );
+
+		// Add the old object onto the stack (as a reference)
+		ret.prevObject = this;
+
+		// Return the newly-formed element set
+		return ret;
+	},
+
+	// Execute a callback for every element in the matched set.
+	each: function( callback ) {
+		return jQuery.each( this, callback );
+	},
+
+	map: function( callback ) {
+		return this.pushStack( jQuery.map( this, function( elem, i ) {
+			return callback.call( elem, i, elem );
+		} ) );
+	},
+
+	slice: function() {
+		return this.pushStack( slice.apply( this, arguments ) );
+	},
+
+	first: function() {
+		return this.eq( 0 );
+	},
+
+	last: function() {
+		return this.eq( -1 );
+	},
+
+	eq: function( i ) {
+		var len = this.length,
+			j = +i + ( i < 0 ? len : 0 );
+		return this.pushStack( j >= 0 && j < len ? [ this[ j ] ] : [] );
+	},
+
+	end: function() {
+		return this.prevObject || this.constructor();
+	},
+
+	// For internal use only.
+	// Behaves like an Array's method, not like a jQuery method.
+	push: push,
+	sort: arr.sort,
+	splice: arr.splice
+};
+
+jQuery.extend = jQuery.fn.extend = function() {
+	var options, name, src, copy, copyIsArray, clone,
+		target = arguments[ 0 ] || {},
+		i = 1,
+		length = arguments.length,
+		deep = false;
+
+	// Handle a deep copy situation
+	if ( typeof target === "boolean" ) {
+		deep = target;
+
+		// Skip the boolean and the target
+		target = arguments[ i ] || {};
+		i++;
+	}
+
+	// Handle case when target is a string or something (possible in deep copy)
+	if ( typeof target !== "object" && !isFunction( target ) ) {
+		target = {};
+	}
+
+	// Extend jQuery itself if only one argument is passed
+	if ( i === length ) {
+		target = this;
+		i--;
+	}
+
+	for ( ; i < length; i++ ) {
+
+		// Only deal with non-null/undefined values
+		if ( ( options = arguments[ i ] ) != null ) {
+
+			// Extend the base object
+			for ( name in options ) {
+				src = target[ name ];
+				copy = options[ name ];
+
+				// Prevent never-ending loop
+				if ( target === copy ) {
+					continue;
+				}
+
+				// Recurse if we're merging plain objects or arrays
+				if ( deep && copy && ( jQuery.isPlainObject( copy ) ||
+					( copyIsArray = Array.isArray( copy ) ) ) ) {
+
+					if ( copyIsArray ) {
+						copyIsArray = false;
+						clone = src && Array.isArray( src ) ? src : [];
+
+					} else {
+						clone = src && jQuery.isPlainObject( src ) ? src : {};
+					}
+
+					// Never move original objects, clone them
+					target[ name ] = jQuery.extend( deep, clone, copy );
+
+				// Don't bring in undefined values
+				} else if ( copy !== undefined ) {
+					target[ name ] = copy;
+				}
+			}
+		}
+	}
+
+	// Return the modified object
+	return target;
+};
+
+jQuery.extend( {
+
+	// Unique for each copy of jQuery on the page
+	expando: "jQuery" + ( version + Math.random() ).replace( /\D/g, "" ),
+
+	// Assume jQuery is ready without the ready module
+	isReady: true,
+
+	error: function( msg ) {
+		throw new Error( msg );
+	},
+
+	noop: function() {},
+
+	isPlainObject: function( obj ) {
+		var proto, Ctor;
+
+		// Detect obvious negatives
+		// Use toString instead of jQuery.type to catch host objects
+		if ( !obj || toString.call( obj ) !== "[object Object]" ) {
+			return false;
+		}
+
+		proto = getProto( obj );
+
+		// Objects with no prototype (e.g., `Object.create( null )`) are plain
+		if ( !proto ) {
+			return true;
+		}
+
+		// Objects with prototype are plain iff they were constructed by a global Object function
+		Ctor = hasOwn.call( proto, "constructor" ) && proto.constructor;
+		return typeof Ctor === "function" && fnToString.call( Ctor ) === ObjectFunctionString;
+	},
+
+	isEmptyObject: function( obj ) {
+
+		/* eslint-disable no-unused-vars */
+		// See https://github.com/eslint/eslint/issues/6125
+		var name;
+
+		for ( name in obj ) {
+			return false;
+		}
+		return true;
+	},
+
+	// Evaluates a script in a global context
+	globalEval: function( code ) {
+		DOMEval( code );
+	},
+
+	each: function( obj, callback ) {
+		var length, i = 0;
+
+		if ( isArrayLike( obj ) ) {
+			length = obj.length;
+			for ( ; i < length; i++ ) {
+				if ( callback.call( obj[ i ], i, obj[ i ] ) === false ) {
+					break;
+				}
+			}
+		} else {
+			for ( i in obj ) {
+				if ( callback.call( obj[ i ], i, obj[ i ] ) === false ) {
+					break;
+				}
+			}
+		}
+
+		return obj;
+	},
+
+	// Support: Android <=4.0 only
+	trim: function( text ) {
+		return text == null ?
+			"" :
+			( text + "" ).replace( rtrim, "" );
+	},
+
+	// results is for internal usage only
+	makeArray: function( arr, results ) {
+		var ret = results || [];
+
+		if ( arr != null ) {
+			if ( isArrayLike( Object( arr ) ) ) {
+				jQuery.merge( ret,
+					typeof arr === "string" ?
+					[ arr ] : arr
+				);
+			} else {
+				push.call( ret, arr );
+			}
+		}
+
+		return ret;
+	},
+
+	inArray: function( elem, arr, i ) {
+		return arr == null ? -1 : indexOf.call( arr, elem, i );
+	},
+
+	// Support: Android <=4.0 only, PhantomJS 1 only
+	// push.apply(_, arraylike) throws on ancient WebKit
+	merge: function( first, second ) {
+		var len = +second.length,
+			j = 0,
+			i = first.length;
+
+		for ( ; j < len; j++ ) {
+			first[ i++ ] = second[ j ];
+		}
+
+		first.length = i;
+
+		return first;
+	},
+
+	grep: function( elems, callback, invert ) {
+		var callbackInverse,
+			matches = [],
+			i = 0,
+			length = elems.length,
+			callbackExpect = !invert;
+
+		// Go through the array, only saving the items
+		// that pass the validator function
+		for ( ; i < length; i++ ) {
+			callbackInverse = !callback( elems[ i ], i );
+			if ( callbackInverse !== callbackExpect ) {
+				matches.push( elems[ i ] );
+			}
+		}
+
+		return matches;
+	},
+
+	// arg is for internal usage only
+	map: function( elems, callback, arg ) {
+		var length, value,
+			i = 0,
+			ret = [];
+
+		// Go through the array, translating each of the items to their new values
+		if ( isArrayLike( elems ) ) {
+			length = elems.length;
+			for ( ; i < length; i++ ) {
+				value = callback( elems[ i ], i, arg );
+
+				if ( value != null ) {
+					ret.push( value );
+				}
+			}
+
+		// Go through every key on the object,
+		} else {
+			for ( i in elems ) {
+				value = callback( elems[ i ], i, arg );
+
+				if ( value != null ) {
+					ret.push( value );
+				}
+			}
+		}
+
+		// Flatten any nested arrays
+		return concat.apply( [], ret );
+	},
+
+	// A global GUID counter for objects
+	guid: 1,
+
+	// jQuery.support is not used in Core but other projects attach their
+	// properties to it so it needs to exist.
+	support: support
+} );
+
+if ( typeof Symbol === "function" ) {
+	jQuery.fn[ Symbol.iterator ] = arr[ Symbol.iterator ];
+}
+
+// Populate the class2type map
+jQuery.each( "Boolean Number String Function Array Date RegExp Object Error Symbol".split( " " ),
+function( i, name ) {
+	class2type[ "[object " + name + "]" ] = name.toLowerCase();
+} );
+
+function isArrayLike( obj ) {
+
+	// Support: real iOS 8.2 only (not reproducible in simulator)
+	// `in` check used to prevent JIT error (gh-2145)
+	// hasOwn isn't used here due to false negatives
+	// regarding Nodelist length in IE
+	var length = !!obj && "length" in obj && obj.length,
+		type = toType( obj );
+
+	if ( isFunction( obj ) || isWindow( obj ) ) {
+		return false;
+	}
+
+	return type === "array" || length === 0 ||
+		typeof length === "number" && length > 0 && ( length - 1 ) in obj;
+}
+var Sizzle =
+/*!
+ * Sizzle CSS Selector Engine v2.3.3
+ * https://sizzlejs.com/
+ *
+ * Copyright jQuery Foundation and other contributors
+ * Released under the MIT license
+ * http://jquery.org/license
+ *
+ * Date: 2016-08-08
+ */
+(function( window ) {
+
+var i,
+	support,
+	Expr,
+	getText,
+	isXML,
+	tokenize,
+	compile,
+	select,
+	outermostContext,
+	sortInput,
+	hasDuplicate,
+
+	// Local document vars
+	setDocument,
+	document,
+	docElem,
+	documentIsHTML,
+	rbuggyQSA,
+	rbuggyMatches,
+	matches,
+	contains,
+
+	// Instance-specific data
+	expando = "sizzle" + 1 * new Date(),
+	preferredDoc = window.document,
+	dirruns = 0,
+	done = 0,
+	classCache = createCache(),
+	tokenCache = createCache(),
+	compilerCache = createCache(),
+	sortOrder = function( a, b ) {
+		if ( a === b ) {
+			hasDuplicate = true;
+		}
+		return 0;
+	},
+
+	// Instance methods
+	hasOwn = ({}).hasOwnProperty,
+	arr = [],
+	pop = arr.pop,
+	push_native = arr.push,
+	push = arr.push,
+	slice = arr.slice,
+	// Use a stripped-down indexOf as it's faster than native
+	// https://jsperf.com/thor-indexof-vs-for/5
+	indexOf = function( list, elem ) {
+		var i = 0,
+			len = list.length;
+		for ( ; i < len; i++ ) {
+			if ( list[i] === elem ) {
+				return i;
+			}
+		}
+		return -1;
+	},
+
+	booleans = "checked|selected|async|autofocus|autoplay|controls|defer|disabled|hidden|ismap|loop|multiple|open|readonly|required|scoped",
+
+	// Regular expressions
+
+	// http://www.w3.org/TR/css3-selectors/#whitespace
+	whitespace = "[\\x20\\t\\r\\n\\f]",
+
+	// http://www.w3.org/TR/CSS21/syndata.html#value-def-identifier
+	identifier = "(?:\\\\.|[\\w-]|[^\0-\\xa0])+",
+
+	// Attribute selectors: http://www.w3.org/TR/selectors/#attribute-selectors
+	attributes = "\\[" + whitespace + "*(" + identifier + ")(?:" + whitespace +
+		// Operator (capture 2)
+		"*([*^$|!~]?=)" + whitespace +
+		// "Attribute values must be CSS identifiers [capture 5] or strings [capture 3 or capture 4]"
+		"*(?:'((?:\\\\.|[^\\\\'])*)'|\"((?:\\\\.|[^\\\\\"])*)\"|(" + identifier + "))|)" + whitespace +
+		"*\\]",
+
+	pseudos = ":(" + identifier + ")(?:\\((" +
+		// To reduce the number of selectors needing tokenize in the preFilter, prefer arguments:
+		// 1. quoted (capture 3; capture 4 or capture 5)
+		"('((?:\\\\.|[^\\\\'])*)'|\"((?:\\\\.|[^\\\\\"])*)\")|" +
+		// 2. simple (capture 6)
+		"((?:\\\\.|[^\\\\()[\\]]|" + attributes + ")*)|" +
+		// 3. anything else (capture 2)
+		".*" +
+		")\\)|)",
+
+	// Leading and non-escaped trailing whitespace, capturing some non-whitespace characters preceding the latter
+	rwhitespace = new RegExp( whitespace + "+", "g" ),
+	rtrim = new RegExp( "^" + whitespace + "+|((?:^|[^\\\\])(?:\\\\.)*)" + whitespace + "+$", "g" ),
+
+	rcomma = new RegExp( "^" + whitespace + "*," + whitespace + "*" ),
+	rcombinators = new RegExp( "^" + whitespace + "*([>+~]|" + whitespace + ")" + whitespace + "*" ),
+
+	rattributeQuotes = new RegExp( "=" + whitespace + "*([^\\]'\"]*?)" + whitespace + "*\\]", "g" ),
+
+	rpseudo = new RegExp( pseudos ),
+	ridentifier = new RegExp( "^" + identifier + "$" ),
+
+	matchExpr = {
+		"ID": new RegExp( "^#(" + identifier + ")" ),
+		"CLASS": new RegExp( "^\\.(" + identifier + ")" ),
+		"TAG": new RegExp( "^(" + identifier + "|[*])" ),
+		"ATTR": new RegExp( "^" + attributes ),
+		"PSEUDO": new RegExp( "^" + pseudos ),
+		"CHILD": new RegExp( "^:(only|first|last|nth|nth-last)-(child|of-type)(?:\\(" + whitespace +
+			"*(even|odd|(([+-]|)(\\d*)n|)" + whitespace + "*(?:([+-]|)" + whitespace +
+			"*(\\d+)|))" + whitespace + "*\\)|)", "i" ),
+		"bool": new RegExp( "^(?:" + booleans + ")$", "i" ),
+		// For use in libraries implementing .is()
+		// We use this for POS matching in `select`
+		"needsContext": new RegExp( "^" + whitespace + "*[>+~]|:(even|odd|eq|gt|lt|nth|first|last)(?:\\(" +
+			whitespace + "*((?:-\\d)?\\d*)" + whitespace + "*\\)|)(?=[^-]|$)", "i" )
+	},
+
+	rinputs = /^(?:input|select|textarea|button)$/i,
+	rheader = /^h\d$/i,
+
+	rnative = /^[^{]+\{\s*\[native \w/,
+
+	// Easily-parseable/retrievable ID or TAG or CLASS selectors
+	rquickExpr = /^(?:#([\w-]+)|(\w+)|\.([\w-]+))$/,
+
+	rsibling = /[+~]/,
+
+	// CSS escapes
+	// http://www.w3.org/TR/CSS21/syndata.html#escaped-characters
+	runescape = new RegExp( "\\\\([\\da-f]{1,6}" + whitespace + "?|(" + whitespace + ")|.)", "ig" ),
+	funescape = function( _, escaped, escapedWhitespace ) {
+		var high = "0x" + escaped - 0x10000;
+		// NaN means non-codepoint
+		// Support: Firefox<24
+		// Workaround erroneous numeric interpretation of +"0x"
+		return high !== high || escapedWhitespace ?
+			escaped :
+			high < 0 ?
+				// BMP codepoint
+				String.fromCharCode( high + 0x10000 ) :
+				// Supplemental Plane codepoint (surrogate pair)
+				String.fromCharCode( high >> 10 | 0xD800, high & 0x3FF | 0xDC00 );
+	},
+
+	// CSS string/identifier serialization
+	// https://drafts.csswg.org/cssom/#common-serializing-idioms
+	rcssescape = /([\0-\x1f\x7f]|^-?\d)|^-$|[^\0-\x1f\x7f-\uFFFF\w-]/g,
+	fcssescape = function( ch, asCodePoint ) {
+		if ( asCodePoint ) {
+
+			// U+0000 NULL becomes U+FFFD REPLACEMENT CHARACTER
+			if ( ch === "\0" ) {
+				return "\uFFFD";
+			}
+
+			// Control characters and (dependent upon position) numbers get escaped as code points
+			return ch.slice( 0, -1 ) + "\\" + ch.charCodeAt( ch.length - 1 ).toString( 16 ) + " ";
+		}
+
+		// Other potentially-special ASCII characters get backslash-escaped
+		return "\\" + ch;
+	},
+
+	// Used for iframes
+	// See setDocument()
+	// Removing the function wrapper causes a "Permission Denied"
+	// error in IE
+	unloadHandler = function() {
+		setDocument();
+	},
+
+	disabledAncestor = addCombinator(
+		function( elem ) {
+			return elem.disabled === true && ("form" in elem || "label" in elem);
+		},
+		{ dir: "parentNode", next: "legend" }
+	);
+
+// Optimize for push.apply( _, NodeList )
+try {
+	push.apply(
+		(arr = slice.call( preferredDoc.childNodes )),
+		preferredDoc.childNodes
+	);
+	// Support: Android<4.0
+	// Detect silently failing push.apply
+	arr[ preferredDoc.childNodes.length ].nodeType;
+} catch ( e ) {
+	push = { apply: arr.length ?
+
+		// Leverage slice if possible
+		function( target, els ) {
+			push_native.apply( target, slice.call(els) );
+		} :
+
+		// Support: IE<9
+		// Otherwise append directly
+		function( target, els ) {
+			var j = target.length,
+				i = 0;
+			// Can't trust NodeList.length
+			while ( (target[j++] = els[i++]) ) {}
+			target.length = j - 1;
+		}
+	};
+}
+
+function Sizzle( selector, context, results, seed ) {
+	var m, i, elem, nid, match, groups, newSelector,
+		newContext = context && context.ownerDocument,
+
+		// nodeType defaults to 9, since context defaults to document
+		nodeType = context ? context.nodeType : 9;
+
+	results = results || [];
+
+	// Return early from calls with invalid selector or context
+	if ( typeof selector !== "string" || !selector ||
+		nodeType !== 1 && nodeType !== 9 && nodeType !== 11 ) {
+
+		return results;
+	}
+
+	// Try to shortcut find operations (as opposed to filters) in HTML documents
+	if ( !seed ) {
+
+		if ( ( context ? context.ownerDocument || context : preferredDoc ) !== document ) {
+			setDocument( context );
+		}
+		context = context || document;
+
+		if ( documentIsHTML ) {
+
+			// If the selector is sufficiently simple, try using a "get*By*" DOM method
+			// (excepting DocumentFragment context, where the methods don't exist)
+			if ( nodeType !== 11 && (match = rquickExpr.exec( selector )) ) {
+
+				// ID selector
+				if ( (m = match[1]) ) {
+
+					// Document context
+					if ( nodeType === 9 ) {
+						if ( (elem = context.getElementById( m )) ) {
+
+							// Support: IE, Opera, Webkit
+							// TODO: identify versions
+							// getElementById can match elements by name instead of ID
+							if ( elem.id === m ) {
+								results.push( elem );
+								return results;
+							}
+						} else {
+							return results;
+						}
+
+					// Element context
+					} else {
+
+						// Support: IE, Opera, Webkit
+						// TODO: identify versions
+						// getElementById can match elements by name instead of ID
+						if ( newContext && (elem = newContext.getElementById( m )) &&
+							contains( context, elem ) &&
+							elem.id === m ) {
+
+							results.push( elem );
+							return results;
+						}
+					}
+
+				// Type selector
+				} else if ( match[2] ) {
+					push.apply( results, context.getElementsByTagName( selector ) );
+					return results;
+
+				// Class selector
+				} else if ( (m = match[3]) && support.getElementsByClassName &&
+					context.getElementsByClassName ) {
+
+					push.apply( results, context.getElementsByClassName( m ) );
+					return results;
+				}
+			}
+
+			// Take advantage of querySelectorAll
+			if ( support.qsa &&
+				!compilerCache[ selector + " " ] &&
+				(!rbuggyQSA || !rbuggyQSA.test( selector )) ) {
+
+				if ( nodeType !== 1 ) {
+					newContext = context;
+					newSelector = selector;
+
+				// qSA looks outside Element context, which is not what we want
+				// Thanks to Andrew Dupont for this workaround technique
+				// Support: IE <=8
+				// Exclude object elements
+				} else if ( context.nodeName.toLowerCase() !== "object" ) {
+
+					// Capture the context ID, setting it first if necessary
+					if ( (nid = context.getAttribute( "id" )) ) {
+						nid = nid.replace( rcssescape, fcssescape );
+					} else {
+						context.setAttribute( "id", (nid = expando) );
+					}
+
+					// Prefix every selector in the list
+					groups = tokenize( selector );
+					i = groups.length;
+					while ( i-- ) {
+						groups[i] = "#" + nid + " " + toSelector( groups[i] );
+					}
+					newSelector = groups.join( "," );
+
+					// Expand context for sibling selectors
+					newContext = rsibling.test( selector ) && testContext( context.parentNode ) ||
+						context;
+				}
+
+				if ( newSelector ) {
+					try {
+						push.apply( results,
+							newContext.querySelectorAll( newSelector )
+						);
+						return results;
+					} catch ( qsaError ) {
+					} finally {
+						if ( nid === expando ) {
+							context.removeAttribute( "id" );
+						}
+					}
+				}
+			}
+		}
+	}
+
+	// All others
+	return select( selector.replace( rtrim, "$1" ), context, results, seed );
+}
+
+/**
+ * Create key-value caches of limited size
+ * @returns {function(string, object)} Returns the Object data after storing it on itself with
+ *	property name the (space-suffixed) string and (if the cache is larger than Expr.cacheLength)
+ *	deleting the oldest entry
+ */
+function createCache() {
+	var keys = [];
+
+	function cache( key, value ) {
+		// Use (key + " ") to avoid collision with native prototype properties (see Issue #157)
+		if ( keys.push( key + " " ) > Expr.cacheLength ) {
+			// Only keep the most recent entries
+			delete cache[ keys.shift() ];
+		}
+		return (cache[ key + " " ] = value);
+	}
+	return cache;
+}
+
+/**
+ * Mark a function for special use by Sizzle
+ * @param {Function} fn The function to mark
+ */
+function markFunction( fn ) {
+	fn[ expando ] = true;
+	return fn;
+}
+
+/**
+ * Support testing using an element
+ * @param {Function} fn Passed the created element and returns a boolean result
+ */
+function assert( fn ) {
+	var el = document.createElement("fieldset");
+
+	try {
+		return !!fn( el );
+	} catch (e) {
+		return false;
+	} finally {
+		// Remove from its parent by default
+		if ( el.parentNode ) {
+			el.parentNode.removeChild( el );
+		}
+		// release memory in IE
+		el = null;
+	}
+}
+
+/**
+ * Adds the same handler for all of the specified attrs
+ * @param {String} attrs Pipe-separated list of attributes
+ * @param {Function} handler The method that will be applied
+ */
+function addHandle( attrs, handler ) {
+	var arr = attrs.split("|"),
+		i = arr.length;
+
+	while ( i-- ) {
+		Expr.attrHandle[ arr[i] ] = handler;
+	}
+}
+
+/**
+ * Checks document order of two siblings
+ * @param {Element} a
+ * @param {Element} b
+ * @returns {Number} Returns less than 0 if a precedes b, greater than 0 if a follows b
+ */
+function siblingCheck( a, b ) {
+	var cur = b && a,
+		diff = cur && a.nodeType === 1 && b.nodeType === 1 &&
+			a.sourceIndex - b.sourceIndex;
+
+	// Use IE sourceIndex if available on both nodes
+	if ( diff ) {
+		return diff;
+	}
+
+	// Check if b follows a
+	if ( cur ) {
+		while ( (cur = cur.nextSibling) ) {
+			if ( cur === b ) {
+				return -1;
+			}
+		}
+	}
+
+	return a ? 1 : -1;
+}
+
+/**
+ * Returns a function to use in pseudos for input types
+ * @param {String} type
+ */
+function createInputPseudo( type ) {
+	return function( elem ) {
+		var name = elem.nodeName.toLowerCase();
+		return name === "input" && elem.type === type;
+	};
+}
+
+/**
+ * Returns a function to use in pseudos for buttons
+ * @param {String} type
+ */
+function createButtonPseudo( type ) {
+	return function( elem ) {
+		var name = elem.nodeName.toLowerCase();
+		return (name === "input" || name === "button") && elem.type === type;
+	};
+}
+
+/**
+ * Returns a function to use in pseudos for :enabled/:disabled
+ * @param {Boolean} disabled true for :disabled; false for :enabled
+ */
+function createDisabledPseudo( disabled ) {
+
+	// Known :disabled false positives: fieldset[disabled] > legend:nth-of-type(n+2) :can-disable
+	return function( elem ) {
+
+		// Only certain elements can match :enabled or :disabled
+		// https://html.spec.whatwg.org/multipage/scripting.html#selector-enabled
+		// https://html.spec.whatwg.org/multipage/scripting.html#selector-disabled
+		if ( "form" in elem ) {
+
+			// Check for inherited disabledness on relevant non-disabled elements:
+			// * listed form-associated elements in a disabled fieldset
+			//   https://html.spec.whatwg.org/multipage/forms.html#category-listed
+			//   https://html.spec.whatwg.org/multipage/forms.html#concept-fe-disabled
+			// * option elements in a disabled optgroup
+			//   https://html.spec.whatwg.org/multipage/forms.html#concept-option-disabled
+			// All such elements have a "form" property.
+			if ( elem.parentNode && elem.disabled === false ) {
+
+				// Option elements defer to a parent optgroup if present
+				if ( "label" in elem ) {
+					if ( "label" in elem.parentNode ) {
+						return elem.parentNode.disabled === disabled;
+					} else {
+						return elem.disabled === disabled;
+					}
+				}
+
+				// Support: IE 6 - 11
+				// Use the isDisabled shortcut property to check for disabled fieldset ancestors
+				return elem.isDisabled === disabled ||
+
+					// Where there is no isDisabled, check manually
+					/* jshint -W018 */
+					elem.isDisabled !== !disabled &&
+						disabledAncestor( elem ) === disabled;
+			}
+
+			return elem.disabled === disabled;
+
+		// Try to winnow out elements that can't be disabled before trusting the disabled property.
+		// Some victims get caught in our net (label, legend, menu, track), but it shouldn't
+		// even exist on them, let alone have a boolean value.
+		} else if ( "label" in elem ) {
+			return elem.disabled === disabled;
+		}
+
+		// Remaining elements are neither :enabled nor :disabled
+		return false;
+	};
+}
+
+/**
+ * Returns a function to use in pseudos for positionals
+ * @param {Function} fn
+ */
+function createPositionalPseudo( fn ) {
+	return markFunction(function( argument ) {
+		argument = +argument;
+		return markFunction(function( seed, matches ) {
+			var j,
+				matchIndexes = fn( [], seed.length, argument ),
+				i = matchIndexes.length;
+
+			// Match elements found at the specified indexes
+			while ( i-- ) {
+				if ( seed[ (j = matchIndexes[i]) ] ) {
+					seed[j] = !(matches[j] = seed[j]);
+				}
+			}
+		});
+	});
+}
+
+/**
+ * Checks a node for validity as a Sizzle context
+ * @param {Element|Object=} context
+ * @returns {Element|Object|Boolean} The input node if acceptable, otherwise a falsy value
+ */
+function testContext( context ) {
+	return context && typeof context.getElementsByTagName !== "undefined" && context;
+}
+
+// Expose support vars for convenience
+support = Sizzle.support = {};
+
+/**
+ * Detects XML nodes
+ * @param {Element|Object} elem An element or a document
+ * @returns {Boolean} True iff elem is a non-HTML XML node
+ */
+isXML = Sizzle.isXML = function( elem ) {
+	// documentElement is verified for cases where it doesn't yet exist
+	// (such as loading iframes in IE - #4833)
+	var documentElement = elem && (elem.ownerDocument || elem).documentElement;
+	return documentElement ? documentElement.nodeName !== "HTML" : false;
+};
+
+/**
+ * Sets document-related variables once based on the current document
+ * @param {Element|Object} [doc] An element or document object to use to set the document
+ * @returns {Object} Returns the current document
+ */
+setDocument = Sizzle.setDocument = function( node ) {
+	var hasCompare, subWindow,
+		doc = node ? node.ownerDocument || node : preferredDoc;
+
+	// Return early if doc is invalid or already selected
+	if ( doc === document || doc.nodeType !== 9 || !doc.documentElement ) {
+		return document;
+	}
+
+	// Update global variables
+	document = doc;
+	docElem = document.documentElement;
+	documentIsHTML = !isXML( document );
+
+	// Support: IE 9-11, Edge
+	// Accessing iframe documents after unload throws "permission denied" errors (jQuery #13936)
+	if ( preferredDoc !== document &&
+		(subWindow = document.defaultView) && subWindow.top !== subWindow ) {
+
+		// Support: IE 11, Edge
+		if ( subWindow.addEventListener ) {
+			subWindow.addEventListener( "unload", unloadHandler, false );
+
+		// Support: IE 9 - 10 only
+		} else if ( subWindow.attachEvent ) {
+			subWindow.attachEvent( "onunload", unloadHandler );
+		}
+	}
+
+	/* Attributes
+	---------------------------------------------------------------------- */
+
+	// Support: IE<8
+	// Verify that getAttribute really returns attributes and not properties
+	// (excepting IE8 booleans)
+	support.attributes = assert(function( el ) {
+		el.className = "i";
+		return !el.getAttribute("className");
+	});
+
+	/* getElement(s)By*
+	---------------------------------------------------------------------- */
+
+	// Check if getElementsByTagName("*") returns only elements
+	support.getElementsByTagName = assert(function( el ) {
+		el.appendChild( document.createComment("") );
+		return !el.getElementsByTagName("*").length;
+	});
+
+	// Support: IE<9
+	support.getElementsByClassName = rnative.test( document.getElementsByClassName );
+
+	// Support: IE<10
+	// Check if getElementById returns elements by name
+	// The broken getElementById methods don't pick up programmatically-set names,
+	// so use a roundabout getElementsByName test
+	support.getById = assert(function( el ) {
+		docElem.appendChild( el ).id = expando;
+		return !document.getElementsByName || !document.getElementsByName( expando ).length;
+	});
+
+	// ID filter and find
+	if ( support.getById ) {
+		Expr.filter["ID"] = function( id ) {
+			var attrId = id.replace( runescape, funescape );
+			return function( elem ) {
+				return elem.getAttribute("id") === attrId;
+			};
+		};
+		Expr.find["ID"] = function( id, context ) {
+			if ( typeof context.getElementById !== "undefined" && documentIsHTML ) {
+				var elem = context.getElementById( id );
+				return elem ? [ elem ] : [];
+			}
+		};
+	} else {
+		Expr.filter["ID"] =  function( id ) {
+			var attrId = id.replace( runescape, funescape );
+			return function( elem ) {
+				var node = typeof elem.getAttributeNode !== "undefined" &&
+					elem.getAttributeNode("id");
+				return node && node.value === attrId;
+			};
+		};
+
+		// Support: IE 6 - 7 only
+		// getElementById is not reliable as a find shortcut
+		Expr.find["ID"] = function( id, context ) {
+			if ( typeof context.getElementById !== "undefined" && documentIsHTML ) {
+				var node, i, elems,
+					elem = context.getElementById( id );
+
+				if ( elem ) {
+
+					// Verify the id attribute
+					node = elem.getAttributeNode("id");
+					if ( node && node.value === id ) {
+						return [ elem ];
+					}
+
+					// Fall back on getElementsByName
+					elems = context.getElementsByName( id );
+					i = 0;
+					while ( (elem = elems[i++]) ) {
+						node = elem.getAttributeNode("id");
+						if ( node && node.value === id ) {
+							return [ elem ];
+						}
+					}
+				}
+
+				return [];
+			}
+		};
+	}
+
+	// Tag
+	Expr.find["TAG"] = support.getElementsByTagName ?
+		function( tag, context ) {
+			if ( typeof context.getElementsByTagName !== "undefined" ) {
+				return context.getElementsByTagName( tag );
+
+			// DocumentFragment nodes don't have gEBTN
+			} else if ( support.qsa ) {
+				return context.querySelectorAll( tag );
+			}
+		} :
+
+		function( tag, context ) {
+			var elem,
+				tmp = [],
+				i = 0,
+				// By happy coincidence, a (broken) gEBTN appears on DocumentFragment nodes too
+				results = context.getElementsByTagName( tag );
+
+			// Filter out possible comments
+			if ( tag === "*" ) {
+				while ( (elem = results[i++]) ) {
+					if ( elem.nodeType === 1 ) {
+						tmp.push( elem );
+					}
+				}
+
+				return tmp;
+			}
+			return results;
+		};
+
+	// Class
+	Expr.find["CLASS"] = support.getElementsByClassName && function( className, context ) {
+		if ( typeof context.getElementsByClassName !== "undefined" && documentIsHTML ) {
+			return context.getElementsByClassName( className );
+		}
+	};
+
+	/* QSA/matchesSelector
+	---------------------------------------------------------------------- */
+
+	// QSA and matchesSelector support
+
+	// matchesSelector(:active) reports false when true (IE9/Opera 11.5)
+	rbuggyMatches = [];
+
+	// qSa(:focus) reports false when true (Chrome 21)
+	// We allow this because of a bug in IE8/9 that throws an error
+	// whenever `document.activeElement` is accessed on an iframe
+	// So, we allow :focus to pass through QSA all the time to avoid the IE error
+	// See https://bugs.jquery.com/ticket/13378
+	rbuggyQSA = [];
+
+	if ( (support.qsa = rnative.test( document.querySelectorAll )) ) {
+		// Build QSA regex
+		// Regex strategy adopted from Diego Perini
+		assert(function( el ) {
+			// Select is set to empty string on purpose
+			// This is to test IE's treatment of not explicitly
+			// setting a boolean content attribute,
+			// since its presence should be enough
+			// https://bugs.jquery.com/ticket/12359
+			docElem.appendChild( el ).innerHTML = "<a id='" + expando + "'></a>" +
+				"<select id='" + expando + "-\r\\' msallowcapture=''>" +
+				"<option selected=''></option></select>";
+
+			// Support: IE8, Opera 11-12.16
+			// Nothing should be selected when empty strings follow ^= or $= or *=
+			// The test attribute must be unknown in Opera but "safe" for WinRT
+			// https://msdn.microsoft.com/en-us/library/ie/hh465388.aspx#attribute_section
+			if ( el.querySelectorAll("[msallowcapture^='']").length ) {
+				rbuggyQSA.push( "[*^$]=" + whitespace + "*(?:''|\"\")" );
+			}
+
+			// Support: IE8
+			// Boolean attributes and "value" are not treated correctly
+			if ( !el.querySelectorAll("[selected]").length ) {
+				rbuggyQSA.push( "\\[" + whitespace + "*(?:value|" + booleans + ")" );
+			}
+
+			// Support: Chrome<29, Android<4.4, Safari<7.0+, iOS<7.0+, PhantomJS<1.9.8+
+			if ( !el.querySelectorAll( "[id~=" + expando + "-]" ).length ) {
+				rbuggyQSA.push("~=");
+			}
+
+			// Webkit/Opera - :checked should return selected option elements
+			// http://www.w3.org/TR/2011/REC-css3-selectors-20110929/#checked
+			// IE8 throws error here and will not see later tests
+			if ( !el.querySelectorAll(":checked").length ) {
+				rbuggyQSA.push(":checked");
+			}
+
+			// Support: Safari 8+, iOS 8+
+			// https://bugs.webkit.org/show_bug.cgi?id=136851
+			// In-page `selector#id sibling-combinator selector` fails
+			if ( !el.querySelectorAll( "a#" + expando + "+*" ).length ) {
+				rbuggyQSA.push(".#.+[+~]");
+			}
+		});
+
+		assert(function( el ) {
+			el.innerHTML = "<a href='' disabled='disabled'></a>" +
+				"<select disabled='disabled'><option/></select>";
+
+			// Support: Windows 8 Native Apps
+			// The type and name attributes are restricted during .innerHTML assignment
+			var input = document.createElement("input");
+			input.setAttribute( "type", "hidden" );
+			el.appendChild( input ).setAttribute( "name", "D" );
+
+			// Support: IE8
+			// Enforce case-sensitivity of name attribute
+			if ( el.querySelectorAll("[name=d]").length ) {
+				rbuggyQSA.push( "name" + whitespace + "*[*^$|!~]?=" );
+			}
+
+			// FF 3.5 - :enabled/:disabled and hidden elements (hidden elements are still enabled)
+			// IE8 throws error here and will not see later tests
+			if ( el.querySelectorAll(":enabled").length !== 2 ) {
+				rbuggyQSA.push( ":enabled", ":disabled" );
+			}
+
+			// Support: IE9-11+
+			// IE's :disabled selector does not pick up the children of disabled fieldsets
+			docElem.appendChild( el ).disabled = true;
+			if ( el.querySelectorAll(":disabled").length !== 2 ) {
+				rbuggyQSA.push( ":enabled", ":disabled" );
+			}
+
+			// Opera 10-11 does not throw on post-comma invalid pseudos
+			el.querySelectorAll("*,:x");
+			rbuggyQSA.push(",.*:");
+		});
+	}
+
+	if ( (support.matchesSelector = rnative.test( (matches = docElem.matches ||
+		docElem.webkitMatchesSelector ||
+		docElem.mozMatchesSelector ||
+		docElem.oMatchesSelector ||
+		docElem.msMatchesSelector) )) ) {
+
+		assert(function( el ) {
+			// Check to see if it's possible to do matchesSelector
+			// on a disconnected node (IE 9)
+			support.disconnectedMatch = matches.call( el, "*" );
+
+			// This should fail with an exception
+			// Gecko does not error, returns false instead
+			matches.call( el, "[s!='']:x" );
+			rbuggyMatches.push( "!=", pseudos );
+		});
+	}
+
+	rbuggyQSA = rbuggyQSA.length && new RegExp( rbuggyQSA.join("|") );
+	rbuggyMatches = rbuggyMatches.length && new RegExp( rbuggyMatches.join("|") );
+
+	/* Contains
+	---------------------------------------------------------------------- */
+	hasCompare = rnative.test( docElem.compareDocumentPosition );
+
+	// Element contains another
+	// Purposefully self-exclusive
+	// As in, an element does not contain itself
+	contains = hasCompare || rnative.test( docElem.contains ) ?
+		function( a, b ) {
+			var adown = a.nodeType === 9 ? a.documentElement : a,
+				bup = b && b.parentNode;
+			return a === bup || !!( bup && bup.nodeType === 1 && (
+				adown.contains ?
+					adown.contains( bup ) :
+					a.compareDocumentPosition && a.compareDocumentPosition( bup ) & 16
+			));
+		} :
+		function( a, b ) {
+			if ( b ) {
+				while ( (b = b.parentNode) ) {
+					if ( b === a ) {
+						return true;
+					}
+				}
+			}
+			return false;
+		};
+
+	/* Sorting
+	---------------------------------------------------------------------- */
+
+	// Document order sorting
+	sortOrder = hasCompare ?
+	function( a, b ) {
+
+		// Flag for duplicate removal
+		if ( a === b ) {
+			hasDuplicate = true;
+			return 0;
+		}
+
+		// Sort on method existence if only one input has compareDocumentPosition
+		var compare = !a.compareDocumentPosition - !b.compareDocumentPosition;
+		if ( compare ) {
+			return compare;
+		}
+
+		// Calculate position if both inputs belong to the same document
+		compare = ( a.ownerDocument || a ) === ( b.ownerDocument || b ) ?
+			a.compareDocumentPosition( b ) :
+
+			// Otherwise we know they are disconnected
+			1;
+
+		// Disconnected nodes
+		if ( compare & 1 ||
+			(!support.sortDetached && b.compareDocumentPosition( a ) === compare) ) {
+
+			// Choose the first element that is related to our preferred document
+			if ( a === document || a.ownerDocument === preferredDoc && contains(preferredDoc, a) ) {
+				return -1;
+			}
+			if ( b === document || b.ownerDocument === preferredDoc && contains(preferredDoc, b) ) {
+				return 1;
+			}
+
+			// Maintain original order
+			return sortInput ?
+				( indexOf( sortInput, a ) - indexOf( sortInput, b ) ) :
+				0;
+		}
+
+		return compare & 4 ? -1 : 1;
+	} :
+	function( a, b ) {
+		// Exit early if the nodes are identical
+		if ( a === b ) {
+			hasDuplicate = true;
+			return 0;
+		}
+
+		var cur,
+			i = 0,
+			aup = a.parentNode,
+			bup = b.parentNode,
+			ap = [ a ],
+			bp = [ b ];
+
+		// Parentless nodes are either documents or disconnected
+		if ( !aup || !bup ) {
+			return a === document ? -1 :
+				b === document ? 1 :
+				aup ? -1 :
+				bup ? 1 :
+				sortInput ?
+				( indexOf( sortInput, a ) - indexOf( sortInput, b ) ) :
+				0;
+
+		// If the nodes are siblings, we can do a quick check
+		} else if ( aup === bup ) {
+			return siblingCheck( a, b );
+		}
+
+		// Otherwise we need full lists of their ancestors for comparison
+		cur = a;
+		while ( (cur = cur.parentNode) ) {
+			ap.unshift( cur );
+		}
+		cur = b;
+		while ( (cur = cur.parentNode) ) {
+			bp.unshift( cur );
+		}
+
+		// Walk down the tree looking for a discrepancy
+		while ( ap[i] === bp[i] ) {
+			i++;
+		}
+
+		return i ?
+			// Do a sibling check if the nodes have a common ancestor
+			siblingCheck( ap[i], bp[i] ) :
+
+			// Otherwise nodes in our document sort first
+			ap[i] === preferredDoc ? -1 :
+			bp[i] === preferredDoc ? 1 :
+			0;
+	};
+
+	return document;
+};
+
+Sizzle.matches = function( expr, elements ) {
+	return Sizzle( expr, null, null, elements );
+};
+
+Sizzle.matchesSelector = function( elem, expr ) {
+	// Set document vars if needed
+	if ( ( elem.ownerDocument || elem ) !== document ) {
+		setDocument( elem );
+	}
+
+	// Make sure that attribute selectors are quoted
+	expr = expr.replace( rattributeQuotes, "='$1']" );
+
+	if ( support.matchesSelector && documentIsHTML &&
+		!compilerCache[ expr + " " ] &&
+		( !rbuggyMatches || !rbuggyMatches.test( expr ) ) &&
+		( !rbuggyQSA     || !rbuggyQSA.test( expr ) ) ) {
+
+		try {
+			var ret = matches.call( elem, expr );
+
+			// IE 9's matchesSelector returns false on disconnected nodes
+			if ( ret || support.disconnectedMatch ||
+					// As well, disconnected nodes are said to be in a document
+					// fragment in IE 9
+					elem.document && elem.document.nodeType !== 11 ) {
+				return ret;
+			}
+		} catch (e) {}
+	}
+
+	return Sizzle( expr, document, null, [ elem ] ).length > 0;
+};
+
+Sizzle.contains = function( context, elem ) {
+	// Set document vars if needed
+	if ( ( context.ownerDocument || context ) !== document ) {
+		setDocument( context );
+	}
+	return contains( context, elem );
+};
+
+Sizzle.attr = function( elem, name ) {
+	// Set document vars if needed
+	if ( ( elem.ownerDocument || elem ) !== document ) {
+		setDocument( elem );
+	}
+
+	var fn = Expr.attrHandle[ name.toLowerCase() ],
+		// Don't get fooled by Object.prototype properties (jQuery #13807)
+		val = fn && hasOwn.call( Expr.attrHandle, name.toLowerCase() ) ?
+			fn( elem, name, !documentIsHTML ) :
+			undefined;
+
+	return val !== undefined ?
+		val :
+		support.attributes || !documentIsHTML ?
+			elem.getAttribute( name ) :
+			(val = elem.getAttributeNode(name)) && val.specified ?
+				val.value :
+				null;
+};
+
+Sizzle.escape = function( sel ) {
+	return (sel + "").replace( rcssescape, fcssescape );
+};
+
+Sizzle.error = function( msg ) {
+	throw new Error( "Syntax error, unrecognized expression: " + msg );
+};
+
+/**
+ * Document sorting and removing duplicates
+ * @param {ArrayLike} results
+ */
+Sizzle.uniqueSort = function( results ) {
+	var elem,
+		duplicates = [],
+		j = 0,
+		i = 0;
+
+	// Unless we *know* we can detect duplicates, assume their presence
+	hasDuplicate = !support.detectDuplicates;
+	sortInput = !support.sortStable && results.slice( 0 );
+	results.sort( sortOrder );
+
+	if ( hasDuplicate ) {
+		while ( (elem = results[i++]) ) {
+			if ( elem === results[ i ] ) {
+				j = duplicates.push( i );
+			}
+		}
+		while ( j-- ) {
+			results.splice( duplicates[ j ], 1 );
+		}
+	}
+
+	// Clear input after sorting to release objects
+	// See https://github.com/jquery/sizzle/pull/225
+	sortInput = null;
+
+	return results;
+};
+
+/**
+ * Utility function for retrieving the text value of an array of DOM nodes
+ * @param {Array|Element} elem
+ */
+getText = Sizzle.getText = function( elem ) {
+	var node,
+		ret = "",
+		i = 0,
+		nodeType = elem.nodeType;
+
+	if ( !nodeType ) {
+		// If no nodeType, this is expected to be an array
+		while ( (node = elem[i++]) ) {
+			// Do not traverse comment nodes
+			ret += getText( node );
+		}
+	} else if ( nodeType === 1 || nodeType === 9 || nodeType === 11 ) {
+		// Use textContent for elements
+		// innerText usage removed for consistency of new lines (jQuery #11153)
+		if ( typeof elem.textContent === "string" ) {
+			return elem.textContent;
+		} else {
+			// Traverse its children
+			for ( elem = elem.firstChild; elem; elem = elem.nextSibling ) {
+				ret += getText( elem );
+			}
+		}
+	} else if ( nodeType === 3 || nodeType === 4 ) {
+		return elem.nodeValue;
+	}
+	// Do not include comment or processing instruction nodes
+
+	return ret;
+};
+
+Expr = Sizzle.selectors = {
+
+	// Can be adjusted by the user
+	cacheLength: 50,
+
+	createPseudo: markFunction,
+
+	match: matchExpr,
+
+	attrHandle: {},
+
+	find: {},
+
+	relative: {
+		">": { dir: "parentNode", first: true },
+		" ": { dir: "parentNode" },
+		"+": { dir: "previousSibling", first: true },
+		"~": { dir: "previousSibling" }
+	},
+
+	preFilter: {
+		"ATTR": function( match ) {
+			match[1] = match[1].replace( runescape, funescape );
+
+			// Move the given value to match[3] whether quoted or unquoted
+			match[3] = ( match[3] || match[4] || match[5] || "" ).replace( runescape, funescape );
+
+			if ( match[2] === "~=" ) {
+				match[3] = " " + match[3] + " ";
+			}
+
+			return match.slice( 0, 4 );
+		},
+
+		"CHILD": function( match ) {
+			/* matches from matchExpr["CHILD"]
+				1 type (only|nth|...)
+				2 what (child|of-type)
+				3 argument (even|odd|\d*|\d*n([+-]\d+)?|...)
+				4 xn-component of xn+y argument ([+-]?\d*n|)
+				5 sign of xn-component
+				6 x of xn-component
+				7 sign of y-component
+				8 y of y-component
+			*/
+			match[1] = match[1].toLowerCase();
+
+			if ( match[1].slice( 0, 3 ) === "nth" ) {
+				// nth-* requires argument
+				if ( !match[3] ) {
+					Sizzle.error( match[0] );
+				}
+
+				// numeric x and y parameters for Expr.filter.CHILD
+				// remember that false/true cast respectively to 0/1
+				match[4] = +( match[4] ? match[5] + (match[6] || 1) : 2 * ( match[3] === "even" || match[3] === "odd" ) );
+				match[5] = +( ( match[7] + match[8] ) || match[3] === "odd" );
+
+			// other types prohibit arguments
+			} else if ( match[3] ) {
+				Sizzle.error( match[0] );
+			}
+
+			return match;
+		},
+
+		"PSEUDO": function( match ) {
+			var excess,
+				unquoted = !match[6] && match[2];
+
+			if ( matchExpr["CHILD"].test( match[0] ) ) {
+				return null;
+			}
+
+			// Accept quoted arguments as-is
+			if ( match[3] ) {
+				match[2] = match[4] || match[5] || "";
+
+			// Strip excess characters from unquoted arguments
+			} else if ( unquoted && rpseudo.test( unquoted ) &&
+				// Get excess from tokenize (recursively)
+				(excess = tokenize( unquoted, true )) &&
+				// advance to the next closing parenthesis
+				(excess = unquoted.indexOf( ")", unquoted.length - excess ) - unquoted.length) ) {
+
+				// excess is a negative index
+				match[0] = match[0].slice( 0, excess );
+				match[2] = unquoted.slice( 0, excess );
+			}
+
+			// Return only captures needed by the pseudo filter method (type and argument)
+			return match.slice( 0, 3 );
+		}
+	},
+
+	filter: {
+
+		"TAG": function( nodeNameSelector ) {
+			var nodeName = nodeNameSelector.replace( runescape, funescape ).toLowerCase();
+			return nodeNameSelector === "*" ?
+				function() { return true; } :
+				function( elem ) {
+					return elem.nodeName && elem.nodeName.toLowerCase() === nodeName;
+				};
+		},
+
+		"CLASS": function( className ) {
+			var pattern = classCache[ className + " " ];
+
+			return pattern ||
+				(pattern = new RegExp( "(^|" + whitespace + ")" + className + "(" + whitespace + "|$)" )) &&
+				classCache( className, function( elem ) {
+					return pattern.test( typeof elem.className === "string" && elem.className || typeof elem.getAttribute !== "undefined" && elem.getAttribute("class") || "" );
+				});
+		},
+
+		"ATTR": function( name, operator, check ) {
+			return function( elem ) {
+				var result = Sizzle.attr( elem, name );
+
+				if ( result == null ) {
+					return operator === "!=";
+				}
+				if ( !operator ) {
+					return true;
+				}
+
+				result += "";
+
+				return operator === "=" ? result === check :
+					operator === "!=" ? result !== check :
+					operator === "^=" ? check && result.indexOf( check ) === 0 :
+					operator === "*=" ? check && result.indexOf( check ) > -1 :
+					operator === "$=" ? check && result.slice( -check.length ) === check :
+					operator === "~=" ? ( " " + result.replace( rwhitespace, " " ) + " " ).indexOf( check ) > -1 :
+					operator === "|=" ? result === check || result.slice( 0, check.length + 1 ) === check + "-" :
+					false;
+			};
+		},
+
+		"CHILD": function( type, what, argument, first, last ) {
+			var simple = type.slice( 0, 3 ) !== "nth",
+				forward = type.slice( -4 ) !== "last",
+				ofType = what === "of-type";
+
+			return first === 1 && last === 0 ?
+
+				// Shortcut for :nth-*(n)
+				function( elem ) {
+					return !!elem.parentNode;
+				} :
+
+				function( elem, context, xml ) {
+					var cache, uniqueCache, outerCache, node, nodeIndex, start,
+						dir = simple !== forward ? "nextSibling" : "previousSibling",
+						parent = elem.parentNode,
+						name = ofType && elem.nodeName.toLowerCase(),
+						useCache = !xml && !ofType,
+						diff = false;
+
+					if ( parent ) {
+
+						// :(first|last|only)-(child|of-type)
+						if ( simple ) {
+							while ( dir ) {
+								node = elem;
+								while ( (node = node[ dir ]) ) {
+									if ( ofType ?
+										node.nodeName.toLowerCase() === name :
+										node.nodeType === 1 ) {
+
+										return false;
+									}
+								}
+								// Reverse direction for :only-* (if we haven't yet done so)
+								start = dir = type === "only" && !start && "nextSibling";
+							}
+							return true;
+						}
+
+						start = [ forward ? parent.firstChild : parent.lastChild ];
+
+						// non-xml :nth-child(...) stores cache data on `parent`
+						if ( forward && useCache ) {
+
+							// Seek `elem` from a previously-cached index
+
+							// ...in a gzip-friendly way
+							node = parent;
+							outerCache = node[ expando ] || (node[ expando ] = {});
+
+							// Support: IE <9 only
+							// Defend against cloned attroperties (jQuery gh-1709)
+							uniqueCache = outerCache[ node.uniqueID ] ||
+								(outerCache[ node.uniqueID ] = {});
+
+							cache = uniqueCache[ type ] || [];
+							nodeIndex = cache[ 0 ] === dirruns && cache[ 1 ];
+							diff = nodeIndex && cache[ 2 ];
+							node = nodeIndex && parent.childNodes[ nodeIndex ];
+
+							while ( (node = ++nodeIndex && node && node[ dir ] ||
+
+								// Fallback to seeking `elem` from the start
+								(diff = nodeIndex = 0) || start.pop()) ) {
+
+								// When found, cache indexes on `parent` and break
+								if ( node.nodeType === 1 && ++diff && node === elem ) {
+									uniqueCache[ type ] = [ dirruns, nodeIndex, diff ];
+									break;
+								}
+							}
+
+						} else {
+							// Use previously-cached element index if available
+							if ( useCache ) {
+								// ...in a gzip-friendly way
+								node = elem;
+								outerCache = node[ expando ] || (node[ expando ] = {});
+
+								// Support: IE <9 only
+								// Defend against cloned attroperties (jQuery gh-1709)
+								uniqueCache = outerCache[ node.uniqueID ] ||
+									(outerCache[ node.uniqueID ] = {});
+
+								cache = uniqueCache[ type ] || [];
+								nodeIndex = cache[ 0 ] === dirruns && cache[ 1 ];
+								diff = nodeIndex;
+							}
+
+							// xml :nth-child(...)
+							// or :nth-last-child(...) or :nth(-last)?-of-type(...)
+							if ( diff === false ) {
+								// Use the same loop as above to seek `elem` from the start
+								while ( (node = ++nodeIndex && node && node[ dir ] ||
+									(diff = nodeIndex = 0) || start.pop()) ) {
+
+									if ( ( ofType ?
+										node.nodeName.toLowerCase() === name :
+										node.nodeType === 1 ) &&
+										++diff ) {
+
+										// Cache the index of each encountered element
+										if ( useCache ) {
+											outerCache = node[ expando ] || (node[ expando ] = {});
+
+											// Support: IE <9 only
+											// Defend against cloned attroperties (jQuery gh-1709)
+											uniqueCache = outerCache[ node.uniqueID ] ||
+												(outerCache[ node.uniqueID ] = {});
+
+											uniqueCache[ type ] = [ dirruns, diff ];
+										}
+
+										if ( node === elem ) {
+											break;
+										}
+									}
+								}
+							}
+						}
+
+						// Incorporate the offset, then check against cycle size
+						diff -= last;
+						return diff === first || ( diff % first === 0 && diff / first >= 0 );
+					}
+				};
+		},
+
+		"PSEUDO": function( pseudo, argument ) {
+			// pseudo-class names are case-insensitive
+			// http://www.w3.org/TR/selectors/#pseudo-classes
+			// Prioritize by case sensitivity in case custom pseudos are added with uppercase letters
+			// Remember that setFilters inherits from pseudos
+			var args,
+				fn = Expr.pseudos[ pseudo ] || Expr.setFilters[ pseudo.toLowerCase() ] ||
+					Sizzle.error( "unsupported pseudo: " + pseudo );
+
+			// The user may use createPseudo to indicate that
+			// arguments are needed to create the filter function
+			// just as Sizzle does
+			if ( fn[ expando ] ) {
+				return fn( argument );
+			}
+
+			// But maintain support for old signatures
+			if ( fn.length > 1 ) {
+				args = [ pseudo, pseudo, "", argument ];
+				return Expr.setFilters.hasOwnProperty( pseudo.toLowerCase() ) ?
+					markFunction(function( seed, matches ) {
+						var idx,
+							matched = fn( seed, argument ),
+							i = matched.length;
+						while ( i-- ) {
+							idx = indexOf( seed, matched[i] );
+							seed[ idx ] = !( matches[ idx ] = matched[i] );
+						}
+					}) :
+					function( elem ) {
+						return fn( elem, 0, args );
+					};
+			}
+
+			return fn;
+		}
+	},
+
+	pseudos: {
+		// Potentially complex pseudos
+		"not": markFunction(function( selector ) {
+			// Trim the selector passed to compile
+			// to avoid treating leading and trailing
+			// spaces as combinators
+			var input = [],
+				results = [],
+				matcher = compile( selector.replace( rtrim, "$1" ) );
+
+			return matcher[ expando ] ?
+				markFunction(function( seed, matches, context, xml ) {
+					var elem,
+						unmatched = matcher( seed, null, xml, [] ),
+						i = seed.length;
+
+					// Match elements unmatched by `matcher`
+					while ( i-- ) {
+						if ( (elem = unmatched[i]) ) {
+							seed[i] = !(matches[i] = elem);
+						}
+					}
+				}) :
+				function( elem, context, xml ) {
+					input[0] = elem;
+					matcher( input, null, xml, results );
+					// Don't keep the element (issue #299)
+					input[0] = null;
+					return !results.pop();
+				};
+		}),
+
+		"has": markFunction(function( selector ) {
+			return function( elem ) {
+				return Sizzle( selector, elem ).length > 0;
+			};
+		}),
+
+		"contains": markFunction(function( text ) {
+			text = text.replace( runescape, funescape );
+			return function( elem ) {
+				return ( elem.textContent || elem.innerText || getText( elem ) ).indexOf( text ) > -1;
+			};
+		}),
+
+		// "Whether an element is represented by a :lang() selector
+		// is based solely on the element's language value
+		// being equal to the identifier C,
+		// or beginning with the identifier C immediately followed by "-".
+		// The matching of C against the element's language value is performed case-insensitively.
+		// The identifier C does not have to be a valid language name."
+		// http://www.w3.org/TR/selectors/#lang-pseudo
+		"lang": markFunction( function( lang ) {
+			// lang value must be a valid identifier
+			if ( !ridentifier.test(lang || "") ) {
+				Sizzle.error( "unsupported lang: " + lang );
+			}
+			lang = lang.replace( runescape, funescape ).toLowerCase();
+			return function( elem ) {
+				var elemLang;
+				do {
+					if ( (elemLang = documentIsHTML ?
+						elem.lang :
+						elem.getAttribute("xml:lang") || elem.getAttribute("lang")) ) {
+
+						elemLang = elemLang.toLowerCase();
+						return elemLang === lang || elemLang.indexOf( lang + "-" ) === 0;
+					}
+				} while ( (elem = elem.parentNode) && elem.nodeType === 1 );
+				return false;
+			};
+		}),
+
+		// Miscellaneous
+		"target": function( elem ) {
+			var hash = window.location && window.location.hash;
+			return hash && hash.slice( 1 ) === elem.id;
+		},
+
+		"root": function( elem ) {
+			return elem === docElem;
+		},
+
+		"focus": function( elem ) {
+			return elem === document.activeElement && (!document.hasFocus || document.hasFocus()) && !!(elem.type || elem.href || ~elem.tabIndex);
+		},
+
+		// Boolean properties
+		"enabled": createDisabledPseudo( false ),
+		"disabled": createDisabledPseudo( true ),
+
+		"checked": function( elem ) {
+			// In CSS3, :checked should return both checked and selected elements
+			// http://www.w3.org/TR/2011/REC-css3-selectors-20110929/#checked
+			var nodeName = elem.nodeName.toLowerCase();
+			return (nodeName === "input" && !!elem.checked) || (nodeName === "option" && !!elem.selected);
+		},
+
+		"selected": function( elem ) {
+			// Accessing this property makes selected-by-default
+			// options in Safari work properly
+			if ( elem.parentNode ) {
+				elem.parentNode.selectedIndex;
+			}
+
+			return elem.selected === true;
+		},
+
+		// Contents
+		"empty": function( elem ) {
+			// http://www.w3.org/TR/selectors/#empty-pseudo
+			// :empty is negated by element (1) or content nodes (text: 3; cdata: 4; entity ref: 5),
+			//   but not by others (comment: 8; processing instruction: 7; etc.)
+			// nodeType < 6 works because attributes (2) do not appear as children
+			for ( elem = elem.firstChild; elem; elem = elem.nextSibling ) {
+				if ( elem.nodeType < 6 ) {
+					return false;
+				}
+			}
+			return true;
+		},
+
+		"parent": function( elem ) {
+			return !Expr.pseudos["empty"]( elem );
+		},
+
+		// Element/input types
+		"header": function( elem ) {
+			return rheader.test( elem.nodeName );
+		},
+
+		"input": function( elem ) {
+			return rinputs.test( elem.nodeName );
+		},
+
+		"button": function( elem ) {
+			var name = elem.nodeName.toLowerCase();
+			return name === "input" && elem.type === "button" || name === "button";
+		},
+
+		"text": function( elem ) {
+			var attr;
+			return elem.nodeName.toLowerCase() === "input" &&
+				elem.type === "text" &&
+
+				// Support: IE<8
+				// New HTML5 attribute values (e.g., "search") appear with elem.type === "text"
+				( (attr = elem.getAttribute("type")) == null || attr.toLowerCase() === "text" );
+		},
+
+		// Position-in-collection
+		"first": createPositionalPseudo(function() {
+			return [ 0 ];
+		}),
+
+		"last": createPositionalPseudo(function( matchIndexes, length ) {
+			return [ length - 1 ];
+		}),
+
+		"eq": createPositionalPseudo(function( matchIndexes, length, argument ) {
+			return [ argument < 0 ? argument + length : argument ];
+		}),
+
+		"even": createPositionalPseudo(function( matchIndexes, length ) {
+			var i = 0;
+			for ( ; i < length; i += 2 ) {
+				matchIndexes.push( i );
+			}
+			return matchIndexes;
+		}),
+
+		"odd": createPositionalPseudo(function( matchIndexes, length ) {
+			var i = 1;
+			for ( ; i < length; i += 2 ) {
+				matchIndexes.push( i );
+			}
+			return matchIndexes;
+		}),
+
+		"lt": createPositionalPseudo(function( matchIndexes, length, argument ) {
+			var i = argument < 0 ? argument + length : argument;
+			for ( ; --i >= 0; ) {
+				matchIndexes.push( i );
+			}
+			return matchIndexes;
+		}),
+
+		"gt": createPositionalPseudo(function( matchIndexes, length, argument ) {
+			var i = argument < 0 ? argument + length : argument;
+			for ( ; ++i < length; ) {
+				matchIndexes.push( i );
+			}
+			return matchIndexes;
+		})
+	}
+};
+
+Expr.pseudos["nth"] = Expr.pseudos["eq"];
+
+// Add button/input type pseudos
+for ( i in { radio: true, checkbox: true, file: true, password: true, image: true } ) {
+	Expr.pseudos[ i ] = createInputPseudo( i );
+}
+for ( i in { submit: true, reset: true } ) {
+	Expr.pseudos[ i ] = createButtonPseudo( i );
+}
+
+// Easy API for creating new setFilters
+function setFilters() {}
+setFilters.prototype = Expr.filters = Expr.pseudos;
+Expr.setFilters = new setFilters();
+
+tokenize = Sizzle.tokenize = function( selector, parseOnly ) {
+	var matched, match, tokens, type,
+		soFar, groups, preFilters,
+		cached = tokenCache[ selector + " " ];
+
+	if ( cached ) {
+		return parseOnly ? 0 : cached.slice( 0 );
+	}
+
+	soFar = selector;
+	groups = [];
+	preFilters = Expr.preFilter;
+
+	while ( soFar ) {
+
+		// Comma and first run
+		if ( !matched || (match = rcomma.exec( soFar )) ) {
+			if ( match ) {
+				// Don't consume trailing commas as valid
+				soFar = soFar.slice( match[0].length ) || soFar;
+			}
+			groups.push( (tokens = []) );
+		}
+
+		matched = false;
+
+		// Combinators
+		if ( (match = rcombinators.exec( soFar )) ) {
+			matched = match.shift();
+			tokens.push({
+				value: matched,
+				// Cast descendant combinators to space
+				type: match[0].replace( rtrim, " " )
+			});
+			soFar = soFar.slice( matched.length );
+		}
+
+		// Filters
+		for ( type in Expr.filter ) {
+			if ( (match = matchExpr[ type ].exec( soFar )) && (!preFilters[ type ] ||
+				(match = preFilters[ type ]( match ))) ) {
+				matched = match.shift();
+				tokens.push({
+					value: matched,
+					type: type,
+					matches: match
+				});
+				soFar = soFar.slice( matched.length );
+			}
+		}
+
+		if ( !matched ) {
+			break;
+		}
+	}
+
+	// Return the length of the invalid excess
+	// if we're just parsing
+	// Otherwise, throw an error or return tokens
+	return parseOnly ?
+		soFar.length :
+		soFar ?
+			Sizzle.error( selector ) :
+			// Cache the tokens
+			tokenCache( selector, groups ).slice( 0 );
+};
+
+function toSelector( tokens ) {
+	var i = 0,
+		len = tokens.length,
+		selector = "";
+	for ( ; i < len; i++ ) {
+		selector += tokens[i].value;
+	}
+	return selector;
+}
+
+function addCombinator( matcher, combinator, base ) {
+	var dir = combinator.dir,
+		skip = combinator.next,
+		key = skip || dir,
+		checkNonElements = base && key === "parentNode",
+		doneName = done++;
+
+	return combinator.first ?
+		// Check against closest ancestor/preceding element
+		function( elem, context, xml ) {
+			while ( (elem = elem[ dir ]) ) {
+				if ( elem.nodeType === 1 || checkNonElements ) {
+					return matcher( elem, context, xml );
+				}
+			}
+			return false;
+		} :
+
+		// Check against all ancestor/preceding elements
+		function( elem, context, xml ) {
+			var oldCache, uniqueCache, outerCache,
+				newCache = [ dirruns, doneName ];
+
+			// We can't set arbitrary data on XML nodes, so they don't benefit from combinator caching
+			if ( xml ) {
+				while ( (elem = elem[ dir ]) ) {
+					if ( elem.nodeType === 1 || checkNonElements ) {
+						if ( matcher( elem, context, xml ) ) {
+							return true;
+						}
+					}
+				}
+			} else {
+				while ( (elem = elem[ dir ]) ) {
+					if ( elem.nodeType === 1 || checkNonElements ) {
+						outerCache = elem[ expando ] || (elem[ expando ] = {});
+
+						// Support: IE <9 only
+						// Defend against cloned attroperties (jQuery gh-1709)
+						uniqueCache = outerCache[ elem.uniqueID ] || (outerCache[ elem.uniqueID ] = {});
+
+						if ( skip && skip === elem.nodeName.toLowerCase() ) {
+							elem = elem[ dir ] || elem;
+						} else if ( (oldCache = uniqueCache[ key ]) &&
+							oldCache[ 0 ] === dirruns && oldCache[ 1 ] === doneName ) {
+
+							// Assign to newCache so results back-propagate to previous elements
+							return (newCache[ 2 ] = oldCache[ 2 ]);
+						} else {
+							// Reuse newcache so results back-propagate to previous elements
+							uniqueCache[ key ] = newCache;
+
+							// A match means we're done; a fail means we have to keep checking
+							if ( (newCache[ 2 ] = matcher( elem, context, xml )) ) {
+								return true;
+							}
+						}
+					}
+				}
+			}
+			return false;
+		};
+}
+
+function elementMatcher( matchers ) {
+	return matchers.length > 1 ?
+		function( elem, context, xml ) {
+			var i = matchers.length;
+			while ( i-- ) {
+				if ( !matchers[i]( elem, context, xml ) ) {
+					return false;
+				}
+			}
+			return true;
+		} :
+		matchers[0];
+}
+
+function multipleContexts( selector, contexts, results ) {
+	var i = 0,
+		len = contexts.length;
+	for ( ; i < len; i++ ) {
+		Sizzle( selector, contexts[i], results );
+	}
+	return results;
+}
+
+function condense( unmatched, map, filter, context, xml ) {
+	var elem,
+		newUnmatched = [],
+		i = 0,
+		len = unmatched.length,
+		mapped = map != null;
+
+	for ( ; i < len; i++ ) {
+		if ( (elem = unmatched[i]) ) {
+			if ( !filter || filter( elem, context, xml ) ) {
+				newUnmatched.push( elem );
+				if ( mapped ) {
+					map.push( i );
+				}
+			}
+		}
+	}
+
+	return newUnmatched;
+}
+
+function setMatcher( preFilter, selector, matcher, postFilter, postFinder, postSelector ) {
+	if ( postFilter && !postFilter[ expando ] ) {
+		postFilter = setMatcher( postFilter );
+	}
+	if ( postFinder && !postFinder[ expando ] ) {
+		postFinder = setMatcher( postFinder, postSelector );
+	}
+	return markFunction(function( seed, results, context, xml ) {
+		var temp, i, elem,
+			preMap = [],
+			postMap = [],
+			preexisting = results.length,
+
+			// Get initial elements from seed or context
+			elems = seed || multipleContexts( selector || "*", context.nodeType ? [ context ] : context, [] ),
+
+			// Prefilter to get matcher input, preserving a map for seed-results synchronization
+			matcherIn = preFilter && ( seed || !selector ) ?
+				condense( elems, preMap, preFilter, context, xml ) :
+				elems,
+
+			matcherOut = matcher ?
+				// If we have a postFinder, or filtered seed, or non-seed postFilter or preexisting results,
+				postFinder || ( seed ? preFilter : preexisting || postFilter ) ?
+
+					// ...intermediate processing is necessary
+					[] :
+
+					// ...otherwise use results directly
+					results :
+				matcherIn;
+
+		// Find primary matches
+		if ( matcher ) {
+			matcher( matcherIn, matcherOut, context, xml );
+		}
+
+		// Apply postFilter
+		if ( postFilter ) {
+			temp = condense( matcherOut, postMap );
+			postFilter( temp, [], context, xml );
+
+			// Un-match failing elements by moving them back to matcherIn
+			i = temp.length;
+			while ( i-- ) {
+				if ( (elem = temp[i]) ) {
+					matcherOut[ postMap[i] ] = !(matcherIn[ postMap[i] ] = elem);
+				}
+			}
+		}
+
+		if ( seed ) {
+			if ( postFinder || preFilter ) {
+				if ( postFinder ) {
+					// Get the final matcherOut by condensing this intermediate into postFinder contexts
+					temp = [];
+					i = matcherOut.length;
+					while ( i-- ) {
+						if ( (elem = matcherOut[i]) ) {
+							// Restore matcherIn since elem is not yet a final match
+							temp.push( (matcherIn[i] = elem) );
+						}
+					}
+					postFinder( null, (matcherOut = []), temp, xml );
+				}
+
+				// Move matched elements from seed to results to keep them synchronized
+				i = matcherOut.length;
+				while ( i-- ) {
+					if ( (elem = matcherOut[i]) &&
+						(temp = postFinder ? indexOf( seed, elem ) : preMap[i]) > -1 ) {
+
+						seed[temp] = !(results[temp] = elem);
+					}
+				}
+			}
+
+		// Add elements to results, through postFinder if defined
+		} else {
+			matcherOut = condense(
+				matcherOut === results ?
+					matcherOut.splice( preexisting, matcherOut.length ) :
+					matcherOut
+			);
+			if ( postFinder ) {
+				postFinder( null, results, matcherOut, xml );
+			} else {
+				push.apply( results, matcherOut );
+			}
+		}
+	});
+}
+
+function matcherFromTokens( tokens ) {
+	var checkContext, matcher, j,
+		len = tokens.length,
+		leadingRelative = Expr.relative[ tokens[0].type ],
+		implicitRelative = leadingRelative || Expr.relative[" "],
+		i = leadingRelative ? 1 : 0,
+
+		// The foundational matcher ensures that elements are reachable from top-level context(s)
+		matchContext = addCombinator( function( elem ) {
+			return elem === checkContext;
+		}, implicitRelative, true ),
+		matchAnyContext = addCombinator( function( elem ) {
+			return indexOf( checkContext, elem ) > -1;
+		}, implicitRelative, true ),
+		matchers = [ function( elem, context, xml ) {
+			var ret = ( !leadingRelative && ( xml || context !== outermostContext ) ) || (
+				(checkContext = context).nodeType ?
+					matchContext( elem, context, xml ) :
+					matchAnyContext( elem, context, xml ) );
+			// Avoid hanging onto element (issue #299)
+			checkContext = null;
+			return ret;
+		} ];
+
+	for ( ; i < len; i++ ) {
+		if ( (matcher = Expr.relative[ tokens[i].type ]) ) {
+			matchers = [ addCombinator(elementMatcher( matchers ), matcher) ];
+		} else {
+			matcher = Expr.filter[ tokens[i].type ].apply( null, tokens[i].matches );
+
+			// Return special upon seeing a positional matcher
+			if ( matcher[ expando ] ) {
+				// Find the next relative operator (if any) for proper handling
+				j = ++i;
+				for ( ; j < len; j++ ) {
+					if ( Expr.relative[ tokens[j].type ] ) {
+						break;
+					}
+				}
+				return setMatcher(
+					i > 1 && elementMatcher( matchers ),
+					i > 1 && toSelector(
+						// If the preceding token was a descendant combinator, insert an implicit any-element `*`
+						tokens.slice( 0, i - 1 ).concat({ value: tokens[ i - 2 ].type === " " ? "*" : "" })
+					).replace( rtrim, "$1" ),
+					matcher,
+					i < j && matcherFromTokens( tokens.slice( i, j ) ),
+					j < len && matcherFromTokens( (tokens = tokens.slice( j )) ),
+					j < len && toSelector( tokens )
+				);
+			}
+			matchers.push( matcher );
+		}
+	}
+
+	return elementMatcher( matchers );
+}
+
+function matcherFromGroupMatchers( elementMatchers, setMatchers ) {
+	var bySet = setMatchers.length > 0,
+		byElement = elementMatchers.length > 0,
+		superMatcher = function( seed, context, xml, results, outermost ) {
+			var elem, j, matcher,
+				matchedCount = 0,
+				i = "0",
+				unmatched = seed && [],
+				setMatched = [],
+				contextBackup = outermostContext,
+				// We must always have either seed elements or outermost context
+				elems = seed || byElement && Expr.find["TAG"]( "*", outermost ),
+				// Use integer dirruns iff this is the outermost matcher
+				dirrunsUnique = (dirruns += contextBackup == null ? 1 : Math.random() || 0.1),
+				len = elems.length;
+
+			if ( outermost ) {
+				outermostContext = context === document || context || outermost;
+			}
+
+			// Add elements passing elementMatchers directly to results
+			// Support: IE<9, Safari
+			// Tolerate NodeList properties (IE: "length"; Safari: <number>) matching elements by id
+			for ( ; i !== len && (elem = elems[i]) != null; i++ ) {
+				if ( byElement && elem ) {
+					j = 0;
+					if ( !context && elem.ownerDocument !== document ) {
+						setDocument( elem );
+						xml = !documentIsHTML;
+					}
+					while ( (matcher = elementMatchers[j++]) ) {
+						if ( matcher( elem, context || document, xml) ) {
+							results.push( elem );
+							break;
+						}
+					}
+					if ( outermost ) {
+						dirruns = dirrunsUnique;
+					}
+				}
+
+				// Track unmatched elements for set filters
+				if ( bySet ) {
+					// They will have gone through all possible matchers
+					if ( (elem = !matcher && elem) ) {
+						matchedCount--;
+					}
+
+					// Lengthen the array for every element, matched or not
+					if ( seed ) {
+						unmatched.push( elem );
+					}
+				}
+			}
+
+			// `i` is now the count of elements visited above, and adding it to `matchedCount`
+			// makes the latter nonnegative.
+			matchedCount += i;
+
+			// Apply set filters to unmatched elements
+			// NOTE: This can be skipped if there are no unmatched elements (i.e., `matchedCount`
+			// equals `i`), unless we didn't visit _any_ elements in the above loop because we have
+			// no element matchers and no seed.
+			// Incrementing an initially-string "0" `i` allows `i` to remain a string only in that
+			// case, which will result in a "00" `matchedCount` that differs from `i` but is also
+			// numerically zero.
+			if ( bySet && i !== matchedCount ) {
+				j = 0;
+				while ( (matcher = setMatchers[j++]) ) {
+					matcher( unmatched, setMatched, context, xml );
+				}
+
+				if ( seed ) {
+					// Reintegrate element matches to eliminate the need for sorting
+					if ( matchedCount > 0 ) {
+						while ( i-- ) {
+							if ( !(unmatched[i] || setMatched[i]) ) {
+								setMatched[i] = pop.call( results );
+							}
+						}
+					}
+
+					// Discard index placeholder values to get only actual matches
+					setMatched = condense( setMatched );
+				}
+
+				// Add matches to results
+				push.apply( results, setMatched );
+
+				// Seedless set matches succeeding multiple successful matchers stipulate sorting
+				if ( outermost && !seed && setMatched.length > 0 &&
+					( matchedCount + setMatchers.length ) > 1 ) {
+
+					Sizzle.uniqueSort( results );
+				}
+			}
+
+			// Override manipulation of globals by nested matchers
+			if ( outermost ) {
+				dirruns = dirrunsUnique;
+				outermostContext = contextBackup;
+			}
+
+			return unmatched;
+		};
+
+	return bySet ?
+		markFunction( superMatcher ) :
+		superMatcher;
+}
+
+compile = Sizzle.compile = function( selector, match /* Internal Use Only */ ) {
+	var i,
+		setMatchers = [],
+		elementMatchers = [],
+		cached = compilerCache[ selector + " " ];
+
+	if ( !cached ) {
+		// Generate a function of recursive functions that can be used to check each element
+		if ( !match ) {
+			match = tokenize( selector );
+		}
+		i = match.length;
+		while ( i-- ) {
+			cached = matcherFromTokens( match[i] );
+			if ( cached[ expando ] ) {
+				setMatchers.push( cached );
+			} else {
+				elementMatchers.push( cached );
+			}
+		}
+
+		// Cache the compiled function
+		cached = compilerCache( selector, matcherFromGroupMatchers( elementMatchers, setMatchers ) );
+
+		// Save selector and tokenization
+		cached.selector = selector;
+	}
+	return cached;
+};
+
+/**
+ * A low-level selection function that works with Sizzle's compiled
+ *  selector functions
+ * @param {String|Function} selector A selector or a pre-compiled
+ *  selector function built with Sizzle.compile
+ * @param {Element} context
+ * @param {Array} [results]
+ * @param {Array} [seed] A set of elements to match against
+ */
+select = Sizzle.select = function( selector, context, results, seed ) {
+	var i, tokens, token, type, find,
+		compiled = typeof selector === "function" && selector,
+		match = !seed && tokenize( (selector = compiled.selector || selector) );
+
+	results = results || [];
+
+	// Try to minimize operations if there is only one selector in the list and no seed
+	// (the latter of which guarantees us context)
+	if ( match.length === 1 ) {
+
+		// Reduce context if the leading compound selector is an ID
+		tokens = match[0] = match[0].slice( 0 );
+		if ( tokens.length > 2 && (token = tokens[0]).type === "ID" &&
+				context.nodeType === 9 && documentIsHTML && Expr.relative[ tokens[1].type ] ) {
+
+			context = ( Expr.find["ID"]( token.matches[0].replace(runescape, funescape), context ) || [] )[0];
+			if ( !context ) {
+				return results;
+
+			// Precompiled matchers will still verify ancestry, so step up a level
+			} else if ( compiled ) {
+				context = context.parentNode;
+			}
+
+			selector = selector.slice( tokens.shift().value.length );
+		}
+
+		// Fetch a seed set for right-to-left matching
+		i = matchExpr["needsContext"].test( selector ) ? 0 : tokens.length;
+		while ( i-- ) {
+			token = tokens[i];
+
+			// Abort if we hit a combinator
+			if ( Expr.relative[ (type = token.type) ] ) {
+				break;
+			}
+			if ( (find = Expr.find[ type ]) ) {
+				// Search, expanding context for leading sibling combinators
+				if ( (seed = find(
+					token.matches[0].replace( runescape, funescape ),
+					rsibling.test( tokens[0].type ) && testContext( context.parentNode ) || context
+				)) ) {
+
+					// If seed is empty or no tokens remain, we can return early
+					tokens.splice( i, 1 );
+					selector = seed.length && toSelector( tokens );
+					if ( !selector ) {
+						push.apply( results, seed );
+						return results;
+					}
+
+					break;
+				}
+			}
+		}
+	}
+
+	// Compile and execute a filtering function if one is not provided
+	// Provide `match` to avoid retokenization if we modified the selector above
+	( compiled || compile( selector, match ) )(
+		seed,
+		context,
+		!documentIsHTML,
+		results,
+		!context || rsibling.test( selector ) && testContext( context.parentNode ) || context
+	);
+	return results;
+};
+
+// One-time assignments
+
+// Sort stability
+support.sortStable = expando.split("").sort( sortOrder ).join("") === expando;
+
+// Support: Chrome 14-35+
+// Always assume duplicates if they aren't passed to the comparison function
+support.detectDuplicates = !!hasDuplicate;
+
+// Initialize against the default document
+setDocument();
+
+// Support: Webkit<537.32 - Safari 6.0.3/Chrome 25 (fixed in Chrome 27)
+// Detached nodes confoundingly follow *each other*
+support.sortDetached = assert(function( el ) {
+	// Should return 1, but returns 4 (following)
+	return el.compareDocumentPosition( document.createElement("fieldset") ) & 1;
+});
+
+// Support: IE<8
+// Prevent attribute/property "interpolation"
+// https://msdn.microsoft.com/en-us/library/ms536429%28VS.85%29.aspx
+if ( !assert(function( el ) {
+	el.innerHTML = "<a href='#'></a>";
+	return el.firstChild.getAttribute("href") === "#" ;
+}) ) {
+	addHandle( "type|href|height|width", function( elem, name, isXML ) {
+		if ( !isXML ) {
+			return elem.getAttribute( name, name.toLowerCase() === "type" ? 1 : 2 );
+		}
+	});
+}
+
+// Support: IE<9
+// Use defaultValue in place of getAttribute("value")
+if ( !support.attributes || !assert(function( el ) {
+	el.innerHTML = "<input/>";
+	el.firstChild.setAttribute( "value", "" );
+	return el.firstChild.getAttribute( "value" ) === "";
+}) ) {
+	addHandle( "value", function( elem, name, isXML ) {
+		if ( !isXML && elem.nodeName.toLowerCase() === "input" ) {
+			return elem.defaultValue;
+		}
+	});
+}
+
+// Support: IE<9
+// Use getAttributeNode to fetch booleans when getAttribute lies
+if ( !assert(function( el ) {
+	return el.getAttribute("disabled") == null;
+}) ) {
+	addHandle( booleans, function( elem, name, isXML ) {
+		var val;
+		if ( !isXML ) {
+			return elem[ name ] === true ? name.toLowerCase() :
+					(val = elem.getAttributeNode( name )) && val.specified ?
+					val.value :
+				null;
+		}
+	});
+}
+
+return Sizzle;
+
+})( window );
+
+
+
+jQuery.find = Sizzle;
+jQuery.expr = Sizzle.selectors;
+
+// Deprecated
+jQuery.expr[ ":" ] = jQuery.expr.pseudos;
+jQuery.uniqueSort = jQuery.unique = Sizzle.uniqueSort;
+jQuery.text = Sizzle.getText;
+jQuery.isXMLDoc = Sizzle.isXML;
+jQuery.contains = Sizzle.contains;
+jQuery.escapeSelector = Sizzle.escape;
+
+
+
+
+var dir = function( elem, dir, until ) {
+	var matched = [],
+		truncate = until !== undefined;
+
+	while ( ( elem = elem[ dir ] ) && elem.nodeType !== 9 ) {
+		if ( elem.nodeType === 1 ) {
+			if ( truncate && jQuery( elem ).is( until ) ) {
+				break;
+			}
+			matched.push( elem );
+		}
+	}
+	return matched;
+};
+
+
+var siblings = function( n, elem ) {
+	var matched = [];
+
+	for ( ; n; n = n.nextSibling ) {
+		if ( n.nodeType === 1 && n !== elem ) {
+			matched.push( n );
+		}
+	}
+
+	return matched;
+};
+
+
+var rneedsContext = jQuery.expr.match.needsContext;
+
+
+
+function nodeName( elem, name ) {
+
+  return elem.nodeName && elem.nodeName.toLowerCase() === name.toLowerCase();
+
+};
+var rsingleTag = ( /^<([a-z][^\/\0>:\x20\t\r\n\f]*)[\x20\t\r\n\f]*\/?>(?:<\/\1>|)$/i );
+
+
+
+// Implement the identical functionality for filter and not
+function winnow( elements, qualifier, not ) {
+	if ( isFunction( qualifier ) ) {
+		return jQuery.grep( elements, function( elem, i ) {
+			return !!qualifier.call( elem, i, elem ) !== not;
+		} );
+	}
+
+	// Single element
+	if ( qualifier.nodeType ) {
+		return jQuery.grep( elements, function( elem ) {
+			return ( elem === qualifier ) !== not;
+		} );
+	}
+
+	// Arraylike of elements (jQuery, arguments, Array)
+	if ( typeof qualifier !== "string" ) {
+		return jQuery.grep( elements, function( elem ) {
+			return ( indexOf.call( qualifier, elem ) > -1 ) !== not;
+		} );
+	}
+
+	// Filtered directly for both simple and complex selectors
+	return jQuery.filter( qualifier, elements, not );
+}
+
+jQuery.filter = function( expr, elems, not ) {
+	var elem = elems[ 0 ];
+
+	if ( not ) {
+		expr = ":not(" + expr + ")";
+	}
+
+	if ( elems.length === 1 && elem.nodeType === 1 ) {
+		return jQuery.find.matchesSelector( elem, expr ) ? [ elem ] : [];
+	}
+
+	return jQuery.find.matches( expr, jQuery.grep( elems, function( elem ) {
+		return elem.nodeType === 1;
+	} ) );
+};
+
+jQuery.fn.extend( {
+	find: function( selector ) {
+		var i, ret,
+			len = this.length,
+			self = this;
+
+		if ( typeof selector !== "string" ) {
+			return this.pushStack( jQuery( selector ).filter( function() {
+				for ( i = 0; i < len; i++ ) {
+					if ( jQuery.contains( self[ i ], this ) ) {
+						return true;
+					}
+				}
+			} ) );
+		}
+
+		ret = this.pushStack( [] );
+
+		for ( i = 0; i < len; i++ ) {
+			jQuery.find( selector, self[ i ], ret );
+		}
+
+		return len > 1 ? jQuery.uniqueSort( ret ) : ret;
+	},
+	filter: function( selector ) {
+		return this.pushStack( winnow( this, selector || [], false ) );
+	},
+	not: function( selector ) {
+		return this.pushStack( winnow( this, selector || [], true ) );
+	},
+	is: function( selector ) {
+		return !!winnow(
+			this,
+
+			// If this is a positional/relative selector, check membership in the returned set
+			// so $("p:first").is("p:last") won't return true for a doc with two "p".
+			typeof selector === "string" && rneedsContext.test( selector ) ?
+				jQuery( selector ) :
+				selector || [],
+			false
+		).length;
+	}
+} );
+
+
+// Initialize a jQuery object
+
+
+// A central reference to the root jQuery(document)
+var rootjQuery,
+
+	// A simple way to check for HTML strings
+	// Prioritize #id over <tag> to avoid XSS via location.hash (#9521)
+	// Strict HTML recognition (#11290: must start with <)
+	// Shortcut simple #id case for speed
+	rquickExpr = /^(?:\s*(<[\w\W]+>)[^>]*|#([\w-]+))$/,
+
+	init = jQuery.fn.init = function( selector, context, root ) {
+		var match, elem;
+
+		// HANDLE: $(""), $(null), $(undefined), $(false)
+		if ( !selector ) {
+			return this;
+		}
+
+		// Method init() accepts an alternate rootjQuery
+		// so migrate can support jQuery.sub (gh-2101)
+		root = root || rootjQuery;
+
+		// Handle HTML strings
+		if ( typeof selector === "string" ) {
+			if ( selector[ 0 ] === "<" &&
+				selector[ selector.length - 1 ] === ">" &&
+				selector.length >= 3 ) {
+
+				// Assume that strings that start and end with <> are HTML and skip the regex check
+				match = [ null, selector, null ];
+
+			} else {
+				match = rquickExpr.exec( selector );
+			}
+
+			// Match html or make sure no context is specified for #id
+			if ( match && ( match[ 1 ] || !context ) ) {
+
+				// HANDLE: $(html) -> $(array)
+				if ( match[ 1 ] ) {
+					context = context instanceof jQuery ? context[ 0 ] : context;
+
+					// Option to run scripts is true for back-compat
+					// Intentionally let the error be thrown if parseHTML is not present
+					jQuery.merge( this, jQuery.parseHTML(
+						match[ 1 ],
+						context && context.nodeType ? context.ownerDocument || context : document,
+						true
+					) );
+
+					// HANDLE: $(html, props)
+					if ( rsingleTag.test( match[ 1 ] ) && jQuery.isPlainObject( context ) ) {
+						for ( match in context ) {
+
+							// Properties of context are called as methods if possible
+							if ( isFunction( this[ match ] ) ) {
+								this[ match ]( context[ match ] );
+
+							// ...and otherwise set as attributes
+							} else {
+								this.attr( match, context[ match ] );
+							}
+						}
+					}
+
+					return this;
+
+				// HANDLE: $(#id)
+				} else {
+					elem = document.getElementById( match[ 2 ] );
+
+					if ( elem ) {
+
+						// Inject the element directly into the jQuery object
+						this[ 0 ] = elem;
+						this.length = 1;
+					}
+					return this;
+				}
+
+			// HANDLE: $(expr, $(...))
+			} else if ( !context || context.jquery ) {
+				return ( context || root ).find( selector );
+
+			// HANDLE: $(expr, context)
+			// (which is just equivalent to: $(context).find(expr)
+			} else {
+				return this.constructor( context ).find( selector );
+			}
+
+		// HANDLE: $(DOMElement)
+		} else if ( selector.nodeType ) {
+			this[ 0 ] = selector;
+			this.length = 1;
+			return this;
+
+		// HANDLE: $(function)
+		// Shortcut for document ready
+		} else if ( isFunction( selector ) ) {
+			return root.ready !== undefined ?
+				root.ready( selector ) :
+
+				// Execute immediately if ready is not present
+				selector( jQuery );
+		}
+
+		return jQuery.makeArray( selector, this );
+	};
+
+// Give the init function the jQuery prototype for later instantiation
+init.prototype = jQuery.fn;
+
+// Initialize central reference
+rootjQuery = jQuery( document );
+
+
+var rparentsprev = /^(?:parents|prev(?:Until|All))/,
+
+	// Methods guaranteed to produce a unique set when starting from a unique set
+	guaranteedUnique = {
+		children: true,
+		contents: true,
+		next: true,
+		prev: true
+	};
+
+jQuery.fn.extend( {
+	has: function( target ) {
+		var targets = jQuery( target, this ),
+			l = targets.length;
+
+		return this.filter( function() {
+			var i = 0;
+			for ( ; i < l; i++ ) {
+				if ( jQuery.contains( this, targets[ i ] ) ) {
+					return true;
+				}
+			}
+		} );
+	},
+
+	closest: function( selectors, context ) {
+		var cur,
+			i = 0,
+			l = this.length,
+			matched = [],
+			targets = typeof selectors !== "string" && jQuery( selectors );
+
+		// Positional selectors never match, since there's no _selection_ context
+		if ( !rneedsContext.test( selectors ) ) {
+			for ( ; i < l; i++ ) {
+				for ( cur = this[ i ]; cur && cur !== context; cur = cur.parentNode ) {
+
+					// Always skip document fragments
+					if ( cur.nodeType < 11 && ( targets ?
+						targets.index( cur ) > -1 :
+
+						// Don't pass non-elements to Sizzle
+						cur.nodeType === 1 &&
+							jQuery.find.matchesSelector( cur, selectors ) ) ) {
+
+						matched.push( cur );
+						break;
+					}
+				}
+			}
+		}
+
+		return this.pushStack( matched.length > 1 ? jQuery.uniqueSort( matched ) : matched );
+	},
+
+	// Determine the position of an element within the set
+	index: function( elem ) {
+
+		// No argument, return index in parent
+		if ( !elem ) {
+			return ( this[ 0 ] && this[ 0 ].parentNode ) ? this.first().prevAll().length : -1;
+		}
+
+		// Index in selector
+		if ( typeof elem === "string" ) {
+			return indexOf.call( jQuery( elem ), this[ 0 ] );
+		}
+
+		// Locate the position of the desired element
+		return indexOf.call( this,
+
+			// If it receives a jQuery object, the first element is used
+			elem.jquery ? elem[ 0 ] : elem
+		);
+	},
+
+	add: function( selector, context ) {
+		return this.pushStack(
+			jQuery.uniqueSort(
+				jQuery.merge( this.get(), jQuery( selector, context ) )
+			)
+		);
+	},
+
+	addBack: function( selector ) {
+		return this.add( selector == null ?
+			this.prevObject : this.prevObject.filter( selector )
+		);
+	}
+} );
+
+function sibling( cur, dir ) {
+	while ( ( cur = cur[ dir ] ) && cur.nodeType !== 1 ) {}
+	return cur;
+}
+
+jQuery.each( {
+	parent: function( elem ) {
+		var parent = elem.parentNode;
+		return parent && parent.nodeType !== 11 ? parent : null;
+	},
+	parents: function( elem ) {
+		return dir( elem, "parentNode" );
+	},
+	parentsUntil: function( elem, i, until ) {
+		return dir( elem, "parentNode", until );
+	},
+	next: function( elem ) {
+		return sibling( elem, "nextSibling" );
+	},
+	prev: function( elem ) {
+		return sibling( elem, "previousSibling" );
+	},
+	nextAll: function( elem ) {
+		return dir( elem, "nextSibling" );
+	},
+	prevAll: function( elem ) {
+		return dir( elem, "previousSibling" );
+	},
+	nextUntil: function( elem, i, until ) {
+		return dir( elem, "nextSibling", until );
+	},
+	prevUntil: function( elem, i, until ) {
+		return dir( elem, "previousSibling", until );
+	},
+	siblings: function( elem ) {
+		return siblings( ( elem.parentNode || {} ).firstChild, elem );
+	},
+	children: function( elem ) {
+		return siblings( elem.firstChild );
+	},
+	contents: function( elem ) {
+        if ( nodeName( elem, "iframe" ) ) {
+            return elem.contentDocument;
+        }
+
+        // Support: IE 9 - 11 only, iOS 7 only, Android Browser <=4.3 only
+        // Treat the template element as a regular one in browsers that
+        // don't support it.
+        if ( nodeName( elem, "template" ) ) {
+            elem = elem.content || elem;
+        }
+
+        return jQuery.merge( [], elem.childNodes );
+	}
+}, function( name, fn ) {
+	jQuery.fn[ name ] = function( until, selector ) {
+		var matched = jQuery.map( this, fn, until );
+
+		if ( name.slice( -5 ) !== "Until" ) {
+			selector = until;
+		}
+
+		if ( selector && typeof selector === "string" ) {
+			matched = jQuery.filter( selector, matched );
+		}
+
+		if ( this.length > 1 ) {
+
+			// Remove duplicates
+			if ( !guaranteedUnique[ name ] ) {
+				jQuery.uniqueSort( matched );
+			}
+
+			// Reverse order for parents* and prev-derivatives
+			if ( rparentsprev.test( name ) ) {
+				matched.reverse();
+			}
+		}
+
+		return this.pushStack( matched );
+	};
+} );
+var rnothtmlwhite = ( /[^\x20\t\r\n\f]+/g );
+
+
+
+// Convert String-formatted options into Object-formatted ones
+function createOptions( options ) {
+	var object = {};
+	jQuery.each( options.match( rnothtmlwhite ) || [], function( _, flag ) {
+		object[ flag ] = true;
+	} );
+	return object;
+}
+
+/*
+ * Create a callback list using the following parameters:
+ *
+ *	options: an optional list of space-separated options that will change how
+ *			the callback list behaves or a more traditional option object
+ *
+ * By default a callback list will act like an event callback list and can be
+ * "fired" multiple times.
+ *
+ * Possible options:
+ *
+ *	once:			will ensure the callback list can only be fired once (like a Deferred)
+ *
+ *	memory:			will keep track of previous values and will call any callback added
+ *					after the list has been fired right away with the latest "memorized"
+ *					values (like a Deferred)
+ *
+ *	unique:			will ensure a callback can only be added once (no duplicate in the list)
+ *
+ *	stopOnFalse:	interrupt callings when a callback returns false
+ *
+ */
+jQuery.Callbacks = function( options ) {
+
+	// Convert options from String-formatted to Object-formatted if needed
+	// (we check in cache first)
+	options = typeof options === "string" ?
+		createOptions( options ) :
+		jQuery.extend( {}, options );
+
+	var // Flag to know if list is currently firing
+		firing,
+
+		// Last fire value for non-forgettable lists
+		memory,
+
+		// Flag to know if list was already fired
+		fired,
+
+		// Flag to prevent firing
+		locked,
+
+		// Actual callback list
+		list = [],
+
+		// Queue of execution data for repeatable lists
+		queue = [],
+
+		// Index of currently firing callback (modified by add/remove as needed)
+		firingIndex = -1,
+
+		// Fire callbacks
+		fire = function() {
+
+			// Enforce single-firing
+			locked = locked || options.once;
+
+			// Execute callbacks for all pending executions,
+			// respecting firingIndex overrides and runtime changes
+			fired = firing = true;
+			for ( ; queue.length; firingIndex = -1 ) {
+				memory = queue.shift();
+				while ( ++firingIndex < list.length ) {
+
+					// Run callback and check for early termination
+					if ( list[ firingIndex ].apply( memory[ 0 ], memory[ 1 ] ) === false &&
+						options.stopOnFalse ) {
+
+						// Jump to end and forget the data so .add doesn't re-fire
+						firingIndex = list.length;
+						memory = false;
+					}
+				}
+			}
+
+			// Forget the data if we're done with it
+			if ( !options.memory ) {
+				memory = false;
+			}
+
+			firing = false;
+
+			// Clean up if we're done firing for good
+			if ( locked ) {
+
+				// Keep an empty list if we have data for future add calls
+				if ( memory ) {
+					list = [];
+
+				// Otherwise, this object is spent
+				} else {
+					list = "";
+				}
+			}
+		},
+
+		// Actual Callbacks object
+		self = {
+
+			// Add a callback or a collection of callbacks to the list
+			add: function() {
+				if ( list ) {
+
+					// If we have memory from a past run, we should fire after adding
+					if ( memory && !firing ) {
+						firingIndex = list.length - 1;
+						queue.push( memory );
+					}
+
+					( function add( args ) {
+						jQuery.each( args, function( _, arg ) {
+							if ( isFunction( arg ) ) {
+								if ( !options.unique || !self.has( arg ) ) {
+									list.push( arg );
+								}
+							} else if ( arg && arg.length && toType( arg ) !== "string" ) {
+
+								// Inspect recursively
+								add( arg );
+							}
+						} );
+					} )( arguments );
+
+					if ( memory && !firing ) {
+						fire();
+					}
+				}
+				return this;
+			},
+
+			// Remove a callback from the list
+			remove: function() {
+				jQuery.each( arguments, function( _, arg ) {
+					var index;
+					while ( ( index = jQuery.inArray( arg, list, index ) ) > -1 ) {
+						list.splice( index, 1 );
+
+						// Handle firing indexes
+						if ( index <= firingIndex ) {
+							firingIndex--;
+						}
+					}
+				} );
+				return this;
+			},
+
+			// Check if a given callback is in the list.
+			// If no argument is given, return whether or not list has callbacks attached.
+			has: function( fn ) {
+				return fn ?
+					jQuery.inArray( fn, list ) > -1 :
+					list.length > 0;
+			},
+
+			// Remove all callbacks from the list
+			empty: function() {
+				if ( list ) {
+					list = [];
+				}
+				return this;
+			},
+
+			// Disable .fire and .add
+			// Abort any current/pending executions
+			// Clear all callbacks and values
+			disable: function() {
+				locked = queue = [];
+				list = memory = "";
+				return this;
+			},
+			disabled: function() {
+				return !list;
+			},
+
+			// Disable .fire
+			// Also disable .add unless we have memory (since it would have no effect)
+			// Abort any pending executions
+			lock: function() {
+				locked = queue = [];
+				if ( !memory && !firing ) {
+					list = memory = "";
+				}
+				return this;
+			},
+			locked: function() {
+				return !!locked;
+			},
+
+			// Call all callbacks with the given context and arguments
+			fireWith: function( context, args ) {
+				if ( !locked ) {
+					args = args || [];
+					args = [ context, args.slice ? args.slice() : args ];
+					queue.push( args );
+					if ( !firing ) {
+						fire();
+					}
+				}
+				return this;
+			},
+
+			// Call all the callbacks with the given arguments
+			fire: function() {
+				self.fireWith( this, arguments );
+				return this;
+			},
+
+			// To know if the callbacks have already been called at least once
+			fired: function() {
+				return !!fired;
+			}
+		};
+
+	return self;
+};
+
+
+function Identity( v ) {
+	return v;
+}
+function Thrower( ex ) {
+	throw ex;
+}
+
+function adoptValue( value, resolve, reject, noValue ) {
+	var method;
+
+	try {
+
+		// Check for promise aspect first to privilege synchronous behavior
+		if ( value && isFunction( ( method = value.promise ) ) ) {
+			method.call( value ).done( resolve ).fail( reject );
+
+		// Other thenables
+		} else if ( value && isFunction( ( method = value.then ) ) ) {
+			method.call( value, resolve, reject );
+
+		// Other non-thenables
+		} else {
+
+			// Control `resolve` arguments by letting Array#slice cast boolean `noValue` to integer:
+			// * false: [ value ].slice( 0 ) => resolve( value )
+			// * true: [ value ].slice( 1 ) => resolve()
+			resolve.apply( undefined, [ value ].slice( noValue ) );
+		}
+
+	// For Promises/A+, convert exceptions into rejections
+	// Since jQuery.when doesn't unwrap thenables, we can skip the extra checks appearing in
+	// Deferred#then to conditionally suppress rejection.
+	} catch ( value ) {
+
+		// Support: Android 4.0 only
+		// Strict mode functions invoked without .call/.apply get global-object context
+		reject.apply( undefined, [ value ] );
+	}
+}
+
+jQuery.extend( {
+
+	Deferred: function( func ) {
+		var tuples = [
+
+				// action, add listener, callbacks,
+				// ... .then handlers, argument index, [final state]
+				[ "notify", "progress", jQuery.Callbacks( "memory" ),
+					jQuery.Callbacks( "memory" ), 2 ],
+				[ "resolve", "done", jQuery.Callbacks( "once memory" ),
+					jQuery.Callbacks( "once memory" ), 0, "resolved" ],
+				[ "reject", "fail", jQuery.Callbacks( "once memory" ),
+					jQuery.Callbacks( "once memory" ), 1, "rejected" ]
+			],
+			state = "pending",
+			promise = {
+				state: function() {
+					return state;
+				},
+				always: function() {
+					deferred.done( arguments ).fail( arguments );
+					return this;
+				},
+				"catch": function( fn ) {
+					return promise.then( null, fn );
+				},
+
+				// Keep pipe for back-compat
+				pipe: function( /* fnDone, fnFail, fnProgress */ ) {
+					var fns = arguments;
+
+					return jQuery.Deferred( function( newDefer ) {
+						jQuery.each( tuples, function( i, tuple ) {
+
+							// Map tuples (progress, done, fail) to arguments (done, fail, progress)
+							var fn = isFunction( fns[ tuple[ 4 ] ] ) && fns[ tuple[ 4 ] ];
+
+							// deferred.progress(function() { bind to newDefer or newDefer.notify })
+							// deferred.done(function() { bind to newDefer or newDefer.resolve })
+							// deferred.fail(function() { bind to newDefer or newDefer.reject })
+							deferred[ tuple[ 1 ] ]( function() {
+								var returned = fn && fn.apply( this, arguments );
+								if ( returned && isFunction( returned.promise ) ) {
+									returned.promise()
+										.progress( newDefer.notify )
+										.done( newDefer.resolve )
+										.fail( newDefer.reject );
+								} else {
+									newDefer[ tuple[ 0 ] + "With" ](
+										this,
+										fn ? [ returned ] : arguments
+									);
+								}
+							} );
+						} );
+						fns = null;
+					} ).promise();
+				},
+				then: function( onFulfilled, onRejected, onProgress ) {
+					var maxDepth = 0;
+					function resolve( depth, deferred, handler, special ) {
+						return function() {
+							var that = this,
+								args = arguments,
+								mightThrow = function() {
+									var returned, then;
+
+									// Support: Promises/A+ section 2.3.3.3.3
+									// https://promisesaplus.com/#point-59
+									// Ignore double-resolution attempts
+									if ( depth < maxDepth ) {
+										return;
+									}
+
+									returned = handler.apply( that, args );
+
+									// Support: Promises/A+ section 2.3.1
+									// https://promisesaplus.com/#point-48
+									if ( returned === deferred.promise() ) {
+										throw new TypeError( "Thenable self-resolution" );
+									}
+
+									// Support: Promises/A+ sections 2.3.3.1, 3.5
+									// https://promisesaplus.com/#point-54
+									// https://promisesaplus.com/#point-75
+									// Retrieve `then` only once
+									then = returned &&
+
+										// Support: Promises/A+ section 2.3.4
+										// https://promisesaplus.com/#point-64
+										// Only check objects and functions for thenability
+										( typeof returned === "object" ||
+											typeof returned === "function" ) &&
+										returned.then;
+
+									// Handle a returned thenable
+									if ( isFunction( then ) ) {
+
+										// Special processors (notify) just wait for resolution
+										if ( special ) {
+											then.call(
+												returned,
+												resolve( maxDepth, deferred, Identity, special ),
+												resolve( maxDepth, deferred, Thrower, special )
+											);
+
+										// Normal processors (resolve) also hook into progress
+										} else {
+
+											// ...and disregard older resolution values
+											maxDepth++;
+
+											then.call(
+												returned,
+												resolve( maxDepth, deferred, Identity, special ),
+												resolve( maxDepth, deferred, Thrower, special ),
+												resolve( maxDepth, deferred, Identity,
+													deferred.notifyWith )
+											);
+										}
+
+									// Handle all other returned values
+									} else {
+
+										// Only substitute handlers pass on context
+										// and multiple values (non-spec behavior)
+										if ( handler !== Identity ) {
+											that = undefined;
+											args = [ returned ];
+										}
+
+										// Process the value(s)
+										// Default process is resolve
+										( special || deferred.resolveWith )( that, args );
+									}
+								},
+
+								// Only normal processors (resolve) catch and reject exceptions
+								process = special ?
+									mightThrow :
+									function() {
+										try {
+											mightThrow();
+										} catch ( e ) {
+
+											if ( jQuery.Deferred.exceptionHook ) {
+												jQuery.Deferred.exceptionHook( e,
+													process.stackTrace );
+											}
+
+											// Support: Promises/A+ section 2.3.3.3.4.1
+											// https://promisesaplus.com/#point-61
+											// Ignore post-resolution exceptions
+											if ( depth + 1 >= maxDepth ) {
+
+												// Only substitute handlers pass on context
+												// and multiple values (non-spec behavior)
+												if ( handler !== Thrower ) {
+													that = undefined;
+													args = [ e ];
+												}
+
+												deferred.rejectWith( that, args );
+											}
+										}
+									};
+
+							// Support: Promises/A+ section 2.3.3.3.1
+							// https://promisesaplus.com/#point-57
+							// Re-resolve promises immediately to dodge false rejection from
+							// subsequent errors
+							if ( depth ) {
+								process();
+							} else {
+
+								// Call an optional hook to record the stack, in case of exception
+								// since it's otherwise lost when execution goes async
+								if ( jQuery.Deferred.getStackHook ) {
+									process.stackTrace = jQuery.Deferred.getStackHook();
+								}
+								window.setTimeout( process );
+							}
+						};
+					}
+
+					return jQuery.Deferred( function( newDefer ) {
+
+						// progress_handlers.add( ... )
+						tuples[ 0 ][ 3 ].add(
+							resolve(
+								0,
+								newDefer,
+								isFunction( onProgress ) ?
+									onProgress :
+									Identity,
+								newDefer.notifyWith
+							)
+						);
+
+						// fulfilled_handlers.add( ... )
+						tuples[ 1 ][ 3 ].add(
+							resolve(
+								0,
+								newDefer,
+								isFunction( onFulfilled ) ?
+									onFulfilled :
+									Identity
+							)
+						);
+
+						// rejected_handlers.add( ... )
+						tuples[ 2 ][ 3 ].add(
+							resolve(
+								0,
+								newDefer,
+								isFunction( onRejected ) ?
+									onRejected :
+									Thrower
+							)
+						);
+					} ).promise();
+				},
+
+				// Get a promise for this deferred
+				// If obj is provided, the promise aspect is added to the object
+				promise: function( obj ) {
+					return obj != null ? jQuery.extend( obj, promise ) : promise;
+				}
+			},
+			deferred = {};
+
+		// Add list-specific methods
+		jQuery.each( tuples, function( i, tuple ) {
+			var list = tuple[ 2 ],
+				stateString = tuple[ 5 ];
+
+			// promise.progress = list.add
+			// promise.done = list.add
+			// promise.fail = list.add
+			promise[ tuple[ 1 ] ] = list.add;
+
+			// Handle state
+			if ( stateString ) {
+				list.add(
+					function() {
+
+						// state = "resolved" (i.e., fulfilled)
+						// state = "rejected"
+						state = stateString;
+					},
+
+					// rejected_callbacks.disable
+					// fulfilled_callbacks.disable
+					tuples[ 3 - i ][ 2 ].disable,
+
+					// rejected_handlers.disable
+					// fulfilled_handlers.disable
+					tuples[ 3 - i ][ 3 ].disable,
+
+					// progress_callbacks.lock
+					tuples[ 0 ][ 2 ].lock,
+
+					// progress_handlers.lock
+					tuples[ 0 ][ 3 ].lock
+				);
+			}
+
+			// progress_handlers.fire
+			// fulfilled_handlers.fire
+			// rejected_handlers.fire
+			list.add( tuple[ 3 ].fire );
+
+			// deferred.notify = function() { deferred.notifyWith(...) }
+			// deferred.resolve = function() { deferred.resolveWith(...) }
+			// deferred.reject = function() { deferred.rejectWith(...) }
+			deferred[ tuple[ 0 ] ] = function() {
+				deferred[ tuple[ 0 ] + "With" ]( this === deferred ? undefined : this, arguments );
+				return this;
+			};
+
+			// deferred.notifyWith = list.fireWith
+			// deferred.resolveWith = list.fireWith
+			// deferred.rejectWith = list.fireWith
+			deferred[ tuple[ 0 ] + "With" ] = list.fireWith;
+		} );
+
+		// Make the deferred a promise
+		promise.promise( deferred );
+
+		// Call given func if any
+		if ( func ) {
+			func.call( deferred, deferred );
+		}
+
+		// All done!
+		return deferred;
+	},
+
+	// Deferred helper
+	when: function( singleValue ) {
+		var
+
+			// count of uncompleted subordinates
+			remaining = arguments.length,
+
+			// count of unprocessed arguments
+			i = remaining,
+
+			// subordinate fulfillment data
+			resolveContexts = Array( i ),
+			resolveValues = slice.call( arguments ),
+
+			// the master Deferred
+			master = jQuery.Deferred(),
+
+			// subordinate callback factory
+			updateFunc = function( i ) {
+				return function( value ) {
+					resolveContexts[ i ] = this;
+					resolveValues[ i ] = arguments.length > 1 ? slice.call( arguments ) : value;
+					if ( !( --remaining ) ) {
+						master.resolveWith( resolveContexts, resolveValues );
+					}
+				};
+			};
+
+		// Single- and empty arguments are adopted like Promise.resolve
+		if ( remaining <= 1 ) {
+			adoptValue( singleValue, master.done( updateFunc( i ) ).resolve, master.reject,
+				!remaining );
+
+			// Use .then() to unwrap secondary thenables (cf. gh-3000)
+			if ( master.state() === "pending" ||
+				isFunction( resolveValues[ i ] && resolveValues[ i ].then ) ) {
+
+				return master.then();
+			}
+		}
+
+		// Multiple arguments are aggregated like Promise.all array elements
+		while ( i-- ) {
+			adoptValue( resolveValues[ i ], updateFunc( i ), master.reject );
+		}
+
+		return master.promise();
+	}
+} );
+
+
+// These usually indicate a programmer mistake during development,
+// warn about them ASAP rather than swallowing them by default.
+var rerrorNames = /^(Eval|Internal|Range|Reference|Syntax|Type|URI)Error$/;
+
+jQuery.Deferred.exceptionHook = function( error, stack ) {
+
+	// Support: IE 8 - 9 only
+	// Console exists when dev tools are open, which can happen at any time
+	if ( window.console && window.console.warn && error && rerrorNames.test( error.name ) ) {
+		window.console.warn( "jQuery.Deferred exception: " + error.message, error.stack, stack );
+	}
+};
+
+
+
+
+jQuery.readyException = function( error ) {
+	window.setTimeout( function() {
+		throw error;
+	} );
+};
+
+
+
+
+// The deferred used on DOM ready
+var readyList = jQuery.Deferred();
+
+jQuery.fn.ready = function( fn ) {
+
+	readyList
+		.then( fn )
+
+		// Wrap jQuery.readyException in a function so that the lookup
+		// happens at the time of error handling instead of callback
+		// registration.
+		.catch( function( error ) {
+			jQuery.readyException( error );
+		} );
+
+	return this;
+};
+
+jQuery.extend( {
+
+	// Is the DOM ready to be used? Set to true once it occurs.
+	isReady: false,
+
+	// A counter to track how many items to wait for before
+	// the ready event fires. See #6781
+	readyWait: 1,
+
+	// Handle when the DOM is ready
+	ready: function( wait ) {
+
+		// Abort if there are pending holds or we're already ready
+		if ( wait === true ? --jQuery.readyWait : jQuery.isReady ) {
+			return;
+		}
+
+		// Remember that the DOM is ready
+		jQuery.isReady = true;
+
+		// If a normal DOM Ready event fired, decrement, and wait if need be
+		if ( wait !== true && --jQuery.readyWait > 0 ) {
+			return;
+		}
+
+		// If there are functions bound, to execute
+		readyList.resolveWith( document, [ jQuery ] );
+	}
+} );
+
+jQuery.ready.then = readyList.then;
+
+// The ready event handler and self cleanup method
+function completed() {
+	document.removeEventListener( "DOMContentLoaded", completed );
+	window.removeEventListener( "load", completed );
+	jQuery.ready();
+}
+
+// Catch cases where $(document).ready() is called
+// after the browser event has already occurred.
+// Support: IE <=9 - 10 only
+// Older IE sometimes signals "interactive" too soon
+if ( document.readyState === "complete" ||
+	( document.readyState !== "loading" && !document.documentElement.doScroll ) ) {
+
+	// Handle it asynchronously to allow scripts the opportunity to delay ready
+	window.setTimeout( jQuery.ready );
+
+} else {
+
+	// Use the handy event callback
+	document.addEventListener( "DOMContentLoaded", completed );
+
+	// A fallback to window.onload, that will always work
+	window.addEventListener( "load", completed );
+}
+
+
+
+
+// Multifunctional method to get and set values of a collection
+// The value/s can optionally be executed if it's a function
+var access = function( elems, fn, key, value, chainable, emptyGet, raw ) {
+	var i = 0,
+		len = elems.length,
+		bulk = key == null;
+
+	// Sets many values
+	if ( toType( key ) === "object" ) {
+		chainable = true;
+		for ( i in key ) {
+			access( elems, fn, i, key[ i ], true, emptyGet, raw );
+		}
+
+	// Sets one value
+	} else if ( value !== undefined ) {
+		chainable = true;
+
+		if ( !isFunction( value ) ) {
+			raw = true;
+		}
+
+		if ( bulk ) {
+
+			// Bulk operations run against the entire set
+			if ( raw ) {
+				fn.call( elems, value );
+				fn = null;
+
+			// ...except when executing function values
+			} else {
+				bulk = fn;
+				fn = function( elem, key, value ) {
+					return bulk.call( jQuery( elem ), value );
+				};
+			}
+		}
+
+		if ( fn ) {
+			for ( ; i < len; i++ ) {
+				fn(
+					elems[ i ], key, raw ?
+					value :
+					value.call( elems[ i ], i, fn( elems[ i ], key ) )
+				);
+			}
+		}
+	}
+
+	if ( chainable ) {
+		return elems;
+	}
+
+	// Gets
+	if ( bulk ) {
+		return fn.call( elems );
+	}
+
+	return len ? fn( elems[ 0 ], key ) : emptyGet;
+};
+
+
+// Matches dashed string for camelizing
+var rmsPrefix = /^-ms-/,
+	rdashAlpha = /-([a-z])/g;
+
+// Used by camelCase as callback to replace()
+function fcamelCase( all, letter ) {
+	return letter.toUpperCase();
+}
+
+// Convert dashed to camelCase; used by the css and data modules
+// Support: IE <=9 - 11, Edge 12 - 15
+// Microsoft forgot to hump their vendor prefix (#9572)
+function camelCase( string ) {
+	return string.replace( rmsPrefix, "ms-" ).replace( rdashAlpha, fcamelCase );
+}
+var acceptData = function( owner ) {
+
+	// Accepts only:
+	//  - Node
+	//    - Node.ELEMENT_NODE
+	//    - Node.DOCUMENT_NODE
+	//  - Object
+	//    - Any
+	return owner.nodeType === 1 || owner.nodeType === 9 || !( +owner.nodeType );
+};
+
+
+
+
+function Data() {
+	this.expando = jQuery.expando + Data.uid++;
+}
+
+Data.uid = 1;
+
+Data.prototype = {
+
+	cache: function( owner ) {
+
+		// Check if the owner object already has a cache
+		var value = owner[ this.expando ];
+
+		// If not, create one
+		if ( !value ) {
+			value = {};
+
+			// We can accept data for non-element nodes in modern browsers,
+			// but we should not, see #8335.
+			// Always return an empty object.
+			if ( acceptData( owner ) ) {
+
+				// If it is a node unlikely to be stringify-ed or looped over
+				// use plain assignment
+				if ( owner.nodeType ) {
+					owner[ this.expando ] = value;
+
+				// Otherwise secure it in a non-enumerable property
+				// configurable must be true to allow the property to be
+				// deleted when data is removed
+				} else {
+					Object.defineProperty( owner, this.expando, {
+						value: value,
+						configurable: true
+					} );
+				}
+			}
+		}
+
+		return value;
+	},
+	set: function( owner, data, value ) {
+		var prop,
+			cache = this.cache( owner );
+
+		// Handle: [ owner, key, value ] args
+		// Always use camelCase key (gh-2257)
+		if ( typeof data === "string" ) {
+			cache[ camelCase( data ) ] = value;
+
+		// Handle: [ owner, { properties } ] args
+		} else {
+
+			// Copy the properties one-by-one to the cache object
+			for ( prop in data ) {
+				cache[ camelCase( prop ) ] = data[ prop ];
+			}
+		}
+		return cache;
+	},
+	get: function( owner, key ) {
+		return key === undefined ?
+			this.cache( owner ) :
+
+			// Always use camelCase key (gh-2257)
+			owner[ this.expando ] && owner[ this.expando ][ camelCase( key ) ];
+	},
+	access: function( owner, key, value ) {
+
+		// In cases where either:
+		//
+		//   1. No key was specified
+		//   2. A string key was specified, but no value provided
+		//
+		// Take the "read" path and allow the get method to determine
+		// which value to return, respectively either:
+		//
+		//   1. The entire cache object
+		//   2. The data stored at the key
+		//
+		if ( key === undefined ||
+				( ( key && typeof key === "string" ) && value === undefined ) ) {
+
+			return this.get( owner, key );
+		}
+
+		// When the key is not a string, or both a key and value
+		// are specified, set or extend (existing objects) with either:
+		//
+		//   1. An object of properties
+		//   2. A key and value
+		//
+		this.set( owner, key, value );
+
+		// Since the "set" path can have two possible entry points
+		// return the expected data based on which path was taken[*]
+		return value !== undefined ? value : key;
+	},
+	remove: function( owner, key ) {
+		var i,
+			cache = owner[ this.expando ];
+
+		if ( cache === undefined ) {
+			return;
+		}
+
+		if ( key !== undefined ) {
+
+			// Support array or space separated string of keys
+			if ( Array.isArray( key ) ) {
+
+				// If key is an array of keys...
+				// We always set camelCase keys, so remove that.
+				key = key.map( camelCase );
+			} else {
+				key = camelCase( key );
+
+				// If a key with the spaces exists, use it.
+				// Otherwise, create an array by matching non-whitespace
+				key = key in cache ?
+					[ key ] :
+					( key.match( rnothtmlwhite ) || [] );
+			}
+
+			i = key.length;
+
+			while ( i-- ) {
+				delete cache[ key[ i ] ];
+			}
+		}
+
+		// Remove the expando if there's no more data
+		if ( key === undefined || jQuery.isEmptyObject( cache ) ) {
+
+			// Support: Chrome <=35 - 45
+			// Webkit & Blink performance suffers when deleting properties
+			// from DOM nodes, so set to undefined instead
+			// https://bugs.chromium.org/p/chromium/issues/detail?id=378607 (bug restricted)
+			if ( owner.nodeType ) {
+				owner[ this.expando ] = undefined;
+			} else {
+				delete owner[ this.expando ];
+			}
+		}
+	},
+	hasData: function( owner ) {
+		var cache = owner[ this.expando ];
+		return cache !== undefined && !jQuery.isEmptyObject( cache );
+	}
+};
+var dataPriv = new Data();
+
+var dataUser = new Data();
+
+
+
+//	Implementation Summary
+//
+//	1. Enforce API surface and semantic compatibility with 1.9.x branch
+//	2. Improve the module's maintainability by reducing the storage
+//		paths to a single mechanism.
+//	3. Use the same single mechanism to support "private" and "user" data.
+//	4. _Never_ expose "private" data to user code (TODO: Drop _data, _removeData)
+//	5. Avoid exposing implementation details on user objects (eg. expando properties)
+//	6. Provide a clear path for implementation upgrade to WeakMap in 2014
+
+var rbrace = /^(?:\{[\w\W]*\}|\[[\w\W]*\])$/,
+	rmultiDash = /[A-Z]/g;
+
+function getData( data ) {
+	if ( data === "true" ) {
+		return true;
+	}
+
+	if ( data === "false" ) {
+		return false;
+	}
+
+	if ( data === "null" ) {
+		return null;
+	}
+
+	// Only convert to a number if it doesn't change the string
+	if ( data === +data + "" ) {
+		return +data;
+	}
+
+	if ( rbrace.test( data ) ) {
+		return JSON.parse( data );
+	}
+
+	return data;
+}
+
+function dataAttr( elem, key, data ) {
+	var name;
+
+	// If nothing was found internally, try to fetch any
+	// data from the HTML5 data-* attribute
+	if ( data === undefined && elem.nodeType === 1 ) {
+		name = "data-" + key.replace( rmultiDash, "-$&" ).toLowerCase();
+		data = elem.getAttribute( name );
+
+		if ( typeof data === "string" ) {
+			try {
+				data = getData( data );
+			} catch ( e ) {}
+
+			// Make sure we set the data so it isn't changed later
+			dataUser.set( elem, key, data );
+		} else {
+			data = undefined;
+		}
+	}
+	return data;
+}
+
+jQuery.extend( {
+	hasData: function( elem ) {
+		return dataUser.hasData( elem ) || dataPriv.hasData( elem );
+	},
+
+	data: function( elem, name, data ) {
+		return dataUser.access( elem, name, data );
+	},
+
+	removeData: function( elem, name ) {
+		dataUser.remove( elem, name );
+	},
+
+	// TODO: Now that all calls to _data and _removeData have been replaced
+	// with direct calls to dataPriv methods, these can be deprecated.
+	_data: function( elem, name, data ) {
+		return dataPriv.access( elem, name, data );
+	},
+
+	_removeData: function( elem, name ) {
+		dataPriv.remove( elem, name );
+	}
+} );
+
+jQuery.fn.extend( {
+	data: function( key, value ) {
+		var i, name, data,
+			elem = this[ 0 ],
+			attrs = elem && elem.attributes;
+
+		// Gets all values
+		if ( key === undefined ) {
+			if ( this.length ) {
+				data = dataUser.get( elem );
+
+				if ( elem.nodeType === 1 && !dataPriv.get( elem, "hasDataAttrs" ) ) {
+					i = attrs.length;
+					while ( i-- ) {
+
+						// Support: IE 11 only
+						// The attrs elements can be null (#14894)
+						if ( attrs[ i ] ) {
+							name = attrs[ i ].name;
+							if ( name.indexOf( "data-" ) === 0 ) {
+								name = camelCase( name.slice( 5 ) );
+								dataAttr( elem, name, data[ name ] );
+							}
+						}
+					}
+					dataPriv.set( elem, "hasDataAttrs", true );
+				}
+			}
+
+			return data;
+		}
+
+		// Sets multiple values
+		if ( typeof key === "object" ) {
+			return this.each( function() {
+				dataUser.set( this, key );
+			} );
+		}
+
+		return access( this, function( value ) {
+			var data;
+
+			// The calling jQuery object (element matches) is not empty
+			// (and therefore has an element appears at this[ 0 ]) and the
+			// `value` parameter was not undefined. An empty jQuery object
+			// will result in `undefined` for elem = this[ 0 ] which will
+			// throw an exception if an attempt to read a data cache is made.
+			if ( elem && value === undefined ) {
+
+				// Attempt to get data from the cache
+				// The key will always be camelCased in Data
+				data = dataUser.get( elem, key );
+				if ( data !== undefined ) {
+					return data;
+				}
+
+				// Attempt to "discover" the data in
+				// HTML5 custom data-* attrs
+				data = dataAttr( elem, key );
+				if ( data !== undefined ) {
+					return data;
+				}
+
+				// We tried really hard, but the data doesn't exist.
+				return;
+			}
+
+			// Set the data...
+			this.each( function() {
+
+				// We always store the camelCased key
+				dataUser.set( this, key, value );
+			} );
+		}, null, value, arguments.length > 1, null, true );
+	},
+
+	removeData: function( key ) {
+		return this.each( function() {
+			dataUser.remove( this, key );
+		} );
+	}
+} );
+
+
+jQuery.extend( {
+	queue: function( elem, type, data ) {
+		var queue;
+
+		if ( elem ) {
+			type = ( type || "fx" ) + "queue";
+			queue = dataPriv.get( elem, type );
+
+			// Speed up dequeue by getting out quickly if this is just a lookup
+			if ( data ) {
+				if ( !queue || Array.isArray( data ) ) {
+					queue = dataPriv.access( elem, type, jQuery.makeArray( data ) );
+				} else {
+					queue.push( data );
+				}
+			}
+			return queue || [];
+		}
+	},
+
+	dequeue: function( elem, type ) {
+		type = type || "fx";
+
+		var queue = jQuery.queue( elem, type ),
+			startLength = queue.length,
+			fn = queue.shift(),
+			hooks = jQuery._queueHooks( elem, type ),
+			next = function() {
+				jQuery.dequeue( elem, type );
+			};
+
+		// If the fx queue is dequeued, always remove the progress sentinel
+		if ( fn === "inprogress" ) {
+			fn = queue.shift();
+			startLength--;
+		}
+
+		if ( fn ) {
+
+			// Add a progress sentinel to prevent the fx queue from being
+			// automatically dequeued
+			if ( type === "fx" ) {
+				queue.unshift( "inprogress" );
+			}
+
+			// Clear up the last queue stop function
+			delete hooks.stop;
+			fn.call( elem, next, hooks );
+		}
+
+		if ( !startLength && hooks ) {
+			hooks.empty.fire();
+		}
+	},
+
+	// Not public - generate a queueHooks object, or return the current one
+	_queueHooks: function( elem, type ) {
+		var key = type + "queueHooks";
+		return dataPriv.get( elem, key ) || dataPriv.access( elem, key, {
+			empty: jQuery.Callbacks( "once memory" ).add( function() {
+				dataPriv.remove( elem, [ type + "queue", key ] );
+			} )
+		} );
+	}
+} );
+
+jQuery.fn.extend( {
+	queue: function( type, data ) {
+		var setter = 2;
+
+		if ( typeof type !== "string" ) {
+			data = type;
+			type = "fx";
+			setter--;
+		}
+
+		if ( arguments.length < setter ) {
+			return jQuery.queue( this[ 0 ], type );
+		}
+
+		return data === undefined ?
+			this :
+			this.each( function() {
+				var queue = jQuery.queue( this, type, data );
+
+				// Ensure a hooks for this queue
+				jQuery._queueHooks( this, type );
+
+				if ( type === "fx" && queue[ 0 ] !== "inprogress" ) {
+					jQuery.dequeue( this, type );
+				}
+			} );
+	},
+	dequeue: function( type ) {
+		return this.each( function() {
+			jQuery.dequeue( this, type );
+		} );
+	},
+	clearQueue: function( type ) {
+		return this.queue( type || "fx", [] );
+	},
+
+	// Get a promise resolved when queues of a certain type
+	// are emptied (fx is the type by default)
+	promise: function( type, obj ) {
+		var tmp,
+			count = 1,
+			defer = jQuery.Deferred(),
+			elements = this,
+			i = this.length,
+			resolve = function() {
+				if ( !( --count ) ) {
+					defer.resolveWith( elements, [ elements ] );
+				}
+			};
+
+		if ( typeof type !== "string" ) {
+			obj = type;
+			type = undefined;
+		}
+		type = type || "fx";
+
+		while ( i-- ) {
+			tmp = dataPriv.get( elements[ i ], type + "queueHooks" );
+			if ( tmp && tmp.empty ) {
+				count++;
+				tmp.empty.add( resolve );
+			}
+		}
+		resolve();
+		return defer.promise( obj );
+	}
+} );
+var pnum = ( /[+-]?(?:\d*\.|)\d+(?:[eE][+-]?\d+|)/ ).source;
+
+var rcssNum = new RegExp( "^(?:([+-])=|)(" + pnum + ")([a-z%]*)$", "i" );
+
+
+var cssExpand = [ "Top", "Right", "Bottom", "Left" ];
+
+var isHiddenWithinTree = function( elem, el ) {
+
+		// isHiddenWithinTree might be called from jQuery#filter function;
+		// in that case, element will be second argument
+		elem = el || elem;
+
+		// Inline style trumps all
+		return elem.style.display === "none" ||
+			elem.style.display === "" &&
+
+			// Otherwise, check computed style
+			// Support: Firefox <=43 - 45
+			// Disconnected elements can have computed display: none, so first confirm that elem is
+			// in the document.
+			jQuery.contains( elem.ownerDocument, elem ) &&
+
+			jQuery.css( elem, "display" ) === "none";
+	};
+
+var swap = function( elem, options, callback, args ) {
+	var ret, name,
+		old = {};
+
+	// Remember the old values, and insert the new ones
+	for ( name in options ) {
+		old[ name ] = elem.style[ name ];
+		elem.style[ name ] = options[ name ];
+	}
+
+	ret = callback.apply( elem, args || [] );
+
+	// Revert the old values
+	for ( name in options ) {
+		elem.style[ name ] = old[ name ];
+	}
+
+	return ret;
+};
+
+
+
+
+function adjustCSS( elem, prop, valueParts, tween ) {
+	var adjusted, scale,
+		maxIterations = 20,
+		currentValue = tween ?
+			function() {
+				return tween.cur();
+			} :
+			function() {
+				return jQuery.css( elem, prop, "" );
+			},
+		initial = currentValue(),
+		unit = valueParts && valueParts[ 3 ] || ( jQuery.cssNumber[ prop ] ? "" : "px" ),
+
+		// Starting value computation is required for potential unit mismatches
+		initialInUnit = ( jQuery.cssNumber[ prop ] || unit !== "px" && +initial ) &&
+			rcssNum.exec( jQuery.css( elem, prop ) );
+
+	if ( initialInUnit && initialInUnit[ 3 ] !== unit ) {
+
+		// Support: Firefox <=54
+		// Halve the iteration target value to prevent interference from CSS upper bounds (gh-2144)
+		initial = initial / 2;
+
+		// Trust units reported by jQuery.css
+		unit = unit || initialInUnit[ 3 ];
+
+		// Iteratively approximate from a nonzero starting point
+		initialInUnit = +initial || 1;
+
+		while ( maxIterations-- ) {
+
+			// Evaluate and update our best guess (doubling guesses that zero out).
+			// Finish if the scale equals or crosses 1 (making the old*new product non-positive).
+			jQuery.style( elem, prop, initialInUnit + unit );
+			if ( ( 1 - scale ) * ( 1 - ( scale = currentValue() / initial || 0.5 ) ) <= 0 ) {
+				maxIterations = 0;
+			}
+			initialInUnit = initialInUnit / scale;
+
+		}
+
+		initialInUnit = initialInUnit * 2;
+		jQuery.style( elem, prop, initialInUnit + unit );
+
+		// Make sure we update the tween properties later on
+		valueParts = valueParts || [];
+	}
+
+	if ( valueParts ) {
+		initialInUnit = +initialInUnit || +initial || 0;
+
+		// Apply relative offset (+=/-=) if specified
+		adjusted = valueParts[ 1 ] ?
+			initialInUnit + ( valueParts[ 1 ] + 1 ) * valueParts[ 2 ] :
+			+valueParts[ 2 ];
+		if ( tween ) {
+			tween.unit = unit;
+			tween.start = initialInUnit;
+			tween.end = adjusted;
+		}
+	}
+	return adjusted;
+}
+
+
+var defaultDisplayMap = {};
+
+function getDefaultDisplay( elem ) {
+	var temp,
+		doc = elem.ownerDocument,
+		nodeName = elem.nodeName,
+		display = defaultDisplayMap[ nodeName ];
+
+	if ( display ) {
+		return display;
+	}
+
+	temp = doc.body.appendChild( doc.createElement( nodeName ) );
+	display = jQuery.css( temp, "display" );
+
+	temp.parentNode.removeChild( temp );
+
+	if ( display === "none" ) {
+		display = "block";
+	}
+	defaultDisplayMap[ nodeName ] = display;
+
+	return display;
+}
+
+function showHide( elements, show ) {
+	var display, elem,
+		values = [],
+		index = 0,
+		length = elements.length;
+
+	// Determine new display value for elements that need to change
+	for ( ; index < length; index++ ) {
+		elem = elements[ index ];
+		if ( !elem.style ) {
+			continue;
+		}
+
+		display = elem.style.display;
+		if ( show ) {
+
+			// Since we force visibility upon cascade-hidden elements, an immediate (and slow)
+			// check is required in this first loop unless we have a nonempty display value (either
+			// inline or about-to-be-restored)
+			if ( display === "none" ) {
+				values[ index ] = dataPriv.get( elem, "display" ) || null;
+				if ( !values[ index ] ) {
+					elem.style.display = "";
+				}
+			}
+			if ( elem.style.display === "" && isHiddenWithinTree( elem ) ) {
+				values[ index ] = getDefaultDisplay( elem );
+			}
+		} else {
+			if ( display !== "none" ) {
+				values[ index ] = "none";
+
+				// Remember what we're overwriting
+				dataPriv.set( elem, "display", display );
+			}
+		}
+	}
+
+	// Set the display of the elements in a second loop to avoid constant reflow
+	for ( index = 0; index < length; index++ ) {
+		if ( values[ index ] != null ) {
+			elements[ index ].style.display = values[ index ];
+		}
+	}
+
+	return elements;
+}
+
+jQuery.fn.extend( {
+	show: function() {
+		return showHide( this, true );
+	},
+	hide: function() {
+		return showHide( this );
+	},
+	toggle: function( state ) {
+		if ( typeof state === "boolean" ) {
+			return state ? this.show() : this.hide();
+		}
+
+		return this.each( function() {
+			if ( isHiddenWithinTree( this ) ) {
+				jQuery( this ).show();
+			} else {
+				jQuery( this ).hide();
+			}
+		} );
+	}
+} );
+var rcheckableType = ( /^(?:checkbox|radio)$/i );
+
+var rtagName = ( /<([a-z][^\/\0>\x20\t\r\n\f]+)/i );
+
+var rscriptType = ( /^$|^module$|\/(?:java|ecma)script/i );
+
+
+
+// We have to close these tags to support XHTML (#13200)
+var wrapMap = {
+
+	// Support: IE <=9 only
+	option: [ 1, "<select multiple='multiple'>", "</select>" ],
+
+	// XHTML parsers do not magically insert elements in the
+	// same way that tag soup parsers do. So we cannot shorten
+	// this by omitting <tbody> or other required elements.
+	thead: [ 1, "<table>", "</table>" ],
+	col: [ 2, "<table><colgroup>", "</colgroup></table>" ],
+	tr: [ 2, "<table><tbody>", "</tbody></table>" ],
+	td: [ 3, "<table><tbody><tr>", "</tr></tbody></table>" ],
+
+	_default: [ 0, "", "" ]
+};
+
+// Support: IE <=9 only
+wrapMap.optgroup = wrapMap.option;
+
+wrapMap.tbody = wrapMap.tfoot = wrapMap.colgroup = wrapMap.caption = wrapMap.thead;
+wrapMap.th = wrapMap.td;
+
+
+function getAll( context, tag ) {
+
+	// Support: IE <=9 - 11 only
+	// Use typeof to avoid zero-argument method invocation on host objects (#15151)
+	var ret;
+
+	if ( typeof context.getElementsByTagName !== "undefined" ) {
+		ret = context.getElementsByTagName( tag || "*" );
+
+	} else if ( typeof context.querySelectorAll !== "undefined" ) {
+		ret = context.querySelectorAll( tag || "*" );
+
+	} else {
+		ret = [];
+	}
+
+	if ( tag === undefined || tag && nodeName( context, tag ) ) {
+		return jQuery.merge( [ context ], ret );
+	}
+
+	return ret;
+}
+
+
+// Mark scripts as having already been evaluated
+function setGlobalEval( elems, refElements ) {
+	var i = 0,
+		l = elems.length;
+
+	for ( ; i < l; i++ ) {
+		dataPriv.set(
+			elems[ i ],
+			"globalEval",
+			!refElements || dataPriv.get( refElements[ i ], "globalEval" )
+		);
+	}
+}
+
+
+var rhtml = /<|&#?\w+;/;
+
+function buildFragment( elems, context, scripts, selection, ignored ) {
+	var elem, tmp, tag, wrap, contains, j,
+		fragment = context.createDocumentFragment(),
+		nodes = [],
+		i = 0,
+		l = elems.length;
+
+	for ( ; i < l; i++ ) {
+		elem = elems[ i ];
+
+		if ( elem || elem === 0 ) {
+
+			// Add nodes directly
+			if ( toType( elem ) === "object" ) {
+
+				// Support: Android <=4.0 only, PhantomJS 1 only
+				// push.apply(_, arraylike) throws on ancient WebKit
+				jQuery.merge( nodes, elem.nodeType ? [ elem ] : elem );
+
+			// Convert non-html into a text node
+			} else if ( !rhtml.test( elem ) ) {
+				nodes.push( context.createTextNode( elem ) );
+
+			// Convert html into DOM nodes
+			} else {
+				tmp = tmp || fragment.appendChild( context.createElement( "div" ) );
+
+				// Deserialize a standard representation
+				tag = ( rtagName.exec( elem ) || [ "", "" ] )[ 1 ].toLowerCase();
+				wrap = wrapMap[ tag ] || wrapMap._default;
+				tmp.innerHTML = wrap[ 1 ] + jQuery.htmlPrefilter( elem ) + wrap[ 2 ];
+
+				// Descend through wrappers to the right content
+				j = wrap[ 0 ];
+				while ( j-- ) {
+					tmp = tmp.lastChild;
+				}
+
+				// Support: Android <=4.0 only, PhantomJS 1 only
+				// push.apply(_, arraylike) throws on ancient WebKit
+				jQuery.merge( nodes, tmp.childNodes );
+
+				// Remember the top-level container
+				tmp = fragment.firstChild;
+
+				// Ensure the created nodes are orphaned (#12392)
+				tmp.textContent = "";
+			}
+		}
+	}
+
+	// Remove wrapper from fragment
+	fragment.textContent = "";
+
+	i = 0;
+	while ( ( elem = nodes[ i++ ] ) ) {
+
+		// Skip elements already in the context collection (trac-4087)
+		if ( selection && jQuery.inArray( elem, selection ) > -1 ) {
+			if ( ignored ) {
+				ignored.push( elem );
+			}
+			continue;
+		}
+
+		contains = jQuery.contains( elem.ownerDocument, elem );
+
+		// Append to fragment
+		tmp = getAll( fragment.appendChild( elem ), "script" );
+
+		// Preserve script evaluation history
+		if ( contains ) {
+			setGlobalEval( tmp );
+		}
+
+		// Capture executables
+		if ( scripts ) {
+			j = 0;
+			while ( ( elem = tmp[ j++ ] ) ) {
+				if ( rscriptType.test( elem.type || "" ) ) {
+					scripts.push( elem );
+				}
+			}
+		}
+	}
+
+	return fragment;
+}
+
+
+( function() {
+	var fragment = document.createDocumentFragment(),
+		div = fragment.appendChild( document.createElement( "div" ) ),
+		input = document.createElement( "input" );
+
+	// Support: Android 4.0 - 4.3 only
+	// Check state lost if the name is set (#11217)
+	// Support: Windows Web Apps (WWA)
+	// `name` and `type` must use .setAttribute for WWA (#14901)
+	input.setAttribute( "type", "radio" );
+	input.setAttribute( "checked", "checked" );
+	input.setAttribute( "name", "t" );
+
+	div.appendChild( input );
+
+	// Support: Android <=4.1 only
+	// Older WebKit doesn't clone checked state correctly in fragments
+	support.checkClone = div.cloneNode( true ).cloneNode( true ).lastChild.checked;
+
+	// Support: IE <=11 only
+	// Make sure textarea (and checkbox) defaultValue is properly cloned
+	div.innerHTML = "<textarea>x</textarea>";
+	support.noCloneChecked = !!div.cloneNode( true ).lastChild.defaultValue;
+} )();
+var documentElement = document.documentElement;
+
+
+
+var
+	rkeyEvent = /^key/,
+	rmouseEvent = /^(?:mouse|pointer|contextmenu|drag|drop)|click/,
+	rtypenamespace = /^([^.]*)(?:\.(.+)|)/;
+
+function returnTrue() {
+	return true;
+}
+
+function returnFalse() {
+	return false;
+}
+
+// Support: IE <=9 only
+// See #13393 for more info
+function safeActiveElement() {
+	try {
+		return document.activeElement;
+	} catch ( err ) { }
+}
+
+function on( elem, types, selector, data, fn, one ) {
+	var origFn, type;
+
+	// Types can be a map of types/handlers
+	if ( typeof types === "object" ) {
+
+		// ( types-Object, selector, data )
+		if ( typeof selector !== "string" ) {
+
+			// ( types-Object, data )
+			data = data || selector;
+			selector = undefined;
+		}
+		for ( type in types ) {
+			on( elem, type, selector, data, types[ type ], one );
+		}
+		return elem;
+	}
+
+	if ( data == null && fn == null ) {
+
+		// ( types, fn )
+		fn = selector;
+		data = selector = undefined;
+	} else if ( fn == null ) {
+		if ( typeof selector === "string" ) {
+
+			// ( types, selector, fn )
+			fn = data;
+			data = undefined;
+		} else {
+
+			// ( types, data, fn )
+			fn = data;
+			data = selector;
+			selector = undefined;
+		}
+	}
+	if ( fn === false ) {
+		fn = returnFalse;
+	} else if ( !fn ) {
+		return elem;
+	}
+
+	if ( one === 1 ) {
+		origFn = fn;
+		fn = function( event ) {
+
+			// Can use an empty set, since event contains the info
+			jQuery().off( event );
+			return origFn.apply( this, arguments );
+		};
+
+		// Use same guid so caller can remove using origFn
+		fn.guid = origFn.guid || ( origFn.guid = jQuery.guid++ );
+	}
+	return elem.each( function() {
+		jQuery.event.add( this, types, fn, data, selector );
+	} );
+}
+
+/*
+ * Helper functions for managing events -- not part of the public interface.
+ * Props to Dean Edwards' addEvent library for many of the ideas.
+ */
+jQuery.event = {
+
+	global: {},
+
+	add: function( elem, types, handler, data, selector ) {
+
+		var handleObjIn, eventHandle, tmp,
+			events, t, handleObj,
+			special, handlers, type, namespaces, origType,
+			elemData = dataPriv.get( elem );
+
+		// Don't attach events to noData or text/comment nodes (but allow plain objects)
+		if ( !elemData ) {
+			return;
+		}
+
+		// Caller can pass in an object of custom data in lieu of the handler
+		if ( handler.handler ) {
+			handleObjIn = handler;
+			handler = handleObjIn.handler;
+			selector = handleObjIn.selector;
+		}
+
+		// Ensure that invalid selectors throw exceptions at attach time
+		// Evaluate against documentElement in case elem is a non-element node (e.g., document)
+		if ( selector ) {
+			jQuery.find.matchesSelector( documentElement, selector );
+		}
+
+		// Make sure that the handler has a unique ID, used to find/remove it later
+		if ( !handler.guid ) {
+			handler.guid = jQuery.guid++;
+		}
+
+		// Init the element's event structure and main handler, if this is the first
+		if ( !( events = elemData.events ) ) {
+			events = elemData.events = {};
+		}
+		if ( !( eventHandle = elemData.handle ) ) {
+			eventHandle = elemData.handle = function( e ) {
+
+				// Discard the second event of a jQuery.event.trigger() and
+				// when an event is called after a page has unloaded
+				return typeof jQuery !== "undefined" && jQuery.event.triggered !== e.type ?
+					jQuery.event.dispatch.apply( elem, arguments ) : undefined;
+			};
+		}
+
+		// Handle multiple events separated by a space
+		types = ( types || "" ).match( rnothtmlwhite ) || [ "" ];
+		t = types.length;
+		while ( t-- ) {
+			tmp = rtypenamespace.exec( types[ t ] ) || [];
+			type = origType = tmp[ 1 ];
+			namespaces = ( tmp[ 2 ] || "" ).split( "." ).sort();
+
+			// There *must* be a type, no attaching namespace-only handlers
+			if ( !type ) {
+				continue;
+			}
+
+			// If event changes its type, use the special event handlers for the changed type
+			special = jQuery.event.special[ type ] || {};
+
+			// If selector defined, determine special event api type, otherwise given type
+			type = ( selector ? special.delegateType : special.bindType ) || type;
+
+			// Update special based on newly reset type
+			special = jQuery.event.special[ type ] || {};
+
+			// handleObj is passed to all event handlers
+			handleObj = jQuery.extend( {
+				type: type,
+				origType: origType,
+				data: data,
+				handler: handler,
+				guid: handler.guid,
+				selector: selector,
+				needsContext: selector && jQuery.expr.match.needsContext.test( selector ),
+				namespace: namespaces.join( "." )
+			}, handleObjIn );
+
+			// Init the event handler queue if we're the first
+			if ( !( handlers = events[ type ] ) ) {
+				handlers = events[ type ] = [];
+				handlers.delegateCount = 0;
+
+				// Only use addEventListener if the special events handler returns false
+				if ( !special.setup ||
+					special.setup.call( elem, data, namespaces, eventHandle ) === false ) {
+
+					if ( elem.addEventListener ) {
+						elem.addEventListener( type, eventHandle );
+					}
+				}
+			}
+
+			if ( special.add ) {
+				special.add.call( elem, handleObj );
+
+				if ( !handleObj.handler.guid ) {
+					handleObj.handler.guid = handler.guid;
+				}
+			}
+
+			// Add to the element's handler list, delegates in front
+			if ( selector ) {
+				handlers.splice( handlers.delegateCount++, 0, handleObj );
+			} else {
+				handlers.push( handleObj );
+			}
+
+			// Keep track of which events have ever been used, for event optimization
+			jQuery.event.global[ type ] = true;
+		}
+
+	},
+
+	// Detach an event or set of events from an element
+	remove: function( elem, types, handler, selector, mappedTypes ) {
+
+		var j, origCount, tmp,
+			events, t, handleObj,
+			special, handlers, type, namespaces, origType,
+			elemData = dataPriv.hasData( elem ) && dataPriv.get( elem );
+
+		if ( !elemData || !( events = elemData.events ) ) {
+			return;
+		}
+
+		// Once for each type.namespace in types; type may be omitted
+		types = ( types || "" ).match( rnothtmlwhite ) || [ "" ];
+		t = types.length;
+		while ( t-- ) {
+			tmp = rtypenamespace.exec( types[ t ] ) || [];
+			type = origType = tmp[ 1 ];
+			namespaces = ( tmp[ 2 ] || "" ).split( "." ).sort();
+
+			// Unbind all events (on this namespace, if provided) for the element
+			if ( !type ) {
+				for ( type in events ) {
+					jQuery.event.remove( elem, type + types[ t ], handler, selector, true );
+				}
+				continue;
+			}
+
+			special = jQuery.event.special[ type ] || {};
+			type = ( selector ? special.delegateType : special.bindType ) || type;
+			handlers = events[ type ] || [];
+			tmp = tmp[ 2 ] &&
+				new RegExp( "(^|\\.)" + namespaces.join( "\\.(?:.*\\.|)" ) + "(\\.|$)" );
+
+			// Remove matching events
+			origCount = j = handlers.length;
+			while ( j-- ) {
+				handleObj = handlers[ j ];
+
+				if ( ( mappedTypes || origType === handleObj.origType ) &&
+					( !handler || handler.guid === handleObj.guid ) &&
+					( !tmp || tmp.test( handleObj.namespace ) ) &&
+					( !selector || selector === handleObj.selector ||
+						selector === "**" && handleObj.selector ) ) {
+					handlers.splice( j, 1 );
+
+					if ( handleObj.selector ) {
+						handlers.delegateCount--;
+					}
+					if ( special.remove ) {
+						special.remove.call( elem, handleObj );
+					}
+				}
+			}
+
+			// Remove generic event handler if we removed something and no more handlers exist
+			// (avoids potential for endless recursion during removal of special event handlers)
+			if ( origCount && !handlers.length ) {
+				if ( !special.teardown ||
+					special.teardown.call( elem, namespaces, elemData.handle ) === false ) {
+
+					jQuery.removeEvent( elem, type, elemData.handle );
+				}
+
+				delete events[ type ];
+			}
+		}
+
+		// Remove data and the expando if it's no longer used
+		if ( jQuery.isEmptyObject( events ) ) {
+			dataPriv.remove( elem, "handle events" );
+		}
+	},
+
+	dispatch: function( nativeEvent ) {
+
+		// Make a writable jQuery.Event from the native event object
+		var event = jQuery.event.fix( nativeEvent );
+
+		var i, j, ret, matched, handleObj, handlerQueue,
+			args = new Array( arguments.length ),
+			handlers = ( dataPriv.get( this, "events" ) || {} )[ event.type ] || [],
+			special = jQuery.event.special[ event.type ] || {};
+
+		// Use the fix-ed jQuery.Event rather than the (read-only) native event
+		args[ 0 ] = event;
+
+		for ( i = 1; i < arguments.length; i++ ) {
+			args[ i ] = arguments[ i ];
+		}
+
+		event.delegateTarget = this;
+
+		// Call the preDispatch hook for the mapped type, and let it bail if desired
+		if ( special.preDispatch && special.preDispatch.call( this, event ) === false ) {
+			return;
+		}
+
+		// Determine handlers
+		handlerQueue = jQuery.event.handlers.call( this, event, handlers );
+
+		// Run delegates first; they may want to stop propagation beneath us
+		i = 0;
+		while ( ( matched = handlerQueue[ i++ ] ) && !event.isPropagationStopped() ) {
+			event.currentTarget = matched.elem;
+
+			j = 0;
+			while ( ( handleObj = matched.handlers[ j++ ] ) &&
+				!event.isImmediatePropagationStopped() ) {
+
+				// Triggered event must either 1) have no namespace, or 2) have namespace(s)
+				// a subset or equal to those in the bound event (both can have no namespace).
+				if ( !event.rnamespace || event.rnamespace.test( handleObj.namespace ) ) {
+
+					event.handleObj = handleObj;
+					event.data = handleObj.data;
+
+					ret = ( ( jQuery.event.special[ handleObj.origType ] || {} ).handle ||
+						handleObj.handler ).apply( matched.elem, args );
+
+					if ( ret !== undefined ) {
+						if ( ( event.result = ret ) === false ) {
+							event.preventDefault();
+							event.stopPropagation();
+						}
+					}
+				}
+			}
+		}
+
+		// Call the postDispatch hook for the mapped type
+		if ( special.postDispatch ) {
+			special.postDispatch.call( this, event );
+		}
+
+		return event.result;
+	},
+
+	handlers: function( event, handlers ) {
+		var i, handleObj, sel, matchedHandlers, matchedSelectors,
+			handlerQueue = [],
+			delegateCount = handlers.delegateCount,
+			cur = event.target;
+
+		// Find delegate handlers
+		if ( delegateCount &&
+
+			// Support: IE <=9
+			// Black-hole SVG <use> instance trees (trac-13180)
+			cur.nodeType &&
+
+			// Support: Firefox <=42
+			// Suppress spec-violating clicks indicating a non-primary pointer button (trac-3861)
+			// https://www.w3.org/TR/DOM-Level-3-Events/#event-type-click
+			// Support: IE 11 only
+			// ...but not arrow key "clicks" of radio inputs, which can have `button` -1 (gh-2343)
+			!( event.type === "click" && event.button >= 1 ) ) {
+
+			for ( ; cur !== this; cur = cur.parentNode || this ) {
+
+				// Don't check non-elements (#13208)
+				// Don't process clicks on disabled elements (#6911, #8165, #11382, #11764)
+				if ( cur.nodeType === 1 && !( event.type === "click" && cur.disabled === true ) ) {
+					matchedHandlers = [];
+					matchedSelectors = {};
+					for ( i = 0; i < delegateCount; i++ ) {
+						handleObj = handlers[ i ];
+
+						// Don't conflict with Object.prototype properties (#13203)
+						sel = handleObj.selector + " ";
+
+						if ( matchedSelectors[ sel ] === undefined ) {
+							matchedSelectors[ sel ] = handleObj.needsContext ?
+								jQuery( sel, this ).index( cur ) > -1 :
+								jQuery.find( sel, this, null, [ cur ] ).length;
+						}
+						if ( matchedSelectors[ sel ] ) {
+							matchedHandlers.push( handleObj );
+						}
+					}
+					if ( matchedHandlers.length ) {
+						handlerQueue.push( { elem: cur, handlers: matchedHandlers } );
+					}
+				}
+			}
+		}
+
+		// Add the remaining (directly-bound) handlers
+		cur = this;
+		if ( delegateCount < handlers.length ) {
+			handlerQueue.push( { elem: cur, handlers: handlers.slice( delegateCount ) } );
+		}
+
+		return handlerQueue;
+	},
+
+	addProp: function( name, hook ) {
+		Object.defineProperty( jQuery.Event.prototype, name, {
+			enumerable: true,
+			configurable: true,
+
+			get: isFunction( hook ) ?
+				function() {
+					if ( this.originalEvent ) {
+							return hook( this.originalEvent );
+					}
+				} :
+				function() {
+					if ( this.originalEvent ) {
+							return this.originalEvent[ name ];
+					}
+				},
+
+			set: function( value ) {
+				Object.defineProperty( this, name, {
+					enumerable: true,
+					configurable: true,
+					writable: true,
+					value: value
+				} );
+			}
+		} );
+	},
+
+	fix: function( originalEvent ) {
+		return originalEvent[ jQuery.expando ] ?
+			originalEvent :
+			new jQuery.Event( originalEvent );
+	},
+
+	special: {
+		load: {
+
+			// Prevent triggered image.load events from bubbling to window.load
+			noBubble: true
+		},
+		focus: {
+
+			// Fire native event if possible so blur/focus sequence is correct
+			trigger: function() {
+				if ( this !== safeActiveElement() && this.focus ) {
+					this.focus();
+					return false;
+				}
+			},
+			delegateType: "focusin"
+		},
+		blur: {
+			trigger: function() {
+				if ( this === safeActiveElement() && this.blur ) {
+					this.blur();
+					return false;
+				}
+			},
+			delegateType: "focusout"
+		},
+		click: {
+
+			// For checkbox, fire native event so checked state will be right
+			trigger: function() {
+				if ( this.type === "checkbox" && this.click && nodeName( this, "input" ) ) {
+					this.click();
+					return false;
+				}
+			},
+
+			// For cross-browser consistency, don't fire native .click() on links
+			_default: function( event ) {
+				return nodeName( event.target, "a" );
+			}
+		},
+
+		beforeunload: {
+			postDispatch: function( event ) {
+
+				// Support: Firefox 20+
+				// Firefox doesn't alert if the returnValue field is not set.
+				if ( event.result !== undefined && event.originalEvent ) {
+					event.originalEvent.returnValue = event.result;
+				}
+			}
+		}
+	}
+};
+
+jQuery.removeEvent = function( elem, type, handle ) {
+
+	// This "if" is needed for plain objects
+	if ( elem.removeEventListener ) {
+		elem.removeEventListener( type, handle );
+	}
+};
+
+jQuery.Event = function( src, props ) {
+
+	// Allow instantiation without the 'new' keyword
+	if ( !( this instanceof jQuery.Event ) ) {
+		return new jQuery.Event( src, props );
+	}
+
+	// Event object
+	if ( src && src.type ) {
+		this.originalEvent = src;
+		this.type = src.type;
+
+		// Events bubbling up the document may have been marked as prevented
+		// by a handler lower down the tree; reflect the correct value.
+		this.isDefaultPrevented = src.defaultPrevented ||
+				src.defaultPrevented === undefined &&
+
+				// Support: Android <=2.3 only
+				src.returnValue === false ?
+			returnTrue :
+			returnFalse;
+
+		// Create target properties
+		// Support: Safari <=6 - 7 only
+		// Target should not be a text node (#504, #13143)
+		this.target = ( src.target && src.target.nodeType === 3 ) ?
+			src.target.parentNode :
+			src.target;
+
+		this.currentTarget = src.currentTarget;
+		this.relatedTarget = src.relatedTarget;
+
+	// Event type
+	} else {
+		this.type = src;
+	}
+
+	// Put explicitly provided properties onto the event object
+	if ( props ) {
+		jQuery.extend( this, props );
+	}
+
+	// Create a timestamp if incoming event doesn't have one
+	this.timeStamp = src && src.timeStamp || Date.now();
+
+	// Mark it as fixed
+	this[ jQuery.expando ] = true;
+};
+
+// jQuery.Event is based on DOM3 Events as specified by the ECMAScript Language Binding
+// https://www.w3.org/TR/2003/WD-DOM-Level-3-Events-20030331/ecma-script-binding.html
+jQuery.Event.prototype = {
+	constructor: jQuery.Event,
+	isDefaultPrevented: returnFalse,
+	isPropagationStopped: returnFalse,
+	isImmediatePropagationStopped: returnFalse,
+	isSimulated: false,
+
+	preventDefault: function() {
+		var e = this.originalEvent;
+
+		this.isDefaultPrevented = returnTrue;
+
+		if ( e && !this.isSimulated ) {
+			e.preventDefault();
+		}
+	},
+	stopPropagation: function() {
+		var e = this.originalEvent;
+
+		this.isPropagationStopped = returnTrue;
+
+		if ( e && !this.isSimulated ) {
+			e.stopPropagation();
+		}
+	},
+	stopImmediatePropagation: function() {
+		var e = this.originalEvent;
+
+		this.isImmediatePropagationStopped = returnTrue;
+
+		if ( e && !this.isSimulated ) {
+			e.stopImmediatePropagation();
+		}
+
+		this.stopPropagation();
+	}
+};
+
+// Includes all common event props including KeyEvent and MouseEvent specific props
+jQuery.each( {
+	altKey: true,
+	bubbles: true,
+	cancelable: true,
+	changedTouches: true,
+	ctrlKey: true,
+	detail: true,
+	eventPhase: true,
+	metaKey: true,
+	pageX: true,
+	pageY: true,
+	shiftKey: true,
+	view: true,
+	"char": true,
+	charCode: true,
+	key: true,
+	keyCode: true,
+	button: true,
+	buttons: true,
+	clientX: true,
+	clientY: true,
+	offsetX: true,
+	offsetY: true,
+	pointerId: true,
+	pointerType: true,
+	screenX: true,
+	screenY: true,
+	targetTouches: true,
+	toElement: true,
+	touches: true,
+
+	which: function( event ) {
+		var button = event.button;
+
+		// Add which for key events
+		if ( event.which == null && rkeyEvent.test( event.type ) ) {
+			return event.charCode != null ? event.charCode : event.keyCode;
+		}
+
+		// Add which for click: 1 === left; 2 === middle; 3 === right
+		if ( !event.which && button !== undefined && rmouseEvent.test( event.type ) ) {
+			if ( button & 1 ) {
+				return 1;
+			}
+
+			if ( button & 2 ) {
+				return 3;
+			}
+
+			if ( button & 4 ) {
+				return 2;
+			}
+
+			return 0;
+		}
+
+		return event.which;
+	}
+}, jQuery.event.addProp );
+
+// Create mouseenter/leave events using mouseover/out and event-time checks
+// so that event delegation works in jQuery.
+// Do the same for pointerenter/pointerleave and pointerover/pointerout
+//
+// Support: Safari 7 only
+// Safari sends mouseenter too often; see:
+// https://bugs.chromium.org/p/chromium/issues/detail?id=470258
+// for the description of the bug (it existed in older Chrome versions as well).
+jQuery.each( {
+	mouseenter: "mouseover",
+	mouseleave: "mouseout",
+	pointerenter: "pointerover",
+	pointerleave: "pointerout"
+}, function( orig, fix ) {
+	jQuery.event.special[ orig ] = {
+		delegateType: fix,
+		bindType: fix,
+
+		handle: function( event ) {
+			var ret,
+				target = this,
+				related = event.relatedTarget,
+				handleObj = event.handleObj;
+
+			// For mouseenter/leave call the handler if related is outside the target.
+			// NB: No relatedTarget if the mouse left/entered the browser window
+			if ( !related || ( related !== target && !jQuery.contains( target, related ) ) ) {
+				event.type = handleObj.origType;
+				ret = handleObj.handler.apply( this, arguments );
+				event.type = fix;
+			}
+			return ret;
+		}
+	};
+} );
+
+jQuery.fn.extend( {
+
+	on: function( types, selector, data, fn ) {
+		return on( this, types, selector, data, fn );
+	},
+	one: function( types, selector, data, fn ) {
+		return on( this, types, selector, data, fn, 1 );
+	},
+	off: function( types, selector, fn ) {
+		var handleObj, type;
+		if ( types && types.preventDefault && types.handleObj ) {
+
+			// ( event )  dispatched jQuery.Event
+			handleObj = types.handleObj;
+			jQuery( types.delegateTarget ).off(
+				handleObj.namespace ?
+					handleObj.origType + "." + handleObj.namespace :
+					handleObj.origType,
+				handleObj.selector,
+				handleObj.handler
+			);
+			return this;
+		}
+		if ( typeof types === "object" ) {
+
+			// ( types-object [, selector] )
+			for ( type in types ) {
+				this.off( type, selector, types[ type ] );
+			}
+			return this;
+		}
+		if ( selector === false || typeof selector === "function" ) {
+
+			// ( types [, fn] )
+			fn = selector;
+			selector = undefined;
+		}
+		if ( fn === false ) {
+			fn = returnFalse;
+		}
+		return this.each( function() {
+			jQuery.event.remove( this, types, fn, selector );
+		} );
+	}
+} );
+
+
+var
+
+	/* eslint-disable max-len */
+
+	// See https://github.com/eslint/eslint/issues/3229
+	rxhtmlTag = /<(?!area|br|col|embed|hr|img|input|link|meta|param)(([a-z][^\/\0>\x20\t\r\n\f]*)[^>]*)\/>/gi,
+
+	/* eslint-enable */
+
+	// Support: IE <=10 - 11, Edge 12 - 13 only
+	// In IE/Edge using regex groups here causes severe slowdowns.
+	// See https://connect.microsoft.com/IE/feedback/details/1736512/
+	rnoInnerhtml = /<script|<style|<link/i,
+
+	// checked="checked" or checked
+	rchecked = /checked\s*(?:[^=]|=\s*.checked.)/i,
+	rcleanScript = /^\s*<!(?:\[CDATA\[|--)|(?:\]\]|--)>\s*$/g;
+
+// Prefer a tbody over its parent table for containing new rows
+function manipulationTarget( elem, content ) {
+	if ( nodeName( elem, "table" ) &&
+		nodeName( content.nodeType !== 11 ? content : content.firstChild, "tr" ) ) {
+
+		return jQuery( elem ).children( "tbody" )[ 0 ] || elem;
+	}
+
+	return elem;
+}
+
+// Replace/restore the type attribute of script elements for safe DOM manipulation
+function disableScript( elem ) {
+	elem.type = ( elem.getAttribute( "type" ) !== null ) + "/" + elem.type;
+	return elem;
+}
+function restoreScript( elem ) {
+	if ( ( elem.type || "" ).slice( 0, 5 ) === "true/" ) {
+		elem.type = elem.type.slice( 5 );
+	} else {
+		elem.removeAttribute( "type" );
+	}
+
+	return elem;
+}
+
+function cloneCopyEvent( src, dest ) {
+	var i, l, type, pdataOld, pdataCur, udataOld, udataCur, events;
+
+	if ( dest.nodeType !== 1 ) {
+		return;
+	}
+
+	// 1. Copy private data: events, handlers, etc.
+	if ( dataPriv.hasData( src ) ) {
+		pdataOld = dataPriv.access( src );
+		pdataCur = dataPriv.set( dest, pdataOld );
+		events = pdataOld.events;
+
+		if ( events ) {
+			delete pdataCur.handle;
+			pdataCur.events = {};
+
+			for ( type in events ) {
+				for ( i = 0, l = events[ type ].length; i < l; i++ ) {
+					jQuery.event.add( dest, type, events[ type ][ i ] );
+				}
+			}
+		}
+	}
+
+	// 2. Copy user data
+	if ( dataUser.hasData( src ) ) {
+		udataOld = dataUser.access( src );
+		udataCur = jQuery.extend( {}, udataOld );
+
+		dataUser.set( dest, udataCur );
+	}
+}
+
+// Fix IE bugs, see support tests
+function fixInput( src, dest ) {
+	var nodeName = dest.nodeName.toLowerCase();
+
+	// Fails to persist the checked state of a cloned checkbox or radio button.
+	if ( nodeName === "input" && rcheckableType.test( src.type ) ) {
+		dest.checked = src.checked;
+
+	// Fails to return the selected option to the default selected state when cloning options
+	} else if ( nodeName === "input" || nodeName === "textarea" ) {
+		dest.defaultValue = src.defaultValue;
+	}
+}
+
+function domManip( collection, args, callback, ignored ) {
+
+	// Flatten any nested arrays
+	args = concat.apply( [], args );
+
+	var fragment, first, scripts, hasScripts, node, doc,
+		i = 0,
+		l = collection.length,
+		iNoClone = l - 1,
+		value = args[ 0 ],
+		valueIsFunction = isFunction( value );
+
+	// We can't cloneNode fragments that contain checked, in WebKit
+	if ( valueIsFunction ||
+			( l > 1 && typeof value === "string" &&
+				!support.checkClone && rchecked.test( value ) ) ) {
+		return collection.each( function( index ) {
+			var self = collection.eq( index );
+			if ( valueIsFunction ) {
+				args[ 0 ] = value.call( this, index, self.html() );
+			}
+			domManip( self, args, callback, ignored );
+		} );
+	}
+
+	if ( l ) {
+		fragment = buildFragment( args, collection[ 0 ].ownerDocument, false, collection, ignored );
+		first = fragment.firstChild;
+
+		if ( fragment.childNodes.length === 1 ) {
+			fragment = first;
+		}
+
+		// Require either new content or an interest in ignored elements to invoke the callback
+		if ( first || ignored ) {
+			scripts = jQuery.map( getAll( fragment, "script" ), disableScript );
+			hasScripts = scripts.length;
+
+			// Use the original fragment for the last item
+			// instead of the first because it can end up
+			// being emptied incorrectly in certain situations (#8070).
+			for ( ; i < l; i++ ) {
+				node = fragment;
+
+				if ( i !== iNoClone ) {
+					node = jQuery.clone( node, true, true );
+
+					// Keep references to cloned scripts for later restoration
+					if ( hasScripts ) {
+
+						// Support: Android <=4.0 only, PhantomJS 1 only
+						// push.apply(_, arraylike) throws on ancient WebKit
+						jQuery.merge( scripts, getAll( node, "script" ) );
+					}
+				}
+
+				callback.call( collection[ i ], node, i );
+			}
+
+			if ( hasScripts ) {
+				doc = scripts[ scripts.length - 1 ].ownerDocument;
+
+				// Reenable scripts
+				jQuery.map( scripts, restoreScript );
+
+				// Evaluate executable scripts on first document insertion
+				for ( i = 0; i < hasScripts; i++ ) {
+					node = scripts[ i ];
+					if ( rscriptType.test( node.type || "" ) &&
+						!dataPriv.access( node, "globalEval" ) &&
+						jQuery.contains( doc, node ) ) {
+
+						if ( node.src && ( node.type || "" ).toLowerCase()  !== "module" ) {
+
+							// Optional AJAX dependency, but won't run scripts if not present
+							if ( jQuery._evalUrl ) {
+								jQuery._evalUrl( node.src );
+							}
+						} else {
+							DOMEval( node.textContent.replace( rcleanScript, "" ), doc, node );
+						}
+					}
+				}
+			}
+		}
+	}
+
+	return collection;
+}
+
+function remove( elem, selector, keepData ) {
+	var node,
+		nodes = selector ? jQuery.filter( selector, elem ) : elem,
+		i = 0;
+
+	for ( ; ( node = nodes[ i ] ) != null; i++ ) {
+		if ( !keepData && node.nodeType === 1 ) {
+			jQuery.cleanData( getAll( node ) );
+		}
+
+		if ( node.parentNode ) {
+			if ( keepData && jQuery.contains( node.ownerDocument, node ) ) {
+				setGlobalEval( getAll( node, "script" ) );
+			}
+			node.parentNode.removeChild( node );
+		}
+	}
+
+	return elem;
+}
+
+jQuery.extend( {
+	htmlPrefilter: function( html ) {
+		return html.replace( rxhtmlTag, "<$1></$2>" );
+	},
+
+	clone: function( elem, dataAndEvents, deepDataAndEvents ) {
+		var i, l, srcElements, destElements,
+			clone = elem.cloneNode( true ),
+			inPage = jQuery.contains( elem.ownerDocument, elem );
+
+		// Fix IE cloning issues
+		if ( !support.noCloneChecked && ( elem.nodeType === 1 || elem.nodeType === 11 ) &&
+				!jQuery.isXMLDoc( elem ) ) {
+
+			// We eschew Sizzle here for performance reasons: https://jsperf.com/getall-vs-sizzle/2
+			destElements = getAll( clone );
+			srcElements = getAll( elem );
+
+			for ( i = 0, l = srcElements.length; i < l; i++ ) {
+				fixInput( srcElements[ i ], destElements[ i ] );
+			}
+		}
+
+		// Copy the events from the original to the clone
+		if ( dataAndEvents ) {
+			if ( deepDataAndEvents ) {
+				srcElements = srcElements || getAll( elem );
+				destElements = destElements || getAll( clone );
+
+				for ( i = 0, l = srcElements.length; i < l; i++ ) {
+					cloneCopyEvent( srcElements[ i ], destElements[ i ] );
+				}
+			} else {
+				cloneCopyEvent( elem, clone );
+			}
+		}
+
+		// Preserve script evaluation history
+		destElements = getAll( clone, "script" );
+		if ( destElements.length > 0 ) {
+			setGlobalEval( destElements, !inPage && getAll( elem, "script" ) );
+		}
+
+		// Return the cloned set
+		return clone;
+	},
+
+	cleanData: function( elems ) {
+		var data, elem, type,
+			special = jQuery.event.special,
+			i = 0;
+
+		for ( ; ( elem = elems[ i ] ) !== undefined; i++ ) {
+			if ( acceptData( elem ) ) {
+				if ( ( data = elem[ dataPriv.expando ] ) ) {
+					if ( data.events ) {
+						for ( type in data.events ) {
+							if ( special[ type ] ) {
+								jQuery.event.remove( elem, type );
+
+							// This is a shortcut to avoid jQuery.event.remove's overhead
+							} else {
+								jQuery.removeEvent( elem, type, data.handle );
+							}
+						}
+					}
+
+					// Support: Chrome <=35 - 45+
+					// Assign undefined instead of using delete, see Data#remove
+					elem[ dataPriv.expando ] = undefined;
+				}
+				if ( elem[ dataUser.expando ] ) {
+
+					// Support: Chrome <=35 - 45+
+					// Assign undefined instead of using delete, see Data#remove
+					elem[ dataUser.expando ] = undefined;
+				}
+			}
+		}
+	}
+} );
+
+jQuery.fn.extend( {
+	detach: function( selector ) {
+		return remove( this, selector, true );
+	},
+
+	remove: function( selector ) {
+		return remove( this, selector );
+	},
+
+	text: function( value ) {
+		return access( this, function( value ) {
+			return value === undefined ?
+				jQuery.text( this ) :
+				this.empty().each( function() {
+					if ( this.nodeType === 1 || this.nodeType === 11 || this.nodeType === 9 ) {
+						this.textContent = value;
+					}
+				} );
+		}, null, value, arguments.length );
+	},
+
+	append: function() {
+		return domManip( this, arguments, function( elem ) {
+			if ( this.nodeType === 1 || this.nodeType === 11 || this.nodeType === 9 ) {
+				var target = manipulationTarget( this, elem );
+				target.appendChild( elem );
+			}
+		} );
+	},
+
+	prepend: function() {
+		return domManip( this, arguments, function( elem ) {
+			if ( this.nodeType === 1 || this.nodeType === 11 || this.nodeType === 9 ) {
+				var target = manipulationTarget( this, elem );
+				target.insertBefore( elem, target.firstChild );
+			}
+		} );
+	},
+
+	before: function() {
+		return domManip( this, arguments, function( elem ) {
+			if ( this.parentNode ) {
+				this.parentNode.insertBefore( elem, this );
+			}
+		} );
+	},
+
+	after: function() {
+		return domManip( this, arguments, function( elem ) {
+			if ( this.parentNode ) {
+				this.parentNode.insertBefore( elem, this.nextSibling );
+			}
+		} );
+	},
+
+	empty: function() {
+		var elem,
+			i = 0;
+
+		for ( ; ( elem = this[ i ] ) != null; i++ ) {
+			if ( elem.nodeType === 1 ) {
+
+				// Prevent memory leaks
+				jQuery.cleanData( getAll( elem, false ) );
+
+				// Remove any remaining nodes
+				elem.textContent = "";
+			}
+		}
+
+		return this;
+	},
+
+	clone: function( dataAndEvents, deepDataAndEvents ) {
+		dataAndEvents = dataAndEvents == null ? false : dataAndEvents;
+		deepDataAndEvents = deepDataAndEvents == null ? dataAndEvents : deepDataAndEvents;
+
+		return this.map( function() {
+			return jQuery.clone( this, dataAndEvents, deepDataAndEvents );
+		} );
+	},
+
+	html: function( value ) {
+		return access( this, function( value ) {
+			var elem = this[ 0 ] || {},
+				i = 0,
+				l = this.length;
+
+			if ( value === undefined && elem.nodeType === 1 ) {
+				return elem.innerHTML;
+			}
+
+			// See if we can take a shortcut and just use innerHTML
+			if ( typeof value === "string" && !rnoInnerhtml.test( value ) &&
+				!wrapMap[ ( rtagName.exec( value ) || [ "", "" ] )[ 1 ].toLowerCase() ] ) {
+
+				value = jQuery.htmlPrefilter( value );
+
+				try {
+					for ( ; i < l; i++ ) {
+						elem = this[ i ] || {};
+
+						// Remove element nodes and prevent memory leaks
+						if ( elem.nodeType === 1 ) {
+							jQuery.cleanData( getAll( elem, false ) );
+							elem.innerHTML = value;
+						}
+					}
+
+					elem = 0;
+
+				// If using innerHTML throws an exception, use the fallback method
+				} catch ( e ) {}
+			}
+
+			if ( elem ) {
+				this.empty().append( value );
+			}
+		}, null, value, arguments.length );
+	},
+
+	replaceWith: function() {
+		var ignored = [];
+
+		// Make the changes, replacing each non-ignored context element with the new content
+		return domManip( this, arguments, function( elem ) {
+			var parent = this.parentNode;
+
+			if ( jQuery.inArray( this, ignored ) < 0 ) {
+				jQuery.cleanData( getAll( this ) );
+				if ( parent ) {
+					parent.replaceChild( elem, this );
+				}
+			}
+
+		// Force callback invocation
+		}, ignored );
+	}
+} );
+
+jQuery.each( {
+	appendTo: "append",
+	prependTo: "prepend",
+	insertBefore: "before",
+	insertAfter: "after",
+	replaceAll: "replaceWith"
+}, function( name, original ) {
+	jQuery.fn[ name ] = function( selector ) {
+		var elems,
+			ret = [],
+			insert = jQuery( selector ),
+			last = insert.length - 1,
+			i = 0;
+
+		for ( ; i <= last; i++ ) {
+			elems = i === last ? this : this.clone( true );
+			jQuery( insert[ i ] )[ original ]( elems );
+
+			// Support: Android <=4.0 only, PhantomJS 1 only
+			// .get() because push.apply(_, arraylike) throws on ancient WebKit
+			push.apply( ret, elems.get() );
+		}
+
+		return this.pushStack( ret );
+	};
+} );
+var rnumnonpx = new RegExp( "^(" + pnum + ")(?!px)[a-z%]+$", "i" );
+
+var getStyles = function( elem ) {
+
+		// Support: IE <=11 only, Firefox <=30 (#15098, #14150)
+		// IE throws on elements created in popups
+		// FF meanwhile throws on frame elements through "defaultView.getComputedStyle"
+		var view = elem.ownerDocument.defaultView;
+
+		if ( !view || !view.opener ) {
+			view = window;
+		}
+
+		return view.getComputedStyle( elem );
+	};
+
+var rboxStyle = new RegExp( cssExpand.join( "|" ), "i" );
+
+
+
+( function() {
+
+	// Executing both pixelPosition & boxSizingReliable tests require only one layout
+	// so they're executed at the same time to save the second computation.
+	function computeStyleTests() {
+
+		// This is a singleton, we need to execute it only once
+		if ( !div ) {
+			return;
+		}
+
+		container.style.cssText = "position:absolute;left:-11111px;width:60px;" +
+			"margin-top:1px;padding:0;border:0";
+		div.style.cssText =
+			"position:relative;display:block;box-sizing:border-box;overflow:scroll;" +
+			"margin:auto;border:1px;padding:1px;" +
+			"width:60%;top:1%";
+		documentElement.appendChild( container ).appendChild( div );
+
+		var divStyle = window.getComputedStyle( div );
+		pixelPositionVal = divStyle.top !== "1%";
+
+		// Support: Android 4.0 - 4.3 only, Firefox <=3 - 44
+		reliableMarginLeftVal = roundPixelMeasures( divStyle.marginLeft ) === 12;
+
+		// Support: Android 4.0 - 4.3 only, Safari <=9.1 - 10.1, iOS <=7.0 - 9.3
+		// Some styles come back with percentage values, even though they shouldn't
+		div.style.right = "60%";
+		pixelBoxStylesVal = roundPixelMeasures( divStyle.right ) === 36;
+
+		// Support: IE 9 - 11 only
+		// Detect misreporting of content dimensions for box-sizing:border-box elements
+		boxSizingReliableVal = roundPixelMeasures( divStyle.width ) === 36;
+
+		// Support: IE 9 only
+		// Detect overflow:scroll screwiness (gh-3699)
+		div.style.position = "absolute";
+		scrollboxSizeVal = div.offsetWidth === 36 || "absolute";
+
+		documentElement.removeChild( container );
+
+		// Nullify the div so it wouldn't be stored in the memory and
+		// it will also be a sign that checks already performed
+		div = null;
+	}
+
+	function roundPixelMeasures( measure ) {
+		return Math.round( parseFloat( measure ) );
+	}
+
+	var pixelPositionVal, boxSizingReliableVal, scrollboxSizeVal, pixelBoxStylesVal,
+		reliableMarginLeftVal,
+		container = document.createElement( "div" ),
+		div = document.createElement( "div" );
+
+	// Finish early in limited (non-browser) environments
+	if ( !div.style ) {
+		return;
+	}
+
+	// Support: IE <=9 - 11 only
+	// Style of cloned element affects source element cloned (#8908)
+	div.style.backgroundClip = "content-box";
+	div.cloneNode( true ).style.backgroundClip = "";
+	support.clearCloneStyle = div.style.backgroundClip === "content-box";
+
+	jQuery.extend( support, {
+		boxSizingReliable: function() {
+			computeStyleTests();
+			return boxSizingReliableVal;
+		},
+		pixelBoxStyles: function() {
+			computeStyleTests();
+			return pixelBoxStylesVal;
+		},
+		pixelPosition: function() {
+			computeStyleTests();
+			return pixelPositionVal;
+		},
+		reliableMarginLeft: function() {
+			computeStyleTests();
+			return reliableMarginLeftVal;
+		},
+		scrollboxSize: function() {
+			computeStyleTests();
+			return scrollboxSizeVal;
+		}
+	} );
+} )();
+
+
+function curCSS( elem, name, computed ) {
+	var width, minWidth, maxWidth, ret,
+
+		// Support: Firefox 51+
+		// Retrieving style before computed somehow
+		// fixes an issue with getting wrong values
+		// on detached elements
+		style = elem.style;
+
+	computed = computed || getStyles( elem );
+
+	// getPropertyValue is needed for:
+	//   .css('filter') (IE 9 only, #12537)
+	//   .css('--customProperty) (#3144)
+	if ( computed ) {
+		ret = computed.getPropertyValue( name ) || computed[ name ];
+
+		if ( ret === "" && !jQuery.contains( elem.ownerDocument, elem ) ) {
+			ret = jQuery.style( elem, name );
+		}
+
+		// A tribute to the "awesome hack by Dean Edwards"
+		// Android Browser returns percentage for some values,
+		// but width seems to be reliably pixels.
+		// This is against the CSSOM draft spec:
+		// https://drafts.csswg.org/cssom/#resolved-values
+		if ( !support.pixelBoxStyles() && rnumnonpx.test( ret ) && rboxStyle.test( name ) ) {
+
+			// Remember the original values
+			width = style.width;
+			minWidth = style.minWidth;
+			maxWidth = style.maxWidth;
+
+			// Put in the new values to get a computed value out
+			style.minWidth = style.maxWidth = style.width = ret;
+			ret = computed.width;
+
+			// Revert the changed values
+			style.width = width;
+			style.minWidth = minWidth;
+			style.maxWidth = maxWidth;
+		}
+	}
+
+	return ret !== undefined ?
+
+		// Support: IE <=9 - 11 only
+		// IE returns zIndex value as an integer.
+		ret + "" :
+		ret;
+}
+
+
+function addGetHookIf( conditionFn, hookFn ) {
+
+	// Define the hook, we'll check on the first run if it's really needed.
+	return {
+		get: function() {
+			if ( conditionFn() ) {
+
+				// Hook not needed (or it's not possible to use it due
+				// to missing dependency), remove it.
+				delete this.get;
+				return;
+			}
+
+			// Hook needed; redefine it so that the support test is not executed again.
+			return ( this.get = hookFn ).apply( this, arguments );
+		}
+	};
+}
+
+
+var
+
+	// Swappable if display is none or starts with table
+	// except "table", "table-cell", or "table-caption"
+	// See here for display values: https://developer.mozilla.org/en-US/docs/CSS/display
+	rdisplayswap = /^(none|table(?!-c[ea]).+)/,
+	rcustomProp = /^--/,
+	cssShow = { position: "absolute", visibility: "hidden", display: "block" },
+	cssNormalTransform = {
+		letterSpacing: "0",
+		fontWeight: "400"
+	},
+
+	cssPrefixes = [ "Webkit", "Moz", "ms" ],
+	emptyStyle = document.createElement( "div" ).style;
+
+// Return a css property mapped to a potentially vendor prefixed property
+function vendorPropName( name ) {
+
+	// Shortcut for names that are not vendor prefixed
+	if ( name in emptyStyle ) {
+		return name;
+	}
+
+	// Check for vendor prefixed names
+	var capName = name[ 0 ].toUpperCase() + name.slice( 1 ),
+		i = cssPrefixes.length;
+
+	while ( i-- ) {
+		name = cssPrefixes[ i ] + capName;
+		if ( name in emptyStyle ) {
+			return name;
+		}
+	}
+}
+
+// Return a property mapped along what jQuery.cssProps suggests or to
+// a vendor prefixed property.
+function finalPropName( name ) {
+	var ret = jQuery.cssProps[ name ];
+	if ( !ret ) {
+		ret = jQuery.cssProps[ name ] = vendorPropName( name ) || name;
+	}
+	return ret;
+}
+
+function setPositiveNumber( elem, value, subtract ) {
+
+	// Any relative (+/-) values have already been
+	// normalized at this point
+	var matches = rcssNum.exec( value );
+	return matches ?
+
+		// Guard against undefined "subtract", e.g., when used as in cssHooks
+		Math.max( 0, matches[ 2 ] - ( subtract || 0 ) ) + ( matches[ 3 ] || "px" ) :
+		value;
+}
+
+function boxModelAdjustment( elem, dimension, box, isBorderBox, styles, computedVal ) {
+	var i = dimension === "width" ? 1 : 0,
+		extra = 0,
+		delta = 0;
+
+	// Adjustment may not be necessary
+	if ( box === ( isBorderBox ? "border" : "content" ) ) {
+		return 0;
+	}
+
+	for ( ; i < 4; i += 2 ) {
+
+		// Both box models exclude margin
+		if ( box === "margin" ) {
+			delta += jQuery.css( elem, box + cssExpand[ i ], true, styles );
+		}
+
+		// If we get here with a content-box, we're seeking "padding" or "border" or "margin"
+		if ( !isBorderBox ) {
+
+			// Add padding
+			delta += jQuery.css( elem, "padding" + cssExpand[ i ], true, styles );
+
+			// For "border" or "margin", add border
+			if ( box !== "padding" ) {
+				delta += jQuery.css( elem, "border" + cssExpand[ i ] + "Width", true, styles );
+
+			// But still keep track of it otherwise
+			} else {
+				extra += jQuery.css( elem, "border" + cssExpand[ i ] + "Width", true, styles );
+			}
+
+		// If we get here with a border-box (content + padding + border), we're seeking "content" or
+		// "padding" or "margin"
+		} else {
+
+			// For "content", subtract padding
+			if ( box === "content" ) {
+				delta -= jQuery.css( elem, "padding" + cssExpand[ i ], true, styles );
+			}
+
+			// For "content" or "padding", subtract border
+			if ( box !== "margin" ) {
+				delta -= jQuery.css( elem, "border" + cssExpand[ i ] + "Width", true, styles );
+			}
+		}
+	}
+
+	// Account for positive content-box scroll gutter when requested by providing computedVal
+	if ( !isBorderBox && computedVal >= 0 ) {
+
+		// offsetWidth/offsetHeight is a rounded sum of content, padding, scroll gutter, and border
+		// Assuming integer scroll gutter, subtract the rest and round down
+		delta += Math.max( 0, Math.ceil(
+			elem[ "offset" + dimension[ 0 ].toUpperCase() + dimension.slice( 1 ) ] -
+			computedVal -
+			delta -
+			extra -
+			0.5
+		) );
+	}
+
+	return delta;
+}
+
+function getWidthOrHeight( elem, dimension, extra ) {
+
+	// Start with computed style
+	var styles = getStyles( elem ),
+		val = curCSS( elem, dimension, styles ),
+		isBorderBox = jQuery.css( elem, "boxSizing", false, styles ) === "border-box",
+		valueIsBorderBox = isBorderBox;
+
+	// Support: Firefox <=54
+	// Return a confounding non-pixel value or feign ignorance, as appropriate.
+	if ( rnumnonpx.test( val ) ) {
+		if ( !extra ) {
+			return val;
+		}
+		val = "auto";
+	}
+
+	// Check for style in case a browser which returns unreliable values
+	// for getComputedStyle silently falls back to the reliable elem.style
+	valueIsBorderBox = valueIsBorderBox &&
+		( support.boxSizingReliable() || val === elem.style[ dimension ] );
+
+	// Fall back to offsetWidth/offsetHeight when value is "auto"
+	// This happens for inline elements with no explicit setting (gh-3571)
+	// Support: Android <=4.1 - 4.3 only
+	// Also use offsetWidth/offsetHeight for misreported inline dimensions (gh-3602)
+	if ( val === "auto" ||
+		!parseFloat( val ) && jQuery.css( elem, "display", false, styles ) === "inline" ) {
+
+		val = elem[ "offset" + dimension[ 0 ].toUpperCase() + dimension.slice( 1 ) ];
+
+		// offsetWidth/offsetHeight provide border-box values
+		valueIsBorderBox = true;
+	}
+
+	// Normalize "" and auto
+	val = parseFloat( val ) || 0;
+
+	// Adjust for the element's box model
+	return ( val +
+		boxModelAdjustment(
+			elem,
+			dimension,
+			extra || ( isBorderBox ? "border" : "content" ),
+			valueIsBorderBox,
+			styles,
+
+			// Provide the current computed size to request scroll gutter calculation (gh-3589)
+			val
+		)
+	) + "px";
+}
+
+jQuery.extend( {
+
+	// Add in style property hooks for overriding the default
+	// behavior of getting and setting a style property
+	cssHooks: {
+		opacity: {
+			get: function( elem, computed ) {
+				if ( computed ) {
+
+					// We should always get a number back from opacity
+					var ret = curCSS( elem, "opacity" );
+					return ret === "" ? "1" : ret;
+				}
+			}
+		}
+	},
+
+	// Don't automatically add "px" to these possibly-unitless properties
+	cssNumber: {
+		"animationIterationCount": true,
+		"columnCount": true,
+		"fillOpacity": true,
+		"flexGrow": true,
+		"flexShrink": true,
+		"fontWeight": true,
+		"lineHeight": true,
+		"opacity": true,
+		"order": true,
+		"orphans": true,
+		"widows": true,
+		"zIndex": true,
+		"zoom": true
+	},
+
+	// Add in properties whose names you wish to fix before
+	// setting or getting the value
+	cssProps: {},
+
+	// Get and set the style property on a DOM Node
+	style: function( elem, name, value, extra ) {
+
+		// Don't set styles on text and comment nodes
+		if ( !elem || elem.nodeType === 3 || elem.nodeType === 8 || !elem.style ) {
+			return;
+		}
+
+		// Make sure that we're working with the right name
+		var ret, type, hooks,
+			origName = camelCase( name ),
+			isCustomProp = rcustomProp.test( name ),
+			style = elem.style;
+
+		// Make sure that we're working with the right name. We don't
+		// want to query the value if it is a CSS custom property
+		// since they are user-defined.
+		if ( !isCustomProp ) {
+			name = finalPropName( origName );
+		}
+
+		// Gets hook for the prefixed version, then unprefixed version
+		hooks = jQuery.cssHooks[ name ] || jQuery.cssHooks[ origName ];
+
+		// Check if we're setting a value
+		if ( value !== undefined ) {
+			type = typeof value;
+
+			// Convert "+=" or "-=" to relative numbers (#7345)
+			if ( type === "string" && ( ret = rcssNum.exec( value ) ) && ret[ 1 ] ) {
+				value = adjustCSS( elem, name, ret );
+
+				// Fixes bug #9237
+				type = "number";
+			}
+
+			// Make sure that null and NaN values aren't set (#7116)
+			if ( value == null || value !== value ) {
+				return;
+			}
+
+			// If a number was passed in, add the unit (except for certain CSS properties)
+			if ( type === "number" ) {
+				value += ret && ret[ 3 ] || ( jQuery.cssNumber[ origName ] ? "" : "px" );
+			}
+
+			// background-* props affect original clone's values
+			if ( !support.clearCloneStyle && value === "" && name.indexOf( "background" ) === 0 ) {
+				style[ name ] = "inherit";
+			}
+
+			// If a hook was provided, use that value, otherwise just set the specified value
+			if ( !hooks || !( "set" in hooks ) ||
+				( value = hooks.set( elem, value, extra ) ) !== undefined ) {
+
+				if ( isCustomProp ) {
+					style.setProperty( name, value );
+				} else {
+					style[ name ] = value;
+				}
+			}
+
+		} else {
+
+			// If a hook was provided get the non-computed value from there
+			if ( hooks && "get" in hooks &&
+				( ret = hooks.get( elem, false, extra ) ) !== undefined ) {
+
+				return ret;
+			}
+
+			// Otherwise just get the value from the style object
+			return style[ name ];
+		}
+	},
+
+	css: function( elem, name, extra, styles ) {
+		var val, num, hooks,
+			origName = camelCase( name ),
+			isCustomProp = rcustomProp.test( name );
+
+		// Make sure that we're working with the right name. We don't
+		// want to modify the value if it is a CSS custom property
+		// since they are user-defined.
+		if ( !isCustomProp ) {
+			name = finalPropName( origName );
+		}
+
+		// Try prefixed name followed by the unprefixed name
+		hooks = jQuery.cssHooks[ name ] || jQuery.cssHooks[ origName ];
+
+		// If a hook was provided get the computed value from there
+		if ( hooks && "get" in hooks ) {
+			val = hooks.get( elem, true, extra );
+		}
+
+		// Otherwise, if a way to get the computed value exists, use that
+		if ( val === undefined ) {
+			val = curCSS( elem, name, styles );
+		}
+
+		// Convert "normal" to computed value
+		if ( val === "normal" && name in cssNormalTransform ) {
+			val = cssNormalTransform[ name ];
+		}
+
+		// Make numeric if forced or a qualifier was provided and val looks numeric
+		if ( extra === "" || extra ) {
+			num = parseFloat( val );
+			return extra === true || isFinite( num ) ? num || 0 : val;
+		}
+
+		return val;
+	}
+} );
+
+jQuery.each( [ "height", "width" ], function( i, dimension ) {
+	jQuery.cssHooks[ dimension ] = {
+		get: function( elem, computed, extra ) {
+			if ( computed ) {
+
+				// Certain elements can have dimension info if we invisibly show them
+				// but it must have a current display style that would benefit
+				return rdisplayswap.test( jQuery.css( elem, "display" ) ) &&
+
+					// Support: Safari 8+
+					// Table columns in Safari have non-zero offsetWidth & zero
+					// getBoundingClientRect().width unless display is changed.
+					// Support: IE <=11 only
+					// Running getBoundingClientRect on a disconnected node
+					// in IE throws an error.
+					( !elem.getClientRects().length || !elem.getBoundingClientRect().width ) ?
+						swap( elem, cssShow, function() {
+							return getWidthOrHeight( elem, dimension, extra );
+						} ) :
+						getWidthOrHeight( elem, dimension, extra );
+			}
+		},
+
+		set: function( elem, value, extra ) {
+			var matches,
+				styles = getStyles( elem ),
+				isBorderBox = jQuery.css( elem, "boxSizing", false, styles ) === "border-box",
+				subtract = extra && boxModelAdjustment(
+					elem,
+					dimension,
+					extra,
+					isBorderBox,
+					styles
+				);
+
+			// Account for unreliable border-box dimensions by comparing offset* to computed and
+			// faking a content-box to get border and padding (gh-3699)
+			if ( isBorderBox && support.scrollboxSize() === styles.position ) {
+				subtract -= Math.ceil(
+					elem[ "offset" + dimension[ 0 ].toUpperCase() + dimension.slice( 1 ) ] -
+					parseFloat( styles[ dimension ] ) -
+					boxModelAdjustment( elem, dimension, "border", false, styles ) -
+					0.5
+				);
+			}
+
+			// Convert to pixels if value adjustment is needed
+			if ( subtract && ( matches = rcssNum.exec( value ) ) &&
+				( matches[ 3 ] || "px" ) !== "px" ) {
+
+				elem.style[ dimension ] = value;
+				value = jQuery.css( elem, dimension );
+			}
+
+			return setPositiveNumber( elem, value, subtract );
+		}
+	};
+} );
+
+jQuery.cssHooks.marginLeft = addGetHookIf( support.reliableMarginLeft,
+	function( elem, computed ) {
+		if ( computed ) {
+			return ( parseFloat( curCSS( elem, "marginLeft" ) ) ||
+				elem.getBoundingClientRect().left -
+					swap( elem, { marginLeft: 0 }, function() {
+						return elem.getBoundingClientRect().left;
+					} )
+				) + "px";
+		}
+	}
+);
+
+// These hooks are used by animate to expand properties
+jQuery.each( {
+	margin: "",
+	padding: "",
+	border: "Width"
+}, function( prefix, suffix ) {
+	jQuery.cssHooks[ prefix + suffix ] = {
+		expand: function( value ) {
+			var i = 0,
+				expanded = {},
+
+				// Assumes a single number if not a string
+				parts = typeof value === "string" ? value.split( " " ) : [ value ];
+
+			for ( ; i < 4; i++ ) {
+				expanded[ prefix + cssExpand[ i ] + suffix ] =
+					parts[ i ] || parts[ i - 2 ] || parts[ 0 ];
+			}
+
+			return expanded;
+		}
+	};
+
+	if ( prefix !== "margin" ) {
+		jQuery.cssHooks[ prefix + suffix ].set = setPositiveNumber;
+	}
+} );
+
+jQuery.fn.extend( {
+	css: function( name, value ) {
+		return access( this, function( elem, name, value ) {
+			var styles, len,
+				map = {},
+				i = 0;
+
+			if ( Array.isArray( name ) ) {
+				styles = getStyles( elem );
+				len = name.length;
+
+				for ( ; i < len; i++ ) {
+					map[ name[ i ] ] = jQuery.css( elem, name[ i ], false, styles );
+				}
+
+				return map;
+			}
+
+			return value !== undefined ?
+				jQuery.style( elem, name, value ) :
+				jQuery.css( elem, name );
+		}, name, value, arguments.length > 1 );
+	}
+} );
+
+
+function Tween( elem, options, prop, end, easing ) {
+	return new Tween.prototype.init( elem, options, prop, end, easing );
+}
+jQuery.Tween = Tween;
+
+Tween.prototype = {
+	constructor: Tween,
+	init: function( elem, options, prop, end, easing, unit ) {
+		this.elem = elem;
+		this.prop = prop;
+		this.easing = easing || jQuery.easing._default;
+		this.options = options;
+		this.start = this.now = this.cur();
+		this.end = end;
+		this.unit = unit || ( jQuery.cssNumber[ prop ] ? "" : "px" );
+	},
+	cur: function() {
+		var hooks = Tween.propHooks[ this.prop ];
+
+		return hooks && hooks.get ?
+			hooks.get( this ) :
+			Tween.propHooks._default.get( this );
+	},
+	run: function( percent ) {
+		var eased,
+			hooks = Tween.propHooks[ this.prop ];
+
+		if ( this.options.duration ) {
+			this.pos = eased = jQuery.easing[ this.easing ](
+				percent, this.options.duration * percent, 0, 1, this.options.duration
+			);
+		} else {
+			this.pos = eased = percent;
+		}
+		this.now = ( this.end - this.start ) * eased + this.start;
+
+		if ( this.options.step ) {
+			this.options.step.call( this.elem, this.now, this );
+		}
+
+		if ( hooks && hooks.set ) {
+			hooks.set( this );
+		} else {
+			Tween.propHooks._default.set( this );
+		}
+		return this;
+	}
+};
+
+Tween.prototype.init.prototype = Tween.prototype;
+
+Tween.propHooks = {
+	_default: {
+		get: function( tween ) {
+			var result;
+
+			// Use a property on the element directly when it is not a DOM element,
+			// or when there is no matching style property that exists.
+			if ( tween.elem.nodeType !== 1 ||
+				tween.elem[ tween.prop ] != null && tween.elem.style[ tween.prop ] == null ) {
+				return tween.elem[ tween.prop ];
+			}
+
+			// Passing an empty string as a 3rd parameter to .css will automatically
+			// attempt a parseFloat and fallback to a string if the parse fails.
+			// Simple values such as "10px" are parsed to Float;
+			// complex values such as "rotate(1rad)" are returned as-is.
+			result = jQuery.css( tween.elem, tween.prop, "" );
+
+			// Empty strings, null, undefined and "auto" are converted to 0.
+			return !result || result === "auto" ? 0 : result;
+		},
+		set: function( tween ) {
+
+			// Use step hook for back compat.
+			// Use cssHook if its there.
+			// Use .style if available and use plain properties where available.
+			if ( jQuery.fx.step[ tween.prop ] ) {
+				jQuery.fx.step[ tween.prop ]( tween );
+			} else if ( tween.elem.nodeType === 1 &&
+				( tween.elem.style[ jQuery.cssProps[ tween.prop ] ] != null ||
+					jQuery.cssHooks[ tween.prop ] ) ) {
+				jQuery.style( tween.elem, tween.prop, tween.now + tween.unit );
+			} else {
+				tween.elem[ tween.prop ] = tween.now;
+			}
+		}
+	}
+};
+
+// Support: IE <=9 only
+// Panic based approach to setting things on disconnected nodes
+Tween.propHooks.scrollTop = Tween.propHooks.scrollLeft = {
+	set: function( tween ) {
+		if ( tween.elem.nodeType && tween.elem.parentNode ) {
+			tween.elem[ tween.prop ] = tween.now;
+		}
+	}
+};
+
+jQuery.easing = {
+	linear: function( p ) {
+		return p;
+	},
+	swing: function( p ) {
+		return 0.5 - Math.cos( p * Math.PI ) / 2;
+	},
+	_default: "swing"
+};
+
+jQuery.fx = Tween.prototype.init;
+
+// Back compat <1.8 extension point
+jQuery.fx.step = {};
+
+
+
+
+var
+	fxNow, inProgress,
+	rfxtypes = /^(?:toggle|show|hide)$/,
+	rrun = /queueHooks$/;
+
+function schedule() {
+	if ( inProgress ) {
+		if ( document.hidden === false && window.requestAnimationFrame ) {
+			window.requestAnimationFrame( schedule );
+		} else {
+			window.setTimeout( schedule, jQuery.fx.interval );
+		}
+
+		jQuery.fx.tick();
+	}
+}
+
+// Animations created synchronously will run synchronously
+function createFxNow() {
+	window.setTimeout( function() {
+		fxNow = undefined;
+	} );
+	return ( fxNow = Date.now() );
+}
+
+// Generate parameters to create a standard animation
+function genFx( type, includeWidth ) {
+	var which,
+		i = 0,
+		attrs = { height: type };
+
+	// If we include width, step value is 1 to do all cssExpand values,
+	// otherwise step value is 2 to skip over Left and Right
+	includeWidth = includeWidth ? 1 : 0;
+	for ( ; i < 4; i += 2 - includeWidth ) {
+		which = cssExpand[ i ];
+		attrs[ "margin" + which ] = attrs[ "padding" + which ] = type;
+	}
+
+	if ( includeWidth ) {
+		attrs.opacity = attrs.width = type;
+	}
+
+	return attrs;
+}
+
+function createTween( value, prop, animation ) {
+	var tween,
+		collection = ( Animation.tweeners[ prop ] || [] ).concat( Animation.tweeners[ "*" ] ),
+		index = 0,
+		length = collection.length;
+	for ( ; index < length; index++ ) {
+		if ( ( tween = collection[ index ].call( animation, prop, value ) ) ) {
+
+			// We're done with this property
+			return tween;
+		}
+	}
+}
+
+function defaultPrefilter( elem, props, opts ) {
+	var prop, value, toggle, hooks, oldfire, propTween, restoreDisplay, display,
+		isBox = "width" in props || "height" in props,
+		anim = this,
+		orig = {},
+		style = elem.style,
+		hidden = elem.nodeType && isHiddenWithinTree( elem ),
+		dataShow = dataPriv.get( elem, "fxshow" );
+
+	// Queue-skipping animations hijack the fx hooks
+	if ( !opts.queue ) {
+		hooks = jQuery._queueHooks( elem, "fx" );
+		if ( hooks.unqueued == null ) {
+			hooks.unqueued = 0;
+			oldfire = hooks.empty.fire;
+			hooks.empty.fire = function() {
+				if ( !hooks.unqueued ) {
+					oldfire();
+				}
+			};
+		}
+		hooks.unqueued++;
+
+		anim.always( function() {
+
+			// Ensure the complete handler is called before this completes
+			anim.always( function() {
+				hooks.unqueued--;
+				if ( !jQuery.queue( elem, "fx" ).length ) {
+					hooks.empty.fire();
+				}
+			} );
+		} );
+	}
+
+	// Detect show/hide animations
+	for ( prop in props ) {
+		value = props[ prop ];
+		if ( rfxtypes.test( value ) ) {
+			delete props[ prop ];
+			toggle = toggle || value === "toggle";
+			if ( value === ( hidden ? "hide" : "show" ) ) {
+
+				// Pretend to be hidden if this is a "show" and
+				// there is still data from a stopped show/hide
+				if ( value === "show" && dataShow && dataShow[ prop ] !== undefined ) {
+					hidden = true;
+
+				// Ignore all other no-op show/hide data
+				} else {
+					continue;
+				}
+			}
+			orig[ prop ] = dataShow && dataShow[ prop ] || jQuery.style( elem, prop );
+		}
+	}
+
+	// Bail out if this is a no-op like .hide().hide()
+	propTween = !jQuery.isEmptyObject( props );
+	if ( !propTween && jQuery.isEmptyObject( orig ) ) {
+		return;
+	}
+
+	// Restrict "overflow" and "display" styles during box animations
+	if ( isBox && elem.nodeType === 1 ) {
+
+		// Support: IE <=9 - 11, Edge 12 - 15
+		// Record all 3 overflow attributes because IE does not infer the shorthand
+		// from identically-valued overflowX and overflowY and Edge just mirrors
+		// the overflowX value there.
+		opts.overflow = [ style.overflow, style.overflowX, style.overflowY ];
+
+		// Identify a display type, preferring old show/hide data over the CSS cascade
+		restoreDisplay = dataShow && dataShow.display;
+		if ( restoreDisplay == null ) {
+			restoreDisplay = dataPriv.get( elem, "display" );
+		}
+		display = jQuery.css( elem, "display" );
+		if ( display === "none" ) {
+			if ( restoreDisplay ) {
+				display = restoreDisplay;
+			} else {
+
+				// Get nonempty value(s) by temporarily forcing visibility
+				showHide( [ elem ], true );
+				restoreDisplay = elem.style.display || restoreDisplay;
+				display = jQuery.css( elem, "display" );
+				showHide( [ elem ] );
+			}
+		}
+
+		// Animate inline elements as inline-block
+		if ( display === "inline" || display === "inline-block" && restoreDisplay != null ) {
+			if ( jQuery.css( elem, "float" ) === "none" ) {
+
+				// Restore the original display value at the end of pure show/hide animations
+				if ( !propTween ) {
+					anim.done( function() {
+						style.display = restoreDisplay;
+					} );
+					if ( restoreDisplay == null ) {
+						display = style.display;
+						restoreDisplay = display === "none" ? "" : display;
+					}
+				}
+				style.display = "inline-block";
+			}
+		}
+	}
+
+	if ( opts.overflow ) {
+		style.overflow = "hidden";
+		anim.always( function() {
+			style.overflow = opts.overflow[ 0 ];
+			style.overflowX = opts.overflow[ 1 ];
+			style.overflowY = opts.overflow[ 2 ];
+		} );
+	}
+
+	// Implement show/hide animations
+	propTween = false;
+	for ( prop in orig ) {
+
+		// General show/hide setup for this element animation
+		if ( !propTween ) {
+			if ( dataShow ) {
+				if ( "hidden" in dataShow ) {
+					hidden = dataShow.hidden;
+				}
+			} else {
+				dataShow = dataPriv.access( elem, "fxshow", { display: restoreDisplay } );
+			}
+
+			// Store hidden/visible for toggle so `.stop().toggle()` "reverses"
+			if ( toggle ) {
+				dataShow.hidden = !hidden;
+			}
+
+			// Show elements before animating them
+			if ( hidden ) {
+				showHide( [ elem ], true );
+			}
+
+			/* eslint-disable no-loop-func */
+
+			anim.done( function() {
+
+			/* eslint-enable no-loop-func */
+
+				// The final step of a "hide" animation is actually hiding the element
+				if ( !hidden ) {
+					showHide( [ elem ] );
+				}
+				dataPriv.remove( elem, "fxshow" );
+				for ( prop in orig ) {
+					jQuery.style( elem, prop, orig[ prop ] );
+				}
+			} );
+		}
+
+		// Per-property setup
+		propTween = createTween( hidden ? dataShow[ prop ] : 0, prop, anim );
+		if ( !( prop in dataShow ) ) {
+			dataShow[ prop ] = propTween.start;
+			if ( hidden ) {
+				propTween.end = propTween.start;
+				propTween.start = 0;
+			}
+		}
+	}
+}
+
+function propFilter( props, specialEasing ) {
+	var index, name, easing, value, hooks;
+
+	// camelCase, specialEasing and expand cssHook pass
+	for ( index in props ) {
+		name = camelCase( index );
+		easing = specialEasing[ name ];
+		value = props[ index ];
+		if ( Array.isArray( value ) ) {
+			easing = value[ 1 ];
+			value = props[ index ] = value[ 0 ];
+		}
+
+		if ( index !== name ) {
+			props[ name ] = value;
+			delete props[ index ];
+		}
+
+		hooks = jQuery.cssHooks[ name ];
+		if ( hooks && "expand" in hooks ) {
+			value = hooks.expand( value );
+			delete props[ name ];
+
+			// Not quite $.extend, this won't overwrite existing keys.
+			// Reusing 'index' because we have the correct "name"
+			for ( index in value ) {
+				if ( !( index in props ) ) {
+					props[ index ] = value[ index ];
+					specialEasing[ index ] = easing;
+				}
+			}
+		} else {
+			specialEasing[ name ] = easing;
+		}
+	}
+}
+
+function Animation( elem, properties, options ) {
+	var result,
+		stopped,
+		index = 0,
+		length = Animation.prefilters.length,
+		deferred = jQuery.Deferred().always( function() {
+
+			// Don't match elem in the :animated selector
+			delete tick.elem;
+		} ),
+		tick = function() {
+			if ( stopped ) {
+				return false;
+			}
+			var currentTime = fxNow || createFxNow(),
+				remaining = Math.max( 0, animation.startTime + animation.duration - currentTime ),
+
+				// Support: Android 2.3 only
+				// Archaic crash bug won't allow us to use `1 - ( 0.5 || 0 )` (#12497)
+				temp = remaining / animation.duration || 0,
+				percent = 1 - temp,
+				index = 0,
+				length = animation.tweens.length;
+
+			for ( ; index < length; index++ ) {
+				animation.tweens[ index ].run( percent );
+			}
+
+			deferred.notifyWith( elem, [ animation, percent, remaining ] );
+
+			// If there's more to do, yield
+			if ( percent < 1 && length ) {
+				return remaining;
+			}
+
+			// If this was an empty animation, synthesize a final progress notification
+			if ( !length ) {
+				deferred.notifyWith( elem, [ animation, 1, 0 ] );
+			}
+
+			// Resolve the animation and report its conclusion
+			deferred.resolveWith( elem, [ animation ] );
+			return false;
+		},
+		animation = deferred.promise( {
+			elem: elem,
+			props: jQuery.extend( {}, properties ),
+			opts: jQuery.extend( true, {
+				specialEasing: {},
+				easing: jQuery.easing._default
+			}, options ),
+			originalProperties: properties,
+			originalOptions: options,
+			startTime: fxNow || createFxNow(),
+			duration: options.duration,
+			tweens: [],
+			createTween: function( prop, end ) {
+				var tween = jQuery.Tween( elem, animation.opts, prop, end,
+						animation.opts.specialEasing[ prop ] || animation.opts.easing );
+				animation.tweens.push( tween );
+				return tween;
+			},
+			stop: function( gotoEnd ) {
+				var index = 0,
+
+					// If we are going to the end, we want to run all the tweens
+					// otherwise we skip this part
+					length = gotoEnd ? animation.tweens.length : 0;
+				if ( stopped ) {
+					return this;
+				}
+				stopped = true;
+				for ( ; index < length; index++ ) {
+					animation.tweens[ index ].run( 1 );
+				}
+
+				// Resolve when we played the last frame; otherwise, reject
+				if ( gotoEnd ) {
+					deferred.notifyWith( elem, [ animation, 1, 0 ] );
+					deferred.resolveWith( elem, [ animation, gotoEnd ] );
+				} else {
+					deferred.rejectWith( elem, [ animation, gotoEnd ] );
+				}
+				return this;
+			}
+		} ),
+		props = animation.props;
+
+	propFilter( props, animation.opts.specialEasing );
+
+	for ( ; index < length; index++ ) {
+		result = Animation.prefilters[ index ].call( animation, elem, props, animation.opts );
+		if ( result ) {
+			if ( isFunction( result.stop ) ) {
+				jQuery._queueHooks( animation.elem, animation.opts.queue ).stop =
+					result.stop.bind( result );
+			}
+			return result;
+		}
+	}
+
+	jQuery.map( props, createTween, animation );
+
+	if ( isFunction( animation.opts.start ) ) {
+		animation.opts.start.call( elem, animation );
+	}
+
+	// Attach callbacks from options
+	animation
+		.progress( animation.opts.progress )
+		.done( animation.opts.done, animation.opts.complete )
+		.fail( animation.opts.fail )
+		.always( animation.opts.always );
+
+	jQuery.fx.timer(
+		jQuery.extend( tick, {
+			elem: elem,
+			anim: animation,
+			queue: animation.opts.queue
+		} )
+	);
+
+	return animation;
+}
+
+jQuery.Animation = jQuery.extend( Animation, {
+
+	tweeners: {
+		"*": [ function( prop, value ) {
+			var tween = this.createTween( prop, value );
+			adjustCSS( tween.elem, prop, rcssNum.exec( value ), tween );
+			return tween;
+		} ]
+	},
+
+	tweener: function( props, callback ) {
+		if ( isFunction( props ) ) {
+			callback = props;
+			props = [ "*" ];
+		} else {
+			props = props.match( rnothtmlwhite );
+		}
+
+		var prop,
+			index = 0,
+			length = props.length;
+
+		for ( ; index < length; index++ ) {
+			prop = props[ index ];
+			Animation.tweeners[ prop ] = Animation.tweeners[ prop ] || [];
+			Animation.tweeners[ prop ].unshift( callback );
+		}
+	},
+
+	prefilters: [ defaultPrefilter ],
+
+	prefilter: function( callback, prepend ) {
+		if ( prepend ) {
+			Animation.prefilters.unshift( callback );
+		} else {
+			Animation.prefilters.push( callback );
+		}
+	}
+} );
+
+jQuery.speed = function( speed, easing, fn ) {
+	var opt = speed && typeof speed === "object" ? jQuery.extend( {}, speed ) : {
+		complete: fn || !fn && easing ||
+			isFunction( speed ) && speed,
+		duration: speed,
+		easing: fn && easing || easing && !isFunction( easing ) && easing
+	};
+
+	// Go to the end state if fx are off
+	if ( jQuery.fx.off ) {
+		opt.duration = 0;
+
+	} else {
+		if ( typeof opt.duration !== "number" ) {
+			if ( opt.duration in jQuery.fx.speeds ) {
+				opt.duration = jQuery.fx.speeds[ opt.duration ];
+
+			} else {
+				opt.duration = jQuery.fx.speeds._default;
+			}
+		}
+	}
+
+	// Normalize opt.queue - true/undefined/null -> "fx"
+	if ( opt.queue == null || opt.queue === true ) {
+		opt.queue = "fx";
+	}
+
+	// Queueing
+	opt.old = opt.complete;
+
+	opt.complete = function() {
+		if ( isFunction( opt.old ) ) {
+			opt.old.call( this );
+		}
+
+		if ( opt.queue ) {
+			jQuery.dequeue( this, opt.queue );
+		}
+	};
+
+	return opt;
+};
+
+jQuery.fn.extend( {
+	fadeTo: function( speed, to, easing, callback ) {
+
+		// Show any hidden elements after setting opacity to 0
+		return this.filter( isHiddenWithinTree ).css( "opacity", 0 ).show()
+
+			// Animate to the value specified
+			.end().animate( { opacity: to }, speed, easing, callback );
+	},
+	animate: function( prop, speed, easing, callback ) {
+		var empty = jQuery.isEmptyObject( prop ),
+			optall = jQuery.speed( speed, easing, callback ),
+			doAnimation = function() {
+
+				// Operate on a copy of prop so per-property easing won't be lost
+				var anim = Animation( this, jQuery.extend( {}, prop ), optall );
+
+				// Empty animations, or finishing resolves immediately
+				if ( empty || dataPriv.get( this, "finish" ) ) {
+					anim.stop( true );
+				}
+			};
+			doAnimation.finish = doAnimation;
+
+		return empty || optall.queue === false ?
+			this.each( doAnimation ) :
+			this.queue( optall.queue, doAnimation );
+	},
+	stop: function( type, clearQueue, gotoEnd ) {
+		var stopQueue = function( hooks ) {
+			var stop = hooks.stop;
+			delete hooks.stop;
+			stop( gotoEnd );
+		};
+
+		if ( typeof type !== "string" ) {
+			gotoEnd = clearQueue;
+			clearQueue = type;
+			type = undefined;
+		}
+		if ( clearQueue && type !== false ) {
+			this.queue( type || "fx", [] );
+		}
+
+		return this.each( function() {
+			var dequeue = true,
+				index = type != null && type + "queueHooks",
+				timers = jQuery.timers,
+				data = dataPriv.get( this );
+
+			if ( index ) {
+				if ( data[ index ] && data[ index ].stop ) {
+					stopQueue( data[ index ] );
+				}
+			} else {
+				for ( index in data ) {
+					if ( data[ index ] && data[ index ].stop && rrun.test( index ) ) {
+						stopQueue( data[ index ] );
+					}
+				}
+			}
+
+			for ( index = timers.length; index--; ) {
+				if ( timers[ index ].elem === this &&
+					( type == null || timers[ index ].queue === type ) ) {
+
+					timers[ index ].anim.stop( gotoEnd );
+					dequeue = false;
+					timers.splice( index, 1 );
+				}
+			}
+
+			// Start the next in the queue if the last step wasn't forced.
+			// Timers currently will call their complete callbacks, which
+			// will dequeue but only if they were gotoEnd.
+			if ( dequeue || !gotoEnd ) {
+				jQuery.dequeue( this, type );
+			}
+		} );
+	},
+	finish: function( type ) {
+		if ( type !== false ) {
+			type = type || "fx";
+		}
+		return this.each( function() {
+			var index,
+				data = dataPriv.get( this ),
+				queue = data[ type + "queue" ],
+				hooks = data[ type + "queueHooks" ],
+				timers = jQuery.timers,
+				length = queue ? queue.length : 0;
+
+			// Enable finishing flag on private data
+			data.finish = true;
+
+			// Empty the queue first
+			jQuery.queue( this, type, [] );
+
+			if ( hooks && hooks.stop ) {
+				hooks.stop.call( this, true );
+			}
+
+			// Look for any active animations, and finish them
+			for ( index = timers.length; index--; ) {
+				if ( timers[ index ].elem === this && timers[ index ].queue === type ) {
+					timers[ index ].anim.stop( true );
+					timers.splice( index, 1 );
+				}
+			}
+
+			// Look for any animations in the old queue and finish them
+			for ( index = 0; index < length; index++ ) {
+				if ( queue[ index ] && queue[ index ].finish ) {
+					queue[ index ].finish.call( this );
+				}
+			}
+
+			// Turn off finishing flag
+			delete data.finish;
+		} );
+	}
+} );
+
+jQuery.each( [ "toggle", "show", "hide" ], function( i, name ) {
+	var cssFn = jQuery.fn[ name ];
+	jQuery.fn[ name ] = function( speed, easing, callback ) {
+		return speed == null || typeof speed === "boolean" ?
+			cssFn.apply( this, arguments ) :
+			this.animate( genFx( name, true ), speed, easing, callback );
+	};
+} );
+
+// Generate shortcuts for custom animations
+jQuery.each( {
+	slideDown: genFx( "show" ),
+	slideUp: genFx( "hide" ),
+	slideToggle: genFx( "toggle" ),
+	fadeIn: { opacity: "show" },
+	fadeOut: { opacity: "hide" },
+	fadeToggle: { opacity: "toggle" }
+}, function( name, props ) {
+	jQuery.fn[ name ] = function( speed, easing, callback ) {
+		return this.animate( props, speed, easing, callback );
+	};
+} );
+
+jQuery.timers = [];
+jQuery.fx.tick = function() {
+	var timer,
+		i = 0,
+		timers = jQuery.timers;
+
+	fxNow = Date.now();
+
+	for ( ; i < timers.length; i++ ) {
+		timer = timers[ i ];
+
+		// Run the timer and safely remove it when done (allowing for external removal)
+		if ( !timer() && timers[ i ] === timer ) {
+			timers.splice( i--, 1 );
+		}
+	}
+
+	if ( !timers.length ) {
+		jQuery.fx.stop();
+	}
+	fxNow = undefined;
+};
+
+jQuery.fx.timer = function( timer ) {
+	jQuery.timers.push( timer );
+	jQuery.fx.start();
+};
+
+jQuery.fx.interval = 13;
+jQuery.fx.start = function() {
+	if ( inProgress ) {
+		return;
+	}
+
+	inProgress = true;
+	schedule();
+};
+
+jQuery.fx.stop = function() {
+	inProgress = null;
+};
+
+jQuery.fx.speeds = {
+	slow: 600,
+	fast: 200,
+
+	// Default speed
+	_default: 400
+};
+
+
+// Based off of the plugin by Clint Helfers, with permission.
+// https://web.archive.org/web/20100324014747/http://blindsignals.com/index.php/2009/07/jquery-delay/
+jQuery.fn.delay = function( time, type ) {
+	time = jQuery.fx ? jQuery.fx.speeds[ time ] || time : time;
+	type = type || "fx";
+
+	return this.queue( type, function( next, hooks ) {
+		var timeout = window.setTimeout( next, time );
+		hooks.stop = function() {
+			window.clearTimeout( timeout );
+		};
+	} );
+};
+
+
+( function() {
+	var input = document.createElement( "input" ),
+		select = document.createElement( "select" ),
+		opt = select.appendChild( document.createElement( "option" ) );
+
+	input.type = "checkbox";
+
+	// Support: Android <=4.3 only
+	// Default value for a checkbox should be "on"
+	support.checkOn = input.value !== "";
+
+	// Support: IE <=11 only
+	// Must access selectedIndex to make default options select
+	support.optSelected = opt.selected;
+
+	// Support: IE <=11 only
+	// An input loses its value after becoming a radio
+	input = document.createElement( "input" );
+	input.value = "t";
+	input.type = "radio";
+	support.radioValue = input.value === "t";
+} )();
+
+
+var boolHook,
+	attrHandle = jQuery.expr.attrHandle;
+
+jQuery.fn.extend( {
+	attr: function( name, value ) {
+		return access( this, jQuery.attr, name, value, arguments.length > 1 );
+	},
+
+	removeAttr: function( name ) {
+		return this.each( function() {
+			jQuery.removeAttr( this, name );
+		} );
+	}
+} );
+
+jQuery.extend( {
+	attr: function( elem, name, value ) {
+		var ret, hooks,
+			nType = elem.nodeType;
+
+		// Don't get/set attributes on text, comment and attribute nodes
+		if ( nType === 3 || nType === 8 || nType === 2 ) {
+			return;
+		}
+
+		// Fallback to prop when attributes are not supported
+		if ( typeof elem.getAttribute === "undefined" ) {
+			return jQuery.prop( elem, name, value );
+		}
+
+		// Attribute hooks are determined by the lowercase version
+		// Grab necessary hook if one is defined
+		if ( nType !== 1 || !jQuery.isXMLDoc( elem ) ) {
+			hooks = jQuery.attrHooks[ name.toLowerCase() ] ||
+				( jQuery.expr.match.bool.test( name ) ? boolHook : undefined );
+		}
+
+		if ( value !== undefined ) {
+			if ( value === null ) {
+				jQuery.removeAttr( elem, name );
+				return;
+			}
+
+			if ( hooks && "set" in hooks &&
+				( ret = hooks.set( elem, value, name ) ) !== undefined ) {
+				return ret;
+			}
+
+			elem.setAttribute( name, value + "" );
+			return value;
+		}
+
+		if ( hooks && "get" in hooks && ( ret = hooks.get( elem, name ) ) !== null ) {
+			return ret;
+		}
+
+		ret = jQuery.find.attr( elem, name );
+
+		// Non-existent attributes return null, we normalize to undefined
+		return ret == null ? undefined : ret;
+	},
+
+	attrHooks: {
+		type: {
+			set: function( elem, value ) {
+				if ( !support.radioValue && value === "radio" &&
+					nodeName( elem, "input" ) ) {
+					var val = elem.value;
+					elem.setAttribute( "type", value );
+					if ( val ) {
+						elem.value = val;
+					}
+					return value;
+				}
+			}
+		}
+	},
+
+	removeAttr: function( elem, value ) {
+		var name,
+			i = 0,
+
+			// Attribute names can contain non-HTML whitespace characters
+			// https://html.spec.whatwg.org/multipage/syntax.html#attributes-2
+			attrNames = value && value.match( rnothtmlwhite );
+
+		if ( attrNames && elem.nodeType === 1 ) {
+			while ( ( name = attrNames[ i++ ] ) ) {
+				elem.removeAttribute( name );
+			}
+		}
+	}
+} );
+
+// Hooks for boolean attributes
+boolHook = {
+	set: function( elem, value, name ) {
+		if ( value === false ) {
+
+			// Remove boolean attributes when set to false
+			jQuery.removeAttr( elem, name );
+		} else {
+			elem.setAttribute( name, name );
+		}
+		return name;
+	}
+};
+
+jQuery.each( jQuery.expr.match.bool.source.match( /\w+/g ), function( i, name ) {
+	var getter = attrHandle[ name ] || jQuery.find.attr;
+
+	attrHandle[ name ] = function( elem, name, isXML ) {
+		var ret, handle,
+			lowercaseName = name.toLowerCase();
+
+		if ( !isXML ) {
+
+			// Avoid an infinite loop by temporarily removing this function from the getter
+			handle = attrHandle[ lowercaseName ];
+			attrHandle[ lowercaseName ] = ret;
+			ret = getter( elem, name, isXML ) != null ?
+				lowercaseName :
+				null;
+			attrHandle[ lowercaseName ] = handle;
+		}
+		return ret;
+	};
+} );
+
+
+
+
+var rfocusable = /^(?:input|select|textarea|button)$/i,
+	rclickable = /^(?:a|area)$/i;
+
+jQuery.fn.extend( {
+	prop: function( name, value ) {
+		return access( this, jQuery.prop, name, value, arguments.length > 1 );
+	},
+
+	removeProp: function( name ) {
+		return this.each( function() {
+			delete this[ jQuery.propFix[ name ] || name ];
+		} );
+	}
+} );
+
+jQuery.extend( {
+	prop: function( elem, name, value ) {
+		var ret, hooks,
+			nType = elem.nodeType;
+
+		// Don't get/set properties on text, comment and attribute nodes
+		if ( nType === 3 || nType === 8 || nType === 2 ) {
+			return;
+		}
+
+		if ( nType !== 1 || !jQuery.isXMLDoc( elem ) ) {
+
+			// Fix name and attach hooks
+			name = jQuery.propFix[ name ] || name;
+			hooks = jQuery.propHooks[ name ];
+		}
+
+		if ( value !== undefined ) {
+			if ( hooks && "set" in hooks &&
+				( ret = hooks.set( elem, value, name ) ) !== undefined ) {
+				return ret;
+			}
+
+			return ( elem[ name ] = value );
+		}
+
+		if ( hooks && "get" in hooks && ( ret = hooks.get( elem, name ) ) !== null ) {
+			return ret;
+		}
+
+		return elem[ name ];
+	},
+
+	propHooks: {
+		tabIndex: {
+			get: function( elem ) {
+
+				// Support: IE <=9 - 11 only
+				// elem.tabIndex doesn't always return the
+				// correct value when it hasn't been explicitly set
+				// https://web.archive.org/web/20141116233347/http://fluidproject.org/blog/2008/01/09/getting-setting-and-removing-tabindex-values-with-javascript/
+				// Use proper attribute retrieval(#12072)
+				var tabindex = jQuery.find.attr( elem, "tabindex" );
+
+				if ( tabindex ) {
+					return parseInt( tabindex, 10 );
+				}
+
+				if (
+					rfocusable.test( elem.nodeName ) ||
+					rclickable.test( elem.nodeName ) &&
+					elem.href
+				) {
+					return 0;
+				}
+
+				return -1;
+			}
+		}
+	},
+
+	propFix: {
+		"for": "htmlFor",
+		"class": "className"
+	}
+} );
+
+// Support: IE <=11 only
+// Accessing the selectedIndex property
+// forces the browser to respect setting selected
+// on the option
+// The getter ensures a default option is selected
+// when in an optgroup
+// eslint rule "no-unused-expressions" is disabled for this code
+// since it considers such accessions noop
+if ( !support.optSelected ) {
+	jQuery.propHooks.selected = {
+		get: function( elem ) {
+
+			/* eslint no-unused-expressions: "off" */
+
+			var parent = elem.parentNode;
+			if ( parent && parent.parentNode ) {
+				parent.parentNode.selectedIndex;
+			}
+			return null;
+		},
+		set: function( elem ) {
+
+			/* eslint no-unused-expressions: "off" */
+
+			var parent = elem.parentNode;
+			if ( parent ) {
+				parent.selectedIndex;
+
+				if ( parent.parentNode ) {
+					parent.parentNode.selectedIndex;
+				}
+			}
+		}
+	};
+}
+
+jQuery.each( [
+	"tabIndex",
+	"readOnly",
+	"maxLength",
+	"cellSpacing",
+	"cellPadding",
+	"rowSpan",
+	"colSpan",
+	"useMap",
+	"frameBorder",
+	"contentEditable"
+], function() {
+	jQuery.propFix[ this.toLowerCase() ] = this;
+} );
+
+
+
+
+	// Strip and collapse whitespace according to HTML spec
+	// https://infra.spec.whatwg.org/#strip-and-collapse-ascii-whitespace
+	function stripAndCollapse( value ) {
+		var tokens = value.match( rnothtmlwhite ) || [];
+		return tokens.join( " " );
+	}
+
+
+function getClass( elem ) {
+	return elem.getAttribute && elem.getAttribute( "class" ) || "";
+}
+
+function classesToArray( value ) {
+	if ( Array.isArray( value ) ) {
+		return value;
+	}
+	if ( typeof value === "string" ) {
+		return value.match( rnothtmlwhite ) || [];
+	}
+	return [];
+}
+
+jQuery.fn.extend( {
+	addClass: function( value ) {
+		var classes, elem, cur, curValue, clazz, j, finalValue,
+			i = 0;
+
+		if ( isFunction( value ) ) {
+			return this.each( function( j ) {
+				jQuery( this ).addClass( value.call( this, j, getClass( this ) ) );
+			} );
+		}
+
+		classes = classesToArray( value );
+
+		if ( classes.length ) {
+			while ( ( elem = this[ i++ ] ) ) {
+				curValue = getClass( elem );
+				cur = elem.nodeType === 1 && ( " " + stripAndCollapse( curValue ) + " " );
+
+				if ( cur ) {
+					j = 0;
+					while ( ( clazz = classes[ j++ ] ) ) {
+						if ( cur.indexOf( " " + clazz + " " ) < 0 ) {
+							cur += clazz + " ";
+						}
+					}
+
+					// Only assign if different to avoid unneeded rendering.
+					finalValue = stripAndCollapse( cur );
+					if ( curValue !== finalValue ) {
+						elem.setAttribute( "class", finalValue );
+					}
+				}
+			}
+		}
+
+		return this;
+	},
+
+	removeClass: function( value ) {
+		var classes, elem, cur, curValue, clazz, j, finalValue,
+			i = 0;
+
+		if ( isFunction( value ) ) {
+			return this.each( function( j ) {
+				jQuery( this ).removeClass( value.call( this, j, getClass( this ) ) );
+			} );
+		}
+
+		if ( !arguments.length ) {
+			return this.attr( "class", "" );
+		}
+
+		classes = classesToArray( value );
+
+		if ( classes.length ) {
+			while ( ( elem = this[ i++ ] ) ) {
+				curValue = getClass( elem );
+
+				// This expression is here for better compressibility (see addClass)
+				cur = elem.nodeType === 1 && ( " " + stripAndCollapse( curValue ) + " " );
+
+				if ( cur ) {
+					j = 0;
+					while ( ( clazz = classes[ j++ ] ) ) {
+
+						// Remove *all* instances
+						while ( cur.indexOf( " " + clazz + " " ) > -1 ) {
+							cur = cur.replace( " " + clazz + " ", " " );
+						}
+					}
+
+					// Only assign if different to avoid unneeded rendering.
+					finalValue = stripAndCollapse( cur );
+					if ( curValue !== finalValue ) {
+						elem.setAttribute( "class", finalValue );
+					}
+				}
+			}
+		}
+
+		return this;
+	},
+
+	toggleClass: function( value, stateVal ) {
+		var type = typeof value,
+			isValidValue = type === "string" || Array.isArray( value );
+
+		if ( typeof stateVal === "boolean" && isValidValue ) {
+			return stateVal ? this.addClass( value ) : this.removeClass( value );
+		}
+
+		if ( isFunction( value ) ) {
+			return this.each( function( i ) {
+				jQuery( this ).toggleClass(
+					value.call( this, i, getClass( this ), stateVal ),
+					stateVal
+				);
+			} );
+		}
+
+		return this.each( function() {
+			var className, i, self, classNames;
+
+			if ( isValidValue ) {
+
+				// Toggle individual class names
+				i = 0;
+				self = jQuery( this );
+				classNames = classesToArray( value );
+
+				while ( ( className = classNames[ i++ ] ) ) {
+
+					// Check each className given, space separated list
+					if ( self.hasClass( className ) ) {
+						self.removeClass( className );
+					} else {
+						self.addClass( className );
+					}
+				}
+
+			// Toggle whole class name
+			} else if ( value === undefined || type === "boolean" ) {
+				className = getClass( this );
+				if ( className ) {
+
+					// Store className if set
+					dataPriv.set( this, "__className__", className );
+				}
+
+				// If the element has a class name or if we're passed `false`,
+				// then remove the whole classname (if there was one, the above saved it).
+				// Otherwise bring back whatever was previously saved (if anything),
+				// falling back to the empty string if nothing was stored.
+				if ( this.setAttribute ) {
+					this.setAttribute( "class",
+						className || value === false ?
+						"" :
+						dataPriv.get( this, "__className__" ) || ""
+					);
+				}
+			}
+		} );
+	},
+
+	hasClass: function( selector ) {
+		var className, elem,
+			i = 0;
+
+		className = " " + selector + " ";
+		while ( ( elem = this[ i++ ] ) ) {
+			if ( elem.nodeType === 1 &&
+				( " " + stripAndCollapse( getClass( elem ) ) + " " ).indexOf( className ) > -1 ) {
+					return true;
+			}
+		}
+
+		return false;
+	}
+} );
+
+
+
+
+var rreturn = /\r/g;
+
+jQuery.fn.extend( {
+	val: function( value ) {
+		var hooks, ret, valueIsFunction,
+			elem = this[ 0 ];
+
+		if ( !arguments.length ) {
+			if ( elem ) {
+				hooks = jQuery.valHooks[ elem.type ] ||
+					jQuery.valHooks[ elem.nodeName.toLowerCase() ];
+
+				if ( hooks &&
+					"get" in hooks &&
+					( ret = hooks.get( elem, "value" ) ) !== undefined
+				) {
+					return ret;
+				}
+
+				ret = elem.value;
+
+				// Handle most common string cases
+				if ( typeof ret === "string" ) {
+					return ret.replace( rreturn, "" );
+				}
+
+				// Handle cases where value is null/undef or number
+				return ret == null ? "" : ret;
+			}
+
+			return;
+		}
+
+		valueIsFunction = isFunction( value );
+
+		return this.each( function( i ) {
+			var val;
+
+			if ( this.nodeType !== 1 ) {
+				return;
+			}
+
+			if ( valueIsFunction ) {
+				val = value.call( this, i, jQuery( this ).val() );
+			} else {
+				val = value;
+			}
+
+			// Treat null/undefined as ""; convert numbers to string
+			if ( val == null ) {
+				val = "";
+
+			} else if ( typeof val === "number" ) {
+				val += "";
+
+			} else if ( Array.isArray( val ) ) {
+				val = jQuery.map( val, function( value ) {
+					return value == null ? "" : value + "";
+				} );
+			}
+
+			hooks = jQuery.valHooks[ this.type ] || jQuery.valHooks[ this.nodeName.toLowerCase() ];
+
+			// If set returns undefined, fall back to normal setting
+			if ( !hooks || !( "set" in hooks ) || hooks.set( this, val, "value" ) === undefined ) {
+				this.value = val;
+			}
+		} );
+	}
+} );
+
+jQuery.extend( {
+	valHooks: {
+		option: {
+			get: function( elem ) {
+
+				var val = jQuery.find.attr( elem, "value" );
+				return val != null ?
+					val :
+
+					// Support: IE <=10 - 11 only
+					// option.text throws exceptions (#14686, #14858)
+					// Strip and collapse whitespace
+					// https://html.spec.whatwg.org/#strip-and-collapse-whitespace
+					stripAndCollapse( jQuery.text( elem ) );
+			}
+		},
+		select: {
+			get: function( elem ) {
+				var value, option, i,
+					options = elem.options,
+					index = elem.selectedIndex,
+					one = elem.type === "select-one",
+					values = one ? null : [],
+					max = one ? index + 1 : options.length;
+
+				if ( index < 0 ) {
+					i = max;
+
+				} else {
+					i = one ? index : 0;
+				}
+
+				// Loop through all the selected options
+				for ( ; i < max; i++ ) {
+					option = options[ i ];
+
+					// Support: IE <=9 only
+					// IE8-9 doesn't update selected after form reset (#2551)
+					if ( ( option.selected || i === index ) &&
+
+							// Don't return options that are disabled or in a disabled optgroup
+							!option.disabled &&
+							( !option.parentNode.disabled ||
+								!nodeName( option.parentNode, "optgroup" ) ) ) {
+
+						// Get the specific value for the option
+						value = jQuery( option ).val();
+
+						// We don't need an array for one selects
+						if ( one ) {
+							return value;
+						}
+
+						// Multi-Selects return an array
+						values.push( value );
+					}
+				}
+
+				return values;
+			},
+
+			set: function( elem, value ) {
+				var optionSet, option,
+					options = elem.options,
+					values = jQuery.makeArray( value ),
+					i = options.length;
+
+				while ( i-- ) {
+					option = options[ i ];
+
+					/* eslint-disable no-cond-assign */
+
+					if ( option.selected =
+						jQuery.inArray( jQuery.valHooks.option.get( option ), values ) > -1
+					) {
+						optionSet = true;
+					}
+
+					/* eslint-enable no-cond-assign */
+				}
+
+				// Force browsers to behave consistently when non-matching value is set
+				if ( !optionSet ) {
+					elem.selectedIndex = -1;
+				}
+				return values;
+			}
+		}
+	}
+} );
+
+// Radios and checkboxes getter/setter
+jQuery.each( [ "radio", "checkbox" ], function() {
+	jQuery.valHooks[ this ] = {
+		set: function( elem, value ) {
+			if ( Array.isArray( value ) ) {
+				return ( elem.checked = jQuery.inArray( jQuery( elem ).val(), value ) > -1 );
+			}
+		}
+	};
+	if ( !support.checkOn ) {
+		jQuery.valHooks[ this ].get = function( elem ) {
+			return elem.getAttribute( "value" ) === null ? "on" : elem.value;
+		};
+	}
+} );
+
+
+
+
+// Return jQuery for attributes-only inclusion
+
+
+support.focusin = "onfocusin" in window;
+
+
+var rfocusMorph = /^(?:focusinfocus|focusoutblur)$/,
+	stopPropagationCallback = function( e ) {
+		e.stopPropagation();
+	};
+
+jQuery.extend( jQuery.event, {
+
+	trigger: function( event, data, elem, onlyHandlers ) {
+
+		var i, cur, tmp, bubbleType, ontype, handle, special, lastElement,
+			eventPath = [ elem || document ],
+			type = hasOwn.call( event, "type" ) ? event.type : event,
+			namespaces = hasOwn.call( event, "namespace" ) ? event.namespace.split( "." ) : [];
+
+		cur = lastElement = tmp = elem = elem || document;
+
+		// Don't do events on text and comment nodes
+		if ( elem.nodeType === 3 || elem.nodeType === 8 ) {
+			return;
+		}
+
+		// focus/blur morphs to focusin/out; ensure we're not firing them right now
+		if ( rfocusMorph.test( type + jQuery.event.triggered ) ) {
+			return;
+		}
+
+		if ( type.indexOf( "." ) > -1 ) {
+
+			// Namespaced trigger; create a regexp to match event type in handle()
+			namespaces = type.split( "." );
+			type = namespaces.shift();
+			namespaces.sort();
+		}
+		ontype = type.indexOf( ":" ) < 0 && "on" + type;
+
+		// Caller can pass in a jQuery.Event object, Object, or just an event type string
+		event = event[ jQuery.expando ] ?
+			event :
+			new jQuery.Event( type, typeof event === "object" && event );
+
+		// Trigger bitmask: & 1 for native handlers; & 2 for jQuery (always true)
+		event.isTrigger = onlyHandlers ? 2 : 3;
+		event.namespace = namespaces.join( "." );
+		event.rnamespace = event.namespace ?
+			new RegExp( "(^|\\.)" + namespaces.join( "\\.(?:.*\\.|)" ) + "(\\.|$)" ) :
+			null;
+
+		// Clean up the event in case it is being reused
+		event.result = undefined;
+		if ( !event.target ) {
+			event.target = elem;
+		}
+
+		// Clone any incoming data and prepend the event, creating the handler arg list
+		data = data == null ?
+			[ event ] :
+			jQuery.makeArray( data, [ event ] );
+
+		// Allow special events to draw outside the lines
+		special = jQuery.event.special[ type ] || {};
+		if ( !onlyHandlers && special.trigger && special.trigger.apply( elem, data ) === false ) {
+			return;
+		}
+
+		// Determine event propagation path in advance, per W3C events spec (#9951)
+		// Bubble up to document, then to window; watch for a global ownerDocument var (#9724)
+		if ( !onlyHandlers && !special.noBubble && !isWindow( elem ) ) {
+
+			bubbleType = special.delegateType || type;
+			if ( !rfocusMorph.test( bubbleType + type ) ) {
+				cur = cur.parentNode;
+			}
+			for ( ; cur; cur = cur.parentNode ) {
+				eventPath.push( cur );
+				tmp = cur;
+			}
+
+			// Only add window if we got to document (e.g., not plain obj or detached DOM)
+			if ( tmp === ( elem.ownerDocument || document ) ) {
+				eventPath.push( tmp.defaultView || tmp.parentWindow || window );
+			}
+		}
+
+		// Fire handlers on the event path
+		i = 0;
+		while ( ( cur = eventPath[ i++ ] ) && !event.isPropagationStopped() ) {
+			lastElement = cur;
+			event.type = i > 1 ?
+				bubbleType :
+				special.bindType || type;
+
+			// jQuery handler
+			handle = ( dataPriv.get( cur, "events" ) || {} )[ event.type ] &&
+				dataPriv.get( cur, "handle" );
+			if ( handle ) {
+				handle.apply( cur, data );
+			}
+
+			// Native handler
+			handle = ontype && cur[ ontype ];
+			if ( handle && handle.apply && acceptData( cur ) ) {
+				event.result = handle.apply( cur, data );
+				if ( event.result === false ) {
+					event.preventDefault();
+				}
+			}
+		}
+		event.type = type;
+
+		// If nobody prevented the default action, do it now
+		if ( !onlyHandlers && !event.isDefaultPrevented() ) {
+
+			if ( ( !special._default ||
+				special._default.apply( eventPath.pop(), data ) === false ) &&
+				acceptData( elem ) ) {
+
+				// Call a native DOM method on the target with the same name as the event.
+				// Don't do default actions on window, that's where global variables be (#6170)
+				if ( ontype && isFunction( elem[ type ] ) && !isWindow( elem ) ) {
+
+					// Don't re-trigger an onFOO event when we call its FOO() method
+					tmp = elem[ ontype ];
+
+					if ( tmp ) {
+						elem[ ontype ] = null;
+					}
+
+					// Prevent re-triggering of the same event, since we already bubbled it above
+					jQuery.event.triggered = type;
+
+					if ( event.isPropagationStopped() ) {
+						lastElement.addEventListener( type, stopPropagationCallback );
+					}
+
+					elem[ type ]();
+
+					if ( event.isPropagationStopped() ) {
+						lastElement.removeEventListener( type, stopPropagationCallback );
+					}
+
+					jQuery.event.triggered = undefined;
+
+					if ( tmp ) {
+						elem[ ontype ] = tmp;
+					}
+				}
+			}
+		}
+
+		return event.result;
+	},
+
+	// Piggyback on a donor event to simulate a different one
+	// Used only for `focus(in | out)` events
+	simulate: function( type, elem, event ) {
+		var e = jQuery.extend(
+			new jQuery.Event(),
+			event,
+			{
+				type: type,
+				isSimulated: true
+			}
+		);
+
+		jQuery.event.trigger( e, null, elem );
+	}
+
+} );
+
+jQuery.fn.extend( {
+
+	trigger: function( type, data ) {
+		return this.each( function() {
+			jQuery.event.trigger( type, data, this );
+		} );
+	},
+	triggerHandler: function( type, data ) {
+		var elem = this[ 0 ];
+		if ( elem ) {
+			return jQuery.event.trigger( type, data, elem, true );
+		}
+	}
+} );
+
+
+// Support: Firefox <=44
+// Firefox doesn't have focus(in | out) events
+// Related ticket - https://bugzilla.mozilla.org/show_bug.cgi?id=687787
+//
+// Support: Chrome <=48 - 49, Safari <=9.0 - 9.1
+// focus(in | out) events fire after focus & blur events,
+// which is spec violation - http://www.w3.org/TR/DOM-Level-3-Events/#events-focusevent-event-order
+// Related ticket - https://bugs.chromium.org/p/chromium/issues/detail?id=449857
+if ( !support.focusin ) {
+	jQuery.each( { focus: "focusin", blur: "focusout" }, function( orig, fix ) {
+
+		// Attach a single capturing handler on the document while someone wants focusin/focusout
+		var handler = function( event ) {
+			jQuery.event.simulate( fix, event.target, jQuery.event.fix( event ) );
+		};
+
+		jQuery.event.special[ fix ] = {
+			setup: function() {
+				var doc = this.ownerDocument || this,
+					attaches = dataPriv.access( doc, fix );
+
+				if ( !attaches ) {
+					doc.addEventListener( orig, handler, true );
+				}
+				dataPriv.access( doc, fix, ( attaches || 0 ) + 1 );
+			},
+			teardown: function() {
+				var doc = this.ownerDocument || this,
+					attaches = dataPriv.access( doc, fix ) - 1;
+
+				if ( !attaches ) {
+					doc.removeEventListener( orig, handler, true );
+					dataPriv.remove( doc, fix );
+
+				} else {
+					dataPriv.access( doc, fix, attaches );
+				}
+			}
+		};
+	} );
+}
+var location = window.location;
+
+var nonce = Date.now();
+
+var rquery = ( /\?/ );
+
+
+
+// Cross-browser xml parsing
+jQuery.parseXML = function( data ) {
+	var xml;
+	if ( !data || typeof data !== "string" ) {
+		return null;
+	}
+
+	// Support: IE 9 - 11 only
+	// IE throws on parseFromString with invalid input.
+	try {
+		xml = ( new window.DOMParser() ).parseFromString( data, "text/xml" );
+	} catch ( e ) {
+		xml = undefined;
+	}
+
+	if ( !xml || xml.getElementsByTagName( "parsererror" ).length ) {
+		jQuery.error( "Invalid XML: " + data );
+	}
+	return xml;
+};
+
+
+var
+	rbracket = /\[\]$/,
+	rCRLF = /\r?\n/g,
+	rsubmitterTypes = /^(?:submit|button|image|reset|file)$/i,
+	rsubmittable = /^(?:input|select|textarea|keygen)/i;
+
+function buildParams( prefix, obj, traditional, add ) {
+	var name;
+
+	if ( Array.isArray( obj ) ) {
+
+		// Serialize array item.
+		jQuery.each( obj, function( i, v ) {
+			if ( traditional || rbracket.test( prefix ) ) {
+
+				// Treat each array item as a scalar.
+				add( prefix, v );
+
+			} else {
+
+				// Item is non-scalar (array or object), encode its numeric index.
+				buildParams(
+					prefix + "[" + ( typeof v === "object" && v != null ? i : "" ) + "]",
+					v,
+					traditional,
+					add
+				);
+			}
+		} );
+
+	} else if ( !traditional && toType( obj ) === "object" ) {
+
+		// Serialize object item.
+		for ( name in obj ) {
+			buildParams( prefix + "[" + name + "]", obj[ name ], traditional, add );
+		}
+
+	} else {
+
+		// Serialize scalar item.
+		add( prefix, obj );
+	}
+}
+
+// Serialize an array of form elements or a set of
+// key/values into a query string
+jQuery.param = function( a, traditional ) {
+	var prefix,
+		s = [],
+		add = function( key, valueOrFunction ) {
+
+			// If value is a function, invoke it and use its return value
+			var value = isFunction( valueOrFunction ) ?
+				valueOrFunction() :
+				valueOrFunction;
+
+			s[ s.length ] = encodeURIComponent( key ) + "=" +
+				encodeURIComponent( value == null ? "" : value );
+		};
+
+	// If an array was passed in, assume that it is an array of form elements.
+	if ( Array.isArray( a ) || ( a.jquery && !jQuery.isPlainObject( a ) ) ) {
+
+		// Serialize the form elements
+		jQuery.each( a, function() {
+			add( this.name, this.value );
+		} );
+
+	} else {
+
+		// If traditional, encode the "old" way (the way 1.3.2 or older
+		// did it), otherwise encode params recursively.
+		for ( prefix in a ) {
+			buildParams( prefix, a[ prefix ], traditional, add );
+		}
+	}
+
+	// Return the resulting serialization
+	return s.join( "&" );
+};
+
+jQuery.fn.extend( {
+	serialize: function() {
+		return jQuery.param( this.serializeArray() );
+	},
+	serializeArray: function() {
+		return this.map( function() {
+
+			// Can add propHook for "elements" to filter or add form elements
+			var elements = jQuery.prop( this, "elements" );
+			return elements ? jQuery.makeArray( elements ) : this;
+		} )
+		.filter( function() {
+			var type = this.type;
+
+			// Use .is( ":disabled" ) so that fieldset[disabled] works
+			return this.name && !jQuery( this ).is( ":disabled" ) &&
+				rsubmittable.test( this.nodeName ) && !rsubmitterTypes.test( type ) &&
+				( this.checked || !rcheckableType.test( type ) );
+		} )
+		.map( function( i, elem ) {
+			var val = jQuery( this ).val();
+
+			if ( val == null ) {
+				return null;
+			}
+
+			if ( Array.isArray( val ) ) {
+				return jQuery.map( val, function( val ) {
+					return { name: elem.name, value: val.replace( rCRLF, "\r\n" ) };
+				} );
+			}
+
+			return { name: elem.name, value: val.replace( rCRLF, "\r\n" ) };
+		} ).get();
+	}
+} );
+
+
+var
+	r20 = /%20/g,
+	rhash = /#.*$/,
+	rantiCache = /([?&])_=[^&]*/,
+	rheaders = /^(.*?):[ \t]*([^\r\n]*)$/mg,
+
+	// #7653, #8125, #8152: local protocol detection
+	rlocalProtocol = /^(?:about|app|app-storage|.+-extension|file|res|widget):$/,
+	rnoContent = /^(?:GET|HEAD)$/,
+	rprotocol = /^\/\//,
+
+	/* Prefilters
+	 * 1) They are useful to introduce custom dataTypes (see ajax/jsonp.js for an example)
+	 * 2) These are called:
+	 *    - BEFORE asking for a transport
+	 *    - AFTER param serialization (s.data is a string if s.processData is true)
+	 * 3) key is the dataType
+	 * 4) the catchall symbol "*" can be used
+	 * 5) execution will start with transport dataType and THEN continue down to "*" if needed
+	 */
+	prefilters = {},
+
+	/* Transports bindings
+	 * 1) key is the dataType
+	 * 2) the catchall symbol "*" can be used
+	 * 3) selection will start with transport dataType and THEN go to "*" if needed
+	 */
+	transports = {},
+
+	// Avoid comment-prolog char sequence (#10098); must appease lint and evade compression
+	allTypes = "*/".concat( "*" ),
+
+	// Anchor tag for parsing the document origin
+	originAnchor = document.createElement( "a" );
+	originAnchor.href = location.href;
+
+// Base "constructor" for jQuery.ajaxPrefilter and jQuery.ajaxTransport
+function addToPrefiltersOrTransports( structure ) {
+
+	// dataTypeExpression is optional and defaults to "*"
+	return function( dataTypeExpression, func ) {
+
+		if ( typeof dataTypeExpression !== "string" ) {
+			func = dataTypeExpression;
+			dataTypeExpression = "*";
+		}
+
+		var dataType,
+			i = 0,
+			dataTypes = dataTypeExpression.toLowerCase().match( rnothtmlwhite ) || [];
+
+		if ( isFunction( func ) ) {
+
+			// For each dataType in the dataTypeExpression
+			while ( ( dataType = dataTypes[ i++ ] ) ) {
+
+				// Prepend if requested
+				if ( dataType[ 0 ] === "+" ) {
+					dataType = dataType.slice( 1 ) || "*";
+					( structure[ dataType ] = structure[ dataType ] || [] ).unshift( func );
+
+				// Otherwise append
+				} else {
+					( structure[ dataType ] = structure[ dataType ] || [] ).push( func );
+				}
+			}
+		}
+	};
+}
+
+// Base inspection function for prefilters and transports
+function inspectPrefiltersOrTransports( structure, options, originalOptions, jqXHR ) {
+
+	var inspected = {},
+		seekingTransport = ( structure === transports );
+
+	function inspect( dataType ) {
+		var selected;
+		inspected[ dataType ] = true;
+		jQuery.each( structure[ dataType ] || [], function( _, prefilterOrFactory ) {
+			var dataTypeOrTransport = prefilterOrFactory( options, originalOptions, jqXHR );
+			if ( typeof dataTypeOrTransport === "string" &&
+				!seekingTransport && !inspected[ dataTypeOrTransport ] ) {
+
+				options.dataTypes.unshift( dataTypeOrTransport );
+				inspect( dataTypeOrTransport );
+				return false;
+			} else if ( seekingTransport ) {
+				return !( selected = dataTypeOrTransport );
+			}
+		} );
+		return selected;
+	}
+
+	return inspect( options.dataTypes[ 0 ] ) || !inspected[ "*" ] && inspect( "*" );
+}
+
+// A special extend for ajax options
+// that takes "flat" options (not to be deep extended)
+// Fixes #9887
+function ajaxExtend( target, src ) {
+	var key, deep,
+		flatOptions = jQuery.ajaxSettings.flatOptions || {};
+
+	for ( key in src ) {
+		if ( src[ key ] !== undefined ) {
+			( flatOptions[ key ] ? target : ( deep || ( deep = {} ) ) )[ key ] = src[ key ];
+		}
+	}
+	if ( deep ) {
+		jQuery.extend( true, target, deep );
+	}
+
+	return target;
+}
+
+/* Handles responses to an ajax request:
+ * - finds the right dataType (mediates between content-type and expected dataType)
+ * - returns the corresponding response
+ */
+function ajaxHandleResponses( s, jqXHR, responses ) {
+
+	var ct, type, finalDataType, firstDataType,
+		contents = s.contents,
+		dataTypes = s.dataTypes;
+
+	// Remove auto dataType and get content-type in the process
+	while ( dataTypes[ 0 ] === "*" ) {
+		dataTypes.shift();
+		if ( ct === undefined ) {
+			ct = s.mimeType || jqXHR.getResponseHeader( "Content-Type" );
+		}
+	}
+
+	// Check if we're dealing with a known content-type
+	if ( ct ) {
+		for ( type in contents ) {
+			if ( contents[ type ] && contents[ type ].test( ct ) ) {
+				dataTypes.unshift( type );
+				break;
+			}
+		}
+	}
+
+	// Check to see if we have a response for the expected dataType
+	if ( dataTypes[ 0 ] in responses ) {
+		finalDataType = dataTypes[ 0 ];
+	} else {
+
+		// Try convertible dataTypes
+		for ( type in responses ) {
+			if ( !dataTypes[ 0 ] || s.converters[ type + " " + dataTypes[ 0 ] ] ) {
+				finalDataType = type;
+				break;
+			}
+			if ( !firstDataType ) {
+				firstDataType = type;
+			}
+		}
+
+		// Or just use first one
+		finalDataType = finalDataType || firstDataType;
+	}
+
+	// If we found a dataType
+	// We add the dataType to the list if needed
+	// and return the corresponding response
+	if ( finalDataType ) {
+		if ( finalDataType !== dataTypes[ 0 ] ) {
+			dataTypes.unshift( finalDataType );
+		}
+		return responses[ finalDataType ];
+	}
+}
+
+/* Chain conversions given the request and the original response
+ * Also sets the responseXXX fields on the jqXHR instance
+ */
+function ajaxConvert( s, response, jqXHR, isSuccess ) {
+	var conv2, current, conv, tmp, prev,
+		converters = {},
+
+		// Work with a copy of dataTypes in case we need to modify it for conversion
+		dataTypes = s.dataTypes.slice();
+
+	// Create converters map with lowercased keys
+	if ( dataTypes[ 1 ] ) {
+		for ( conv in s.converters ) {
+			converters[ conv.toLowerCase() ] = s.converters[ conv ];
+		}
+	}
+
+	current = dataTypes.shift();
+
+	// Convert to each sequential dataType
+	while ( current ) {
+
+		if ( s.responseFields[ current ] ) {
+			jqXHR[ s.responseFields[ current ] ] = response;
+		}
+
+		// Apply the dataFilter if provided
+		if ( !prev && isSuccess && s.dataFilter ) {
+			response = s.dataFilter( response, s.dataType );
+		}
+
+		prev = current;
+		current = dataTypes.shift();
+
+		if ( current ) {
+
+			// There's only work to do if current dataType is non-auto
+			if ( current === "*" ) {
+
+				current = prev;
+
+			// Convert response if prev dataType is non-auto and differs from current
+			} else if ( prev !== "*" && prev !== current ) {
+
+				// Seek a direct converter
+				conv = converters[ prev + " " + current ] || converters[ "* " + current ];
+
+				// If none found, seek a pair
+				if ( !conv ) {
+					for ( conv2 in converters ) {
+
+						// If conv2 outputs current
+						tmp = conv2.split( " " );
+						if ( tmp[ 1 ] === current ) {
+
+							// If prev can be converted to accepted input
+							conv = converters[ prev + " " + tmp[ 0 ] ] ||
+								converters[ "* " + tmp[ 0 ] ];
+							if ( conv ) {
+
+								// Condense equivalence converters
+								if ( conv === true ) {
+									conv = converters[ conv2 ];
+
+								// Otherwise, insert the intermediate dataType
+								} else if ( converters[ conv2 ] !== true ) {
+									current = tmp[ 0 ];
+									dataTypes.unshift( tmp[ 1 ] );
+								}
+								break;
+							}
+						}
+					}
+				}
+
+				// Apply converter (if not an equivalence)
+				if ( conv !== true ) {
+
+					// Unless errors are allowed to bubble, catch and return them
+					if ( conv && s.throws ) {
+						response = conv( response );
+					} else {
+						try {
+							response = conv( response );
+						} catch ( e ) {
+							return {
+								state: "parsererror",
+								error: conv ? e : "No conversion from " + prev + " to " + current
+							};
+						}
+					}
+				}
+			}
+		}
+	}
+
+	return { state: "success", data: response };
+}
+
+jQuery.extend( {
+
+	// Counter for holding the number of active queries
+	active: 0,
+
+	// Last-Modified header cache for next request
+	lastModified: {},
+	etag: {},
+
+	ajaxSettings: {
+		url: location.href,
+		type: "GET",
+		isLocal: rlocalProtocol.test( location.protocol ),
+		global: true,
+		processData: true,
+		async: true,
+		contentType: "application/x-www-form-urlencoded; charset=UTF-8",
+
+		/*
+		timeout: 0,
+		data: null,
+		dataType: null,
+		username: null,
+		password: null,
+		cache: null,
+		throws: false,
+		traditional: false,
+		headers: {},
+		*/
+
+		accepts: {
+			"*": allTypes,
+			text: "text/plain",
+			html: "text/html",
+			xml: "application/xml, text/xml",
+			json: "application/json, text/javascript"
+		},
+
+		contents: {
+			xml: /\bxml\b/,
+			html: /\bhtml/,
+			json: /\bjson\b/
+		},
+
+		responseFields: {
+			xml: "responseXML",
+			text: "responseText",
+			json: "responseJSON"
+		},
+
+		// Data converters
+		// Keys separate source (or catchall "*") and destination types with a single space
+		converters: {
+
+			// Convert anything to text
+			"* text": String,
+
+			// Text to html (true = no transformation)
+			"text html": true,
+
+			// Evaluate text as a json expression
+			"text json": JSON.parse,
+
+			// Parse text as xml
+			"text xml": jQuery.parseXML
+		},
+
+		// For options that shouldn't be deep extended:
+		// you can add your own custom options here if
+		// and when you create one that shouldn't be
+		// deep extended (see ajaxExtend)
+		flatOptions: {
+			url: true,
+			context: true
+		}
+	},
+
+	// Creates a full fledged settings object into target
+	// with both ajaxSettings and settings fields.
+	// If target is omitted, writes into ajaxSettings.
+	ajaxSetup: function( target, settings ) {
+		return settings ?
+
+			// Building a settings object
+			ajaxExtend( ajaxExtend( target, jQuery.ajaxSettings ), settings ) :
+
+			// Extending ajaxSettings
+			ajaxExtend( jQuery.ajaxSettings, target );
+	},
+
+	ajaxPrefilter: addToPrefiltersOrTransports( prefilters ),
+	ajaxTransport: addToPrefiltersOrTransports( transports ),
+
+	// Main method
+	ajax: function( url, options ) {
+
+		// If url is an object, simulate pre-1.5 signature
+		if ( typeof url === "object" ) {
+			options = url;
+			url = undefined;
+		}
+
+		// Force options to be an object
+		options = options || {};
+
+		var transport,
+
+			// URL without anti-cache param
+			cacheURL,
+
+			// Response headers
+			responseHeadersString,
+			responseHeaders,
+
+			// timeout handle
+			timeoutTimer,
+
+			// Url cleanup var
+			urlAnchor,
+
+			// Request state (becomes false upon send and true upon completion)
+			completed,
+
+			// To know if global events are to be dispatched
+			fireGlobals,
+
+			// Loop variable
+			i,
+
+			// uncached part of the url
+			uncached,
+
+			// Create the final options object
+			s = jQuery.ajaxSetup( {}, options ),
+
+			// Callbacks context
+			callbackContext = s.context || s,
+
+			// Context for global events is callbackContext if it is a DOM node or jQuery collection
+			globalEventContext = s.context &&
+				( callbackContext.nodeType || callbackContext.jquery ) ?
+					jQuery( callbackContext ) :
+					jQuery.event,
+
+			// Deferreds
+			deferred = jQuery.Deferred(),
+			completeDeferred = jQuery.Callbacks( "once memory" ),
+
+			// Status-dependent callbacks
+			statusCode = s.statusCode || {},
+
+			// Headers (they are sent all at once)
+			requestHeaders = {},
+			requestHeadersNames = {},
+
+			// Default abort message
+			strAbort = "canceled",
+
+			// Fake xhr
+			jqXHR = {
+				readyState: 0,
+
+				// Builds headers hashtable if needed
+				getResponseHeader: function( key ) {
+					var match;
+					if ( completed ) {
+						if ( !responseHeaders ) {
+							responseHeaders = {};
+							while ( ( match = rheaders.exec( responseHeadersString ) ) ) {
+								responseHeaders[ match[ 1 ].toLowerCase() ] = match[ 2 ];
+							}
+						}
+						match = responseHeaders[ key.toLowerCase() ];
+					}
+					return match == null ? null : match;
+				},
+
+				// Raw string
+				getAllResponseHeaders: function() {
+					return completed ? responseHeadersString : null;
+				},
+
+				// Caches the header
+				setRequestHeader: function( name, value ) {
+					if ( completed == null ) {
+						name = requestHeadersNames[ name.toLowerCase() ] =
+							requestHeadersNames[ name.toLowerCase() ] || name;
+						requestHeaders[ name ] = value;
+					}
+					return this;
+				},
+
+				// Overrides response content-type header
+				overrideMimeType: function( type ) {
+					if ( completed == null ) {
+						s.mimeType = type;
+					}
+					return this;
+				},
+
+				// Status-dependent callbacks
+				statusCode: function( map ) {
+					var code;
+					if ( map ) {
+						if ( completed ) {
+
+							// Execute the appropriate callbacks
+							jqXHR.always( map[ jqXHR.status ] );
+						} else {
+
+							// Lazy-add the new callbacks in a way that preserves old ones
+							for ( code in map ) {
+								statusCode[ code ] = [ statusCode[ code ], map[ code ] ];
+							}
+						}
+					}
+					return this;
+				},
+
+				// Cancel the request
+				abort: function( statusText ) {
+					var finalText = statusText || strAbort;
+					if ( transport ) {
+						transport.abort( finalText );
+					}
+					done( 0, finalText );
+					return this;
+				}
+			};
+
+		// Attach deferreds
+		deferred.promise( jqXHR );
+
+		// Add protocol if not provided (prefilters might expect it)
+		// Handle falsy url in the settings object (#10093: consistency with old signature)
+		// We also use the url parameter if available
+		s.url = ( ( url || s.url || location.href ) + "" )
+			.replace( rprotocol, location.protocol + "//" );
+
+		// Alias method option to type as per ticket #12004
+		s.type = options.method || options.type || s.method || s.type;
+
+		// Extract dataTypes list
+		s.dataTypes = ( s.dataType || "*" ).toLowerCase().match( rnothtmlwhite ) || [ "" ];
+
+		// A cross-domain request is in order when the origin doesn't match the current origin.
+		if ( s.crossDomain == null ) {
+			urlAnchor = document.createElement( "a" );
+
+			// Support: IE <=8 - 11, Edge 12 - 15
+			// IE throws exception on accessing the href property if url is malformed,
+			// e.g. http://example.com:80x/
+			try {
+				urlAnchor.href = s.url;
+
+				// Support: IE <=8 - 11 only
+				// Anchor's host property isn't correctly set when s.url is relative
+				urlAnchor.href = urlAnchor.href;
+				s.crossDomain = originAnchor.protocol + "//" + originAnchor.host !==
+					urlAnchor.protocol + "//" + urlAnchor.host;
+			} catch ( e ) {
+
+				// If there is an error parsing the URL, assume it is crossDomain,
+				// it can be rejected by the transport if it is invalid
+				s.crossDomain = true;
+			}
+		}
+
+		// Convert data if not already a string
+		if ( s.data && s.processData && typeof s.data !== "string" ) {
+			s.data = jQuery.param( s.data, s.traditional );
+		}
+
+		// Apply prefilters
+		inspectPrefiltersOrTransports( prefilters, s, options, jqXHR );
+
+		// If request was aborted inside a prefilter, stop there
+		if ( completed ) {
+			return jqXHR;
+		}
+
+		// We can fire global events as of now if asked to
+		// Don't fire events if jQuery.event is undefined in an AMD-usage scenario (#15118)
+		fireGlobals = jQuery.event && s.global;
+
+		// Watch for a new set of requests
+		if ( fireGlobals && jQuery.active++ === 0 ) {
+			jQuery.event.trigger( "ajaxStart" );
+		}
+
+		// Uppercase the type
+		s.type = s.type.toUpperCase();
+
+		// Determine if request has content
+		s.hasContent = !rnoContent.test( s.type );
+
+		// Save the URL in case we're toying with the If-Modified-Since
+		// and/or If-None-Match header later on
+		// Remove hash to simplify url manipulation
+		cacheURL = s.url.replace( rhash, "" );
+
+		// More options handling for requests with no content
+		if ( !s.hasContent ) {
+
+			// Remember the hash so we can put it back
+			uncached = s.url.slice( cacheURL.length );
+
+			// If data is available and should be processed, append data to url
+			if ( s.data && ( s.processData || typeof s.data === "string" ) ) {
+				cacheURL += ( rquery.test( cacheURL ) ? "&" : "?" ) + s.data;
+
+				// #9682: remove data so that it's not used in an eventual retry
+				delete s.data;
+			}
+
+			// Add or update anti-cache param if needed
+			if ( s.cache === false ) {
+				cacheURL = cacheURL.replace( rantiCache, "$1" );
+				uncached = ( rquery.test( cacheURL ) ? "&" : "?" ) + "_=" + ( nonce++ ) + uncached;
+			}
+
+			// Put hash and anti-cache on the URL that will be requested (gh-1732)
+			s.url = cacheURL + uncached;
+
+		// Change '%20' to '+' if this is encoded form body content (gh-2658)
+		} else if ( s.data && s.processData &&
+			( s.contentType || "" ).indexOf( "application/x-www-form-urlencoded" ) === 0 ) {
+			s.data = s.data.replace( r20, "+" );
+		}
+
+		// Set the If-Modified-Since and/or If-None-Match header, if in ifModified mode.
+		if ( s.ifModified ) {
+			if ( jQuery.lastModified[ cacheURL ] ) {
+				jqXHR.setRequestHeader( "If-Modified-Since", jQuery.lastModified[ cacheURL ] );
+			}
+			if ( jQuery.etag[ cacheURL ] ) {
+				jqXHR.setRequestHeader( "If-None-Match", jQuery.etag[ cacheURL ] );
+			}
+		}
+
+		// Set the correct header, if data is being sent
+		if ( s.data && s.hasContent && s.contentType !== false || options.contentType ) {
+			jqXHR.setRequestHeader( "Content-Type", s.contentType );
+		}
+
+		// Set the Accepts header for the server, depending on the dataType
+		jqXHR.setRequestHeader(
+			"Accept",
+			s.dataTypes[ 0 ] && s.accepts[ s.dataTypes[ 0 ] ] ?
+				s.accepts[ s.dataTypes[ 0 ] ] +
+					( s.dataTypes[ 0 ] !== "*" ? ", " + allTypes + "; q=0.01" : "" ) :
+				s.accepts[ "*" ]
+		);
+
+		// Check for headers option
+		for ( i in s.headers ) {
+			jqXHR.setRequestHeader( i, s.headers[ i ] );
+		}
+
+		// Allow custom headers/mimetypes and early abort
+		if ( s.beforeSend &&
+			( s.beforeSend.call( callbackContext, jqXHR, s ) === false || completed ) ) {
+
+			// Abort if not done already and return
+			return jqXHR.abort();
+		}
+
+		// Aborting is no longer a cancellation
+		strAbort = "abort";
+
+		// Install callbacks on deferreds
+		completeDeferred.add( s.complete );
+		jqXHR.done( s.success );
+		jqXHR.fail( s.error );
+
+		// Get transport
+		transport = inspectPrefiltersOrTransports( transports, s, options, jqXHR );
+
+		// If no transport, we auto-abort
+		if ( !transport ) {
+			done( -1, "No Transport" );
+		} else {
+			jqXHR.readyState = 1;
+
+			// Send global event
+			if ( fireGlobals ) {
+				globalEventContext.trigger( "ajaxSend", [ jqXHR, s ] );
+			}
+
+			// If request was aborted inside ajaxSend, stop there
+			if ( completed ) {
+				return jqXHR;
+			}
+
+			// Timeout
+			if ( s.async && s.timeout > 0 ) {
+				timeoutTimer = window.setTimeout( function() {
+					jqXHR.abort( "timeout" );
+				}, s.timeout );
+			}
+
+			try {
+				completed = false;
+				transport.send( requestHeaders, done );
+			} catch ( e ) {
+
+				// Rethrow post-completion exceptions
+				if ( completed ) {
+					throw e;
+				}
+
+				// Propagate others as results
+				done( -1, e );
+			}
+		}
+
+		// Callback for when everything is done
+		function done( status, nativeStatusText, responses, headers ) {
+			var isSuccess, success, error, response, modified,
+				statusText = nativeStatusText;
+
+			// Ignore repeat invocations
+			if ( completed ) {
+				return;
+			}
+
+			completed = true;
+
+			// Clear timeout if it exists
+			if ( timeoutTimer ) {
+				window.clearTimeout( timeoutTimer );
+			}
+
+			// Dereference transport for early garbage collection
+			// (no matter how long the jqXHR object will be used)
+			transport = undefined;
+
+			// Cache response headers
+			responseHeadersString = headers || "";
+
+			// Set readyState
+			jqXHR.readyState = status > 0 ? 4 : 0;
+
+			// Determine if successful
+			isSuccess = status >= 200 && status < 300 || status === 304;
+
+			// Get response data
+			if ( responses ) {
+				response = ajaxHandleResponses( s, jqXHR, responses );
+			}
+
+			// Convert no matter what (that way responseXXX fields are always set)
+			response = ajaxConvert( s, response, jqXHR, isSuccess );
+
+			// If successful, handle type chaining
+			if ( isSuccess ) {
+
+				// Set the If-Modified-Since and/or If-None-Match header, if in ifModified mode.
+				if ( s.ifModified ) {
+					modified = jqXHR.getResponseHeader( "Last-Modified" );
+					if ( modified ) {
+						jQuery.lastModified[ cacheURL ] = modified;
+					}
+					modified = jqXHR.getResponseHeader( "etag" );
+					if ( modified ) {
+						jQuery.etag[ cacheURL ] = modified;
+					}
+				}
+
+				// if no content
+				if ( status === 204 || s.type === "HEAD" ) {
+					statusText = "nocontent";
+
+				// if not modified
+				} else if ( status === 304 ) {
+					statusText = "notmodified";
+
+				// If we have data, let's convert it
+				} else {
+					statusText = response.state;
+					success = response.data;
+					error = response.error;
+					isSuccess = !error;
+				}
+			} else {
+
+				// Extract error from statusText and normalize for non-aborts
+				error = statusText;
+				if ( status || !statusText ) {
+					statusText = "error";
+					if ( status < 0 ) {
+						status = 0;
+					}
+				}
+			}
+
+			// Set data for the fake xhr object
+			jqXHR.status = status;
+			jqXHR.statusText = ( nativeStatusText || statusText ) + "";
+
+			// Success/Error
+			if ( isSuccess ) {
+				deferred.resolveWith( callbackContext, [ success, statusText, jqXHR ] );
+			} else {
+				deferred.rejectWith( callbackContext, [ jqXHR, statusText, error ] );
+			}
+
+			// Status-dependent callbacks
+			jqXHR.statusCode( statusCode );
+			statusCode = undefined;
+
+			if ( fireGlobals ) {
+				globalEventContext.trigger( isSuccess ? "ajaxSuccess" : "ajaxError",
+					[ jqXHR, s, isSuccess ? success : error ] );
+			}
+
+			// Complete
+			completeDeferred.fireWith( callbackContext, [ jqXHR, statusText ] );
+
+			if ( fireGlobals ) {
+				globalEventContext.trigger( "ajaxComplete", [ jqXHR, s ] );
+
+				// Handle the global AJAX counter
+				if ( !( --jQuery.active ) ) {
+					jQuery.event.trigger( "ajaxStop" );
+				}
+			}
+		}
+
+		return jqXHR;
+	},
+
+	getJSON: function( url, data, callback ) {
+		return jQuery.get( url, data, callback, "json" );
+	},
+
+	getScript: function( url, callback ) {
+		return jQuery.get( url, undefined, callback, "script" );
+	}
+} );
+
+jQuery.each( [ "get", "post" ], function( i, method ) {
+	jQuery[ method ] = function( url, data, callback, type ) {
+
+		// Shift arguments if data argument was omitted
+		if ( isFunction( data ) ) {
+			type = type || callback;
+			callback = data;
+			data = undefined;
+		}
+
+		// The url can be an options object (which then must have .url)
+		return jQuery.ajax( jQuery.extend( {
+			url: url,
+			type: method,
+			dataType: type,
+			data: data,
+			success: callback
+		}, jQuery.isPlainObject( url ) && url ) );
+	};
+} );
+
+
+jQuery._evalUrl = function( url ) {
+	return jQuery.ajax( {
+		url: url,
+
+		// Make this explicit, since user can override this through ajaxSetup (#11264)
+		type: "GET",
+		dataType: "script",
+		cache: true,
+		async: false,
+		global: false,
+		"throws": true
+	} );
+};
+
+
+jQuery.fn.extend( {
+	wrapAll: function( html ) {
+		var wrap;
+
+		if ( this[ 0 ] ) {
+			if ( isFunction( html ) ) {
+				html = html.call( this[ 0 ] );
+			}
+
+			// The elements to wrap the target around
+			wrap = jQuery( html, this[ 0 ].ownerDocument ).eq( 0 ).clone( true );
+
+			if ( this[ 0 ].parentNode ) {
+				wrap.insertBefore( this[ 0 ] );
+			}
+
+			wrap.map( function() {
+				var elem = this;
+
+				while ( elem.firstElementChild ) {
+					elem = elem.firstElementChild;
+				}
+
+				return elem;
+			} ).append( this );
+		}
+
+		return this;
+	},
+
+	wrapInner: function( html ) {
+		if ( isFunction( html ) ) {
+			return this.each( function( i ) {
+				jQuery( this ).wrapInner( html.call( this, i ) );
+			} );
+		}
+
+		return this.each( function() {
+			var self = jQuery( this ),
+				contents = self.contents();
+
+			if ( contents.length ) {
+				contents.wrapAll( html );
+
+			} else {
+				self.append( html );
+			}
+		} );
+	},
+
+	wrap: function( html ) {
+		var htmlIsFunction = isFunction( html );
+
+		return this.each( function( i ) {
+			jQuery( this ).wrapAll( htmlIsFunction ? html.call( this, i ) : html );
+		} );
+	},
+
+	unwrap: function( selector ) {
+		this.parent( selector ).not( "body" ).each( function() {
+			jQuery( this ).replaceWith( this.childNodes );
+		} );
+		return this;
+	}
+} );
+
+
+jQuery.expr.pseudos.hidden = function( elem ) {
+	return !jQuery.expr.pseudos.visible( elem );
+};
+jQuery.expr.pseudos.visible = function( elem ) {
+	return !!( elem.offsetWidth || elem.offsetHeight || elem.getClientRects().length );
+};
+
+
+
+
+jQuery.ajaxSettings.xhr = function() {
+	try {
+		return new window.XMLHttpRequest();
+	} catch ( e ) {}
+};
+
+var xhrSuccessStatus = {
+
+		// File protocol always yields status code 0, assume 200
+		0: 200,
+
+		// Support: IE <=9 only
+		// #1450: sometimes IE returns 1223 when it should be 204
+		1223: 204
+	},
+	xhrSupported = jQuery.ajaxSettings.xhr();
+
+support.cors = !!xhrSupported && ( "withCredentials" in xhrSupported );
+support.ajax = xhrSupported = !!xhrSupported;
+
+jQuery.ajaxTransport( function( options ) {
+	var callback, errorCallback;
+
+	// Cross domain only allowed if supported through XMLHttpRequest
+	if ( support.cors || xhrSupported && !options.crossDomain ) {
+		return {
+			send: function( headers, complete ) {
+				var i,
+					xhr = options.xhr();
+
+				xhr.open(
+					options.type,
+					options.url,
+					options.async,
+					options.username,
+					options.password
+				);
+
+				// Apply custom fields if provided
+				if ( options.xhrFields ) {
+					for ( i in options.xhrFields ) {
+						xhr[ i ] = options.xhrFields[ i ];
+					}
+				}
+
+				// Override mime type if needed
+				if ( options.mimeType && xhr.overrideMimeType ) {
+					xhr.overrideMimeType( options.mimeType );
+				}
+
+				// X-Requested-With header
+				// For cross-domain requests, seeing as conditions for a preflight are
+				// akin to a jigsaw puzzle, we simply never set it to be sure.
+				// (it can always be set on a per-request basis or even using ajaxSetup)
+				// For same-domain requests, won't change header if already provided.
+				if ( !options.crossDomain && !headers[ "X-Requested-With" ] ) {
+					headers[ "X-Requested-With" ] = "XMLHttpRequest";
+				}
+
+				// Set headers
+				for ( i in headers ) {
+					xhr.setRequestHeader( i, headers[ i ] );
+				}
+
+				// Callback
+				callback = function( type ) {
+					return function() {
+						if ( callback ) {
+							callback = errorCallback = xhr.onload =
+								xhr.onerror = xhr.onabort = xhr.ontimeout =
+									xhr.onreadystatechange = null;
+
+							if ( type === "abort" ) {
+								xhr.abort();
+							} else if ( type === "error" ) {
+
+								// Support: IE <=9 only
+								// On a manual native abort, IE9 throws
+								// errors on any property access that is not readyState
+								if ( typeof xhr.status !== "number" ) {
+									complete( 0, "error" );
+								} else {
+									complete(
+
+										// File: protocol always yields status 0; see #8605, #14207
+										xhr.status,
+										xhr.statusText
+									);
+								}
+							} else {
+								complete(
+									xhrSuccessStatus[ xhr.status ] || xhr.status,
+									xhr.statusText,
+
+									// Support: IE <=9 only
+									// IE9 has no XHR2 but throws on binary (trac-11426)
+									// For XHR2 non-text, let the caller handle it (gh-2498)
+									( xhr.responseType || "text" ) !== "text"  ||
+									typeof xhr.responseText !== "string" ?
+										{ binary: xhr.response } :
+										{ text: xhr.responseText },
+									xhr.getAllResponseHeaders()
+								);
+							}
+						}
+					};
+				};
+
+				// Listen to events
+				xhr.onload = callback();
+				errorCallback = xhr.onerror = xhr.ontimeout = callback( "error" );
+
+				// Support: IE 9 only
+				// Use onreadystatechange to replace onabort
+				// to handle uncaught aborts
+				if ( xhr.onabort !== undefined ) {
+					xhr.onabort = errorCallback;
+				} else {
+					xhr.onreadystatechange = function() {
+
+						// Check readyState before timeout as it changes
+						if ( xhr.readyState === 4 ) {
+
+							// Allow onerror to be called first,
+							// but that will not handle a native abort
+							// Also, save errorCallback to a variable
+							// as xhr.onerror cannot be accessed
+							window.setTimeout( function() {
+								if ( callback ) {
+									errorCallback();
+								}
+							} );
+						}
+					};
+				}
+
+				// Create the abort callback
+				callback = callback( "abort" );
+
+				try {
+
+					// Do send the request (this may raise an exception)
+					xhr.send( options.hasContent && options.data || null );
+				} catch ( e ) {
+
+					// #14683: Only rethrow if this hasn't been notified as an error yet
+					if ( callback ) {
+						throw e;
+					}
+				}
+			},
+
+			abort: function() {
+				if ( callback ) {
+					callback();
+				}
+			}
+		};
+	}
+} );
+
+
+
+
+// Prevent auto-execution of scripts when no explicit dataType was provided (See gh-2432)
+jQuery.ajaxPrefilter( function( s ) {
+	if ( s.crossDomain ) {
+		s.contents.script = false;
+	}
+} );
+
+// Install script dataType
+jQuery.ajaxSetup( {
+	accepts: {
+		script: "text/javascript, application/javascript, " +
+			"application/ecmascript, application/x-ecmascript"
+	},
+	contents: {
+		script: /\b(?:java|ecma)script\b/
+	},
+	converters: {
+		"text script": function( text ) {
+			jQuery.globalEval( text );
+			return text;
+		}
+	}
+} );
+
+// Handle cache's special case and crossDomain
+jQuery.ajaxPrefilter( "script", function( s ) {
+	if ( s.cache === undefined ) {
+		s.cache = false;
+	}
+	if ( s.crossDomain ) {
+		s.type = "GET";
+	}
+} );
+
+// Bind script tag hack transport
+jQuery.ajaxTransport( "script", function( s ) {
+
+	// This transport only deals with cross domain requests
+	if ( s.crossDomain ) {
+		var script, callback;
+		return {
+			send: function( _, complete ) {
+				script = jQuery( "<script>" ).prop( {
+					charset: s.scriptCharset,
+					src: s.url
+				} ).on(
+					"load error",
+					callback = function( evt ) {
+						script.remove();
+						callback = null;
+						if ( evt ) {
+							complete( evt.type === "error" ? 404 : 200, evt.type );
+						}
+					}
+				);
+
+				// Use native DOM manipulation to avoid our domManip AJAX trickery
+				document.head.appendChild( script[ 0 ] );
+			},
+			abort: function() {
+				if ( callback ) {
+					callback();
+				}
+			}
+		};
+	}
+} );
+
+
+
+
+var oldCallbacks = [],
+	rjsonp = /(=)\?(?=&|$)|\?\?/;
+
+// Default jsonp settings
+jQuery.ajaxSetup( {
+	jsonp: "callback",
+	jsonpCallback: function() {
+		var callback = oldCallbacks.pop() || ( jQuery.expando + "_" + ( nonce++ ) );
+		this[ callback ] = true;
+		return callback;
+	}
+} );
+
+// Detect, normalize options and install callbacks for jsonp requests
+jQuery.ajaxPrefilter( "json jsonp", function( s, originalSettings, jqXHR ) {
+
+	var callbackName, overwritten, responseContainer,
+		jsonProp = s.jsonp !== false && ( rjsonp.test( s.url ) ?
+			"url" :
+			typeof s.data === "string" &&
+				( s.contentType || "" )
+					.indexOf( "application/x-www-form-urlencoded" ) === 0 &&
+				rjsonp.test( s.data ) && "data"
+		);
+
+	// Handle iff the expected data type is "jsonp" or we have a parameter to set
+	if ( jsonProp || s.dataTypes[ 0 ] === "jsonp" ) {
+
+		// Get callback name, remembering preexisting value associated with it
+		callbackName = s.jsonpCallback = isFunction( s.jsonpCallback ) ?
+			s.jsonpCallback() :
+			s.jsonpCallback;
+
+		// Insert callback into url or form data
+		if ( jsonProp ) {
+			s[ jsonProp ] = s[ jsonProp ].replace( rjsonp, "$1" + callbackName );
+		} else if ( s.jsonp !== false ) {
+			s.url += ( rquery.test( s.url ) ? "&" : "?" ) + s.jsonp + "=" + callbackName;
+		}
+
+		// Use data converter to retrieve json after script execution
+		s.converters[ "script json" ] = function() {
+			if ( !responseContainer ) {
+				jQuery.error( callbackName + " was not called" );
+			}
+			return responseContainer[ 0 ];
+		};
+
+		// Force json dataType
+		s.dataTypes[ 0 ] = "json";
+
+		// Install callback
+		overwritten = window[ callbackName ];
+		window[ callbackName ] = function() {
+			responseContainer = arguments;
+		};
+
+		// Clean-up function (fires after converters)
+		jqXHR.always( function() {
+
+			// If previous value didn't exist - remove it
+			if ( overwritten === undefined ) {
+				jQuery( window ).removeProp( callbackName );
+
+			// Otherwise restore preexisting value
+			} else {
+				window[ callbackName ] = overwritten;
+			}
+
+			// Save back as free
+			if ( s[ callbackName ] ) {
+
+				// Make sure that re-using the options doesn't screw things around
+				s.jsonpCallback = originalSettings.jsonpCallback;
+
+				// Save the callback name for future use
+				oldCallbacks.push( callbackName );
+			}
+
+			// Call if it was a function and we have a response
+			if ( responseContainer && isFunction( overwritten ) ) {
+				overwritten( responseContainer[ 0 ] );
+			}
+
+			responseContainer = overwritten = undefined;
+		} );
+
+		// Delegate to script
+		return "script";
+	}
+} );
+
+
+
+
+// Support: Safari 8 only
+// In Safari 8 documents created via document.implementation.createHTMLDocument
+// collapse sibling forms: the second one becomes a child of the first one.
+// Because of that, this security measure has to be disabled in Safari 8.
+// https://bugs.webkit.org/show_bug.cgi?id=137337
+support.createHTMLDocument = ( function() {
+	var body = document.implementation.createHTMLDocument( "" ).body;
+	body.innerHTML = "<form></form><form></form>";
+	return body.childNodes.length === 2;
+} )();
+
+
+// Argument "data" should be string of html
+// context (optional): If specified, the fragment will be created in this context,
+// defaults to document
+// keepScripts (optional): If true, will include scripts passed in the html string
+jQuery.parseHTML = function( data, context, keepScripts ) {
+	if ( typeof data !== "string" ) {
+		return [];
+	}
+	if ( typeof context === "boolean" ) {
+		keepScripts = context;
+		context = false;
+	}
+
+	var base, parsed, scripts;
+
+	if ( !context ) {
+
+		// Stop scripts or inline event handlers from being executed immediately
+		// by using document.implementation
+		if ( support.createHTMLDocument ) {
+			context = document.implementation.createHTMLDocument( "" );
+
+			// Set the base href for the created document
+			// so any parsed elements with URLs
+			// are based on the document's URL (gh-2965)
+			base = context.createElement( "base" );
+			base.href = document.location.href;
+			context.head.appendChild( base );
+		} else {
+			context = document;
+		}
+	}
+
+	parsed = rsingleTag.exec( data );
+	scripts = !keepScripts && [];
+
+	// Single tag
+	if ( parsed ) {
+		return [ context.createElement( parsed[ 1 ] ) ];
+	}
+
+	parsed = buildFragment( [ data ], context, scripts );
+
+	if ( scripts && scripts.length ) {
+		jQuery( scripts ).remove();
+	}
+
+	return jQuery.merge( [], parsed.childNodes );
+};
+
+
+/**
+ * Load a url into a page
+ */
+jQuery.fn.load = function( url, params, callback ) {
+	var selector, type, response,
+		self = this,
+		off = url.indexOf( " " );
+
+	if ( off > -1 ) {
+		selector = stripAndCollapse( url.slice( off ) );
+		url = url.slice( 0, off );
+	}
+
+	// If it's a function
+	if ( isFunction( params ) ) {
+
+		// We assume that it's the callback
+		callback = params;
+		params = undefined;
+
+	// Otherwise, build a param string
+	} else if ( params && typeof params === "object" ) {
+		type = "POST";
+	}
+
+	// If we have elements to modify, make the request
+	if ( self.length > 0 ) {
+		jQuery.ajax( {
+			url: url,
+
+			// If "type" variable is undefined, then "GET" method will be used.
+			// Make value of this field explicit since
+			// user can override it through ajaxSetup method
+			type: type || "GET",
+			dataType: "html",
+			data: params
+		} ).done( function( responseText ) {
+
+			// Save response for use in complete callback
+			response = arguments;
+
+			self.html( selector ?
+
+				// If a selector was specified, locate the right elements in a dummy div
+				// Exclude scripts to avoid IE 'Permission Denied' errors
+				jQuery( "<div>" ).append( jQuery.parseHTML( responseText ) ).find( selector ) :
+
+				// Otherwise use the full result
+				responseText );
+
+		// If the request succeeds, this function gets "data", "status", "jqXHR"
+		// but they are ignored because response was set above.
+		// If it fails, this function gets "jqXHR", "status", "error"
+		} ).always( callback && function( jqXHR, status ) {
+			self.each( function() {
+				callback.apply( this, response || [ jqXHR.responseText, status, jqXHR ] );
+			} );
+		} );
+	}
+
+	return this;
+};
+
+
+
+
+// Attach a bunch of functions for handling common AJAX events
+jQuery.each( [
+	"ajaxStart",
+	"ajaxStop",
+	"ajaxComplete",
+	"ajaxError",
+	"ajaxSuccess",
+	"ajaxSend"
+], function( i, type ) {
+	jQuery.fn[ type ] = function( fn ) {
+		return this.on( type, fn );
+	};
+} );
+
+
+
+
+jQuery.expr.pseudos.animated = function( elem ) {
+	return jQuery.grep( jQuery.timers, function( fn ) {
+		return elem === fn.elem;
+	} ).length;
+};
+
+
+
+
+jQuery.offset = {
+	setOffset: function( elem, options, i ) {
+		var curPosition, curLeft, curCSSTop, curTop, curOffset, curCSSLeft, calculatePosition,
+			position = jQuery.css( elem, "position" ),
+			curElem = jQuery( elem ),
+			props = {};
+
+		// Set position first, in-case top/left are set even on static elem
+		if ( position === "static" ) {
+			elem.style.position = "relative";
+		}
+
+		curOffset = curElem.offset();
+		curCSSTop = jQuery.css( elem, "top" );
+		curCSSLeft = jQuery.css( elem, "left" );
+		calculatePosition = ( position === "absolute" || position === "fixed" ) &&
+			( curCSSTop + curCSSLeft ).indexOf( "auto" ) > -1;
+
+		// Need to be able to calculate position if either
+		// top or left is auto and position is either absolute or fixed
+		if ( calculatePosition ) {
+			curPosition = curElem.position();
+			curTop = curPosition.top;
+			curLeft = curPosition.left;
+
+		} else {
+			curTop = parseFloat( curCSSTop ) || 0;
+			curLeft = parseFloat( curCSSLeft ) || 0;
+		}
+
+		if ( isFunction( options ) ) {
+
+			// Use jQuery.extend here to allow modification of coordinates argument (gh-1848)
+			options = options.call( elem, i, jQuery.extend( {}, curOffset ) );
+		}
+
+		if ( options.top != null ) {
+			props.top = ( options.top - curOffset.top ) + curTop;
+		}
+		if ( options.left != null ) {
+			props.left = ( options.left - curOffset.left ) + curLeft;
+		}
+
+		if ( "using" in options ) {
+			options.using.call( elem, props );
+
+		} else {
+			curElem.css( props );
+		}
+	}
+};
+
+jQuery.fn.extend( {
+
+	// offset() relates an element's border box to the document origin
+	offset: function( options ) {
+
+		// Preserve chaining for setter
+		if ( arguments.length ) {
+			return options === undefined ?
+				this :
+				this.each( function( i ) {
+					jQuery.offset.setOffset( this, options, i );
+				} );
+		}
+
+		var rect, win,
+			elem = this[ 0 ];
+
+		if ( !elem ) {
+			return;
+		}
+
+		// Return zeros for disconnected and hidden (display: none) elements (gh-2310)
+		// Support: IE <=11 only
+		// Running getBoundingClientRect on a
+		// disconnected node in IE throws an error
+		if ( !elem.getClientRects().length ) {
+			return { top: 0, left: 0 };
+		}
+
+		// Get document-relative position by adding viewport scroll to viewport-relative gBCR
+		rect = elem.getBoundingClientRect();
+		win = elem.ownerDocument.defaultView;
+		return {
+			top: rect.top + win.pageYOffset,
+			left: rect.left + win.pageXOffset
+		};
+	},
+
+	// position() relates an element's margin box to its offset parent's padding box
+	// This corresponds to the behavior of CSS absolute positioning
+	position: function() {
+		if ( !this[ 0 ] ) {
+			return;
+		}
+
+		var offsetParent, offset, doc,
+			elem = this[ 0 ],
+			parentOffset = { top: 0, left: 0 };
+
+		// position:fixed elements are offset from the viewport, which itself always has zero offset
+		if ( jQuery.css( elem, "position" ) === "fixed" ) {
+
+			// Assume position:fixed implies availability of getBoundingClientRect
+			offset = elem.getBoundingClientRect();
+
+		} else {
+			offset = this.offset();
+
+			// Account for the *real* offset parent, which can be the document or its root element
+			// when a statically positioned element is identified
+			doc = elem.ownerDocument;
+			offsetParent = elem.offsetParent || doc.documentElement;
+			while ( offsetParent &&
+				( offsetParent === doc.body || offsetParent === doc.documentElement ) &&
+				jQuery.css( offsetParent, "position" ) === "static" ) {
+
+				offsetParent = offsetParent.parentNode;
+			}
+			if ( offsetParent && offsetParent !== elem && offsetParent.nodeType === 1 ) {
+
+				// Incorporate borders into its offset, since they are outside its content origin
+				parentOffset = jQuery( offsetParent ).offset();
+				parentOffset.top += jQuery.css( offsetParent, "borderTopWidth", true );
+				parentOffset.left += jQuery.css( offsetParent, "borderLeftWidth", true );
+			}
+		}
+
+		// Subtract parent offsets and element margins
+		return {
+			top: offset.top - parentOffset.top - jQuery.css( elem, "marginTop", true ),
+			left: offset.left - parentOffset.left - jQuery.css( elem, "marginLeft", true )
+		};
+	},
+
+	// This method will return documentElement in the following cases:
+	// 1) For the element inside the iframe without offsetParent, this method will return
+	//    documentElement of the parent window
+	// 2) For the hidden or detached element
+	// 3) For body or html element, i.e. in case of the html node - it will return itself
+	//
+	// but those exceptions were never presented as a real life use-cases
+	// and might be considered as more preferable results.
+	//
+	// This logic, however, is not guaranteed and can change at any point in the future
+	offsetParent: function() {
+		return this.map( function() {
+			var offsetParent = this.offsetParent;
+
+			while ( offsetParent && jQuery.css( offsetParent, "position" ) === "static" ) {
+				offsetParent = offsetParent.offsetParent;
+			}
+
+			return offsetParent || documentElement;
+		} );
+	}
+} );
+
+// Create scrollLeft and scrollTop methods
+jQuery.each( { scrollLeft: "pageXOffset", scrollTop: "pageYOffset" }, function( method, prop ) {
+	var top = "pageYOffset" === prop;
+
+	jQuery.fn[ method ] = function( val ) {
+		return access( this, function( elem, method, val ) {
+
+			// Coalesce documents and windows
+			var win;
+			if ( isWindow( elem ) ) {
+				win = elem;
+			} else if ( elem.nodeType === 9 ) {
+				win = elem.defaultView;
+			}
+
+			if ( val === undefined ) {
+				return win ? win[ prop ] : elem[ method ];
+			}
+
+			if ( win ) {
+				win.scrollTo(
+					!top ? val : win.pageXOffset,
+					top ? val : win.pageYOffset
+				);
+
+			} else {
+				elem[ method ] = val;
+			}
+		}, method, val, arguments.length );
+	};
+} );
+
+// Support: Safari <=7 - 9.1, Chrome <=37 - 49
+// Add the top/left cssHooks using jQuery.fn.position
+// Webkit bug: https://bugs.webkit.org/show_bug.cgi?id=29084
+// Blink bug: https://bugs.chromium.org/p/chromium/issues/detail?id=589347
+// getComputedStyle returns percent when specified for top/left/bottom/right;
+// rather than make the css module depend on the offset module, just check for it here
+jQuery.each( [ "top", "left" ], function( i, prop ) {
+	jQuery.cssHooks[ prop ] = addGetHookIf( support.pixelPosition,
+		function( elem, computed ) {
+			if ( computed ) {
+				computed = curCSS( elem, prop );
+
+				// If curCSS returns percentage, fallback to offset
+				return rnumnonpx.test( computed ) ?
+					jQuery( elem ).position()[ prop ] + "px" :
+					computed;
+			}
+		}
+	);
+} );
+
+
+// Create innerHeight, innerWidth, height, width, outerHeight and outerWidth methods
+jQuery.each( { Height: "height", Width: "width" }, function( name, type ) {
+	jQuery.each( { padding: "inner" + name, content: type, "": "outer" + name },
+		function( defaultExtra, funcName ) {
+
+		// Margin is only for outerHeight, outerWidth
+		jQuery.fn[ funcName ] = function( margin, value ) {
+			var chainable = arguments.length && ( defaultExtra || typeof margin !== "boolean" ),
+				extra = defaultExtra || ( margin === true || value === true ? "margin" : "border" );
+
+			return access( this, function( elem, type, value ) {
+				var doc;
+
+				if ( isWindow( elem ) ) {
+
+					// $( window ).outerWidth/Height return w/h including scrollbars (gh-1729)
+					return funcName.indexOf( "outer" ) === 0 ?
+						elem[ "inner" + name ] :
+						elem.document.documentElement[ "client" + name ];
+				}
+
+				// Get document width or height
+				if ( elem.nodeType === 9 ) {
+					doc = elem.documentElement;
+
+					// Either scroll[Width/Height] or offset[Width/Height] or client[Width/Height],
+					// whichever is greatest
+					return Math.max(
+						elem.body[ "scroll" + name ], doc[ "scroll" + name ],
+						elem.body[ "offset" + name ], doc[ "offset" + name ],
+						doc[ "client" + name ]
+					);
+				}
+
+				return value === undefined ?
+
+					// Get width or height on the element, requesting but not forcing parseFloat
+					jQuery.css( elem, type, extra ) :
+
+					// Set width or height on the element
+					jQuery.style( elem, type, value, extra );
+			}, type, chainable ? margin : undefined, chainable );
+		};
+	} );
+} );
+
+
+jQuery.each( ( "blur focus focusin focusout resize scroll click dblclick " +
+	"mousedown mouseup mousemove mouseover mouseout mouseenter mouseleave " +
+	"change select submit keydown keypress keyup contextmenu" ).split( " " ),
+	function( i, name ) {
+
+	// Handle event binding
+	jQuery.fn[ name ] = function( data, fn ) {
+		return arguments.length > 0 ?
+			this.on( name, null, data, fn ) :
+			this.trigger( name );
+	};
+} );
+
+jQuery.fn.extend( {
+	hover: function( fnOver, fnOut ) {
+		return this.mouseenter( fnOver ).mouseleave( fnOut || fnOver );
+	}
+} );
+
+
+
+
+jQuery.fn.extend( {
+
+	bind: function( types, data, fn ) {
+		return this.on( types, null, data, fn );
+	},
+	unbind: function( types, fn ) {
+		return this.off( types, null, fn );
+	},
+
+	delegate: function( selector, types, data, fn ) {
+		return this.on( types, selector, data, fn );
+	},
+	undelegate: function( selector, types, fn ) {
+
+		// ( namespace ) or ( selector, types [, fn] )
+		return arguments.length === 1 ?
+			this.off( selector, "**" ) :
+			this.off( types, selector || "**", fn );
+	}
+} );
+
+// Bind a function to a context, optionally partially applying any
+// arguments.
+// jQuery.proxy is deprecated to promote standards (specifically Function#bind)
+// However, it is not slated for removal any time soon
+jQuery.proxy = function( fn, context ) {
+	var tmp, args, proxy;
+
+	if ( typeof context === "string" ) {
+		tmp = fn[ context ];
+		context = fn;
+		fn = tmp;
+	}
+
+	// Quick check to determine if target is callable, in the spec
+	// this throws a TypeError, but we will just return undefined.
+	if ( !isFunction( fn ) ) {
+		return undefined;
+	}
+
+	// Simulated bind
+	args = slice.call( arguments, 2 );
+	proxy = function() {
+		return fn.apply( context || this, args.concat( slice.call( arguments ) ) );
+	};
+
+	// Set the guid of unique handler to the same of original handler, so it can be removed
+	proxy.guid = fn.guid = fn.guid || jQuery.guid++;
+
+	return proxy;
+};
+
+jQuery.holdReady = function( hold ) {
+	if ( hold ) {
+		jQuery.readyWait++;
+	} else {
+		jQuery.ready( true );
+	}
+};
+jQuery.isArray = Array.isArray;
+jQuery.parseJSON = JSON.parse;
+jQuery.nodeName = nodeName;
+jQuery.isFunction = isFunction;
+jQuery.isWindow = isWindow;
+jQuery.camelCase = camelCase;
+jQuery.type = toType;
+
+jQuery.now = Date.now;
+
+jQuery.isNumeric = function( obj ) {
+
+	// As of jQuery 3.0, isNumeric is limited to
+	// strings and numbers (primitives or objects)
+	// that can be coerced to finite numbers (gh-2662)
+	var type = jQuery.type( obj );
+	return ( type === "number" || type === "string" ) &&
+
+		// parseFloat NaNs numeric-cast false positives ("")
+		// ...but misinterprets leading-number strings, particularly hex literals ("0x...")
+		// subtraction forces infinities to NaN
+		!isNaN( obj - parseFloat( obj ) );
+};
+
+
+
+
+// Register as a named AMD module, since jQuery can be concatenated with other
+// files that may use define, but not via a proper concatenation script that
+// understands anonymous AMD modules. A named AMD is safest and most robust
+// way to register. Lowercase jquery is used because AMD module names are
+// derived from file names, and jQuery is normally delivered in a lowercase
+// file name. Do this after creating the global so that if an AMD module wants
+// to call noConflict to hide this version of jQuery, it will work.
+
+// Note that for maximum portability, libraries that are not jQuery should
+// declare themselves as anonymous modules, and avoid setting a global if an
+// AMD loader is present. jQuery is a special case. For more information, see
+// https://github.com/jrburke/requirejs/wiki/Updating-existing-libraries#wiki-anon
+
+if ( true ) {
+	!(__WEBPACK_AMD_DEFINE_ARRAY__ = [], __WEBPACK_AMD_DEFINE_RESULT__ = (function() {
+		return jQuery;
+	}).apply(exports, __WEBPACK_AMD_DEFINE_ARRAY__),
+				__WEBPACK_AMD_DEFINE_RESULT__ !== undefined && (module.exports = __WEBPACK_AMD_DEFINE_RESULT__));
+}
+
+
+
+
+var
+
+	// Map over jQuery in case of overwrite
+	_jQuery = window.jQuery,
+
+	// Map over the $ in case of overwrite
+	_$ = window.$;
+
+jQuery.noConflict = function( deep ) {
+	if ( window.$ === jQuery ) {
+		window.$ = _$;
+	}
+
+	if ( deep && window.jQuery === jQuery ) {
+		window.jQuery = _jQuery;
+	}
+
+	return jQuery;
+};
+
+// Expose jQuery and $ identifiers, even in AMD
+// (#7102#comment:10, https://github.com/jquery/jquery/pull/557)
+// and CommonJS for browser emulators (#13566)
+if ( !noGlobal ) {
+	window.jQuery = window.$ = jQuery;
+}
+
+
+
+
+return jQuery;
+} );
 
 
 /***/ })

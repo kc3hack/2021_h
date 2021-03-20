@@ -8,6 +8,15 @@ var session = require('express-session');
 var GitHubStrategy = require('passport-github2').Strategy;
 var passport = require('passport');
 
+// モデルの読み込み
+var User = require('./models/user');
+var Card = require('./models/card');
+
+User.sync().then(() => {
+  Card.belongsTo(User, { foreignKey: 'createdBy' });
+  Card.sync();
+});
+
 var config = require('./config');
 
 var indexRouter = require('./routes/index');
@@ -27,7 +36,16 @@ passport.use(new GitHubStrategy(
 
   function (accessToken, refreshToken, profile, done) {
 
-    process.nextTick(() => done(null, profile));
+    process.nextTick(() => {
+
+      User.upsert(
+        {
+        userId: profile.id,
+        username: profile.username,
+        displayName: profile.displayName
+        }
+      ).then(() => done(null, profile));
+    });
   }
 ));
 
@@ -60,7 +78,24 @@ app.get('/auth/github',
 );
 app.get('/auth/github/callback',
   passport.authenticate('github', { failureRedirect: '/login' }),
-  (req, res) => res.redirect('/')
+  (req, res) => {
+
+    var loginFrom = req.cookies.loginFrom;
+
+    // オープンリダイレクタ脆弱性対策
+    if (
+      loginFrom &&
+      !loginFrom.includes('http://') &&
+      !loginFrom.includes('https://')
+    ) {
+        res.clearCookie('loginFrom');
+        res.redirect(loginFrom);
+    }
+    else {
+
+      res.redirect('/')  // Successful authentication, redirect home.
+    }
+  }
 );
 app.get('/login', (req, res) => res.render('login'));
 app.get('/logout', (req, res) => {
