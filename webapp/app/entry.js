@@ -13,7 +13,7 @@ UIkit.use(Icons);
 
 $(function () {
 
-  var two = new Two( { autostart: true } ).appendTo(document.body);
+  var two = new Two( { autostart: true } ).appendTo(document.getElementById('chat'));
   var rect = two.makeRectangle(two.width / 2, two.height / 2, 250, 250);
 
   rect.noStroke().fill = getRandomColor();

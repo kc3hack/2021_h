@@ -1,6 +1,7 @@
 'use strict';
 const express = require('express');
 const router = express.Router();
+const database = require('../models/sequelize-loader')
 const authenticationEnsurer = require('./authentication-ensurer');
 const User = require('../models/user');
 const Card = require('../models/card');
@@ -16,11 +17,11 @@ router.get('/', authenticationEnsurer, csrfProtection, (req, res, next) => {
     ).then((cards) => {
 
       cards.forEach((card) => card.formattedUpdatedAt = moment(card.updatedAt).tz('Asia/Tokyo').format('YYYY/MM/DD HH:mm'));
-      res.render('chat', { title: 'Chatree - OpenChat', user: req.user, cards: cards, csrfToken: req.csrfToken() });
+      res.render('test', { title: 'Chatree - OpenChat', user: req.user, cards: cards, csrfToken: req.csrfToken() });
     });
   }
 
-  else res.render('chat', { title: 'Chatree - OpenChat', user: req.user, csrfToken: req.csrfToken() });
+  else res.render('test', { title: 'Chatree - OpenChat', user: req.user, csrfToken: req.csrfToken() });
 });
 
 router.post('/', authenticationEnsurer, csrfProtection, (req, res, next) => {

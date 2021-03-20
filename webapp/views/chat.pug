@@ -1,33 +1,58 @@
 extends layout.pug
 
+block js
+  script(src="javascripts/two.min.js")
+  script(src="javascripts/chat.js")
+
 block content
-	div
-		- var hasCard = cards.length > 0
-		if hasCard
-			each card in cards
-				div.uk-card.uk-card-default
-					div.uk-card-header
-						div(uk-grid).uk-grid-small.uk-flex-middle
-							div.uk-width-auto
-								img(src=`https://avatars.githubusercontent.com/u/${card.createdBy}` alt="" width="40px").uk-border-circle
-							div.uk-width-expand
-								p.uk-text-meta
-									time(datetime=card.updatedAt) #{card.formattedUpdatedAt}
-							div.uk-card-badge.uk-label ID: #{card.cardId}
-					div.uk-card-body
-						p #{card.content}
+  div.uk-container.uk-container-expand
+    //- div.uk-position-top-left.uk-position-z-index.uk-margin-top
+    //-   div.uk-navbar-left.uk-position-z-index.uk-margin-top
+    //-     button.uk-navbar-toggle(type='button' uk-navbar-toggle-icon='' uk-toggle='target: .menu-bar; animation: uk-animation-slide-left, uk-animation-slide-bottom')
+    //-   ul.menu-bar.uk-text-large.uk-nav
+    //-     li 
+    //-       a(href="/profile").uk-link-text プロフィール
+    //-       br
+    //-     li 
+    //-       a(href="/logout").uk-link-text ログアウト
+    //-       br
 
-	div.uk-position-bottom-center.uk-position-z-index.uk-margin-top
-		form(action="", method="post")
-			input(type="hidden" name="_csrf" value=csrfToken)
-			//- input(type="text" name="sendTo" readonly)
+    div#myCanvas
 
-			div(uk-grid)
-				div.uk-width-2-5
-					input(type="number" name="sendTo" placeholder="Number to Reply").uk-input.uk-border-pill
+    div
+      - var hasCard = cards.length > 0;
+      script 
+        | chatree = new Chatree();
+      if hasCard
+        each card in cards
+          script
+            | chatree.setCard("#{card.content}", "#{card.sendTo}", "#{card.cardId}", "#{card.updatedAt}", "#{card.createBy}");
+        script
+          | chatree.update();
+      //-   each card in cards
+      //-     div.uk-card.uk-card-default
+      //-       div.uk-card-header
+      //-         div(uk-grid).uk-grid-small.uk-flex-middle
+      //-           div.uk-width-auto
+      //-             img(src=`https://avatars.githubusercontent.com/u/${card.createdBy}` alt="" width="40px").uk-border-circle
+      //-           div.uk-width-expand
+      //-             p.uk-text-meta
+      //-               time(datetime=card.updatedAt) #{card.formattedUpdatedAt}
+      //-           div.uk-card-badge.uk-label ID: #{card.cardId}
+      //-       div.uk-card-body
+      //-         p #{card.content}d
 
-				div.uk-width-2-5
-					input(type="text" name="content" placeholder="Comment (Up to 255 chars)").uk-input.uk-border-pill
+    div.uk-position-bottom-center.uk-position-z-index.uk-margin-top
+      form(action="", method="post")
+        input(type="hidden" name="_csrf" value=csrfToken)
+        //- input(type="text" name="sendTo" readonly)
 
-				div.uk-width-1-5
-					button(type="submit").uk-button.uk-button-primary.uk-border-pill Send
+        div(uk-grid)
+          div.uk-width-2-5
+            input(type="number" name="sendTo" placeholder="Number to Reply").uk-input.uk-border-pill
+
+          div.uk-width-2-5
+            input(type="text" name="content" placeholder="Comment (Up to 255 chars)").uk-input.uk-border-pill
+
+          div.uk-width-1-5
+            button(type="submit").uk-button.uk-button-primary.uk-border-pill Send

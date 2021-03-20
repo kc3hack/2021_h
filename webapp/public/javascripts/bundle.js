@@ -110,7 +110,11 @@ uikit__WEBPACK_IMPORTED_MODULE_0___default.a.use(uikit_dist_js_uikit_icons__WEBP
 jquery__WEBPACK_IMPORTED_MODULE_3___default()(function () {
   var two = new two_js__WEBPACK_IMPORTED_MODULE_2__["default"]({
     autostart: true
+<<<<<<< HEAD
   }).appendTo(document.body);
+=======
+  }).appendTo(document.getElementById('chat'));
+>>>>>>> 9d67a22671aca5bf58bf1d9c6cfa81ff7a7ef67c
   var rect = two.makeRectangle(two.width / 2, two.height / 2, 250, 250);
   rect.noStroke().fill = getRandomColor(); // Update the renderer in order to generate corresponding DOM Elements.
 
