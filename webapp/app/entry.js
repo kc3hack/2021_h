@@ -13,7 +13,8 @@ UIkit.use(Icons);
 
 $(function () {
 
-  var two = new Two( { autostart: true } ).appendTo(document.body);
+  var canvas = document.getElementById('myCanvas');
+  var two = new Two({ autostart: true }).appendTo(canvas);
   var rect = two.makeRectangle(two.width / 2, two.height / 2, 250, 250);
 
   rect.noStroke().fill = getRandomColor();
@@ -28,7 +29,7 @@ $(function () {
     });
 
   two.bind('update', function (frameCount, timeDelta) {
-    rect.rotation = frameCount / 60;
+    // rect.rotation = frameCount / 60;
   });
 
   function getRandomColor() {
