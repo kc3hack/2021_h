@@ -54,9 +54,10 @@ html
               div.uk-navbar-right
                 ul(class="uk-visible@m").uk-navbar-nav
                   li
-                    a(href="/profile")
-                      span(uk-icon="icon: user" data-uk-icon="icon: user")
-                      | Profile
+                    if user
+                      a(href="/profile")
+                        span(uk-icon="icon: user" data-uk-icon="icon: user")
+                        | Profile
 
       section(uk-height-viewport="offset-top: true").uk-section.uk-section-muted
         block content

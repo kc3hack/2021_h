@@ -16,8 +16,8 @@ router.get('/', csrfProtection, (req, res, next) => {
     Card.findAll( // { order: [['updatedAt', 'ASC']] }
     ).then((cards) => {
 
-      cards.forEach((card) => card.formattedUpdatedAt = moment(card.updatedAt).tz('Asia/Tokyo').format('YYYY/MM/DD HH:mm')
-      ).then(() => res.render('chat', { title: 'Chatree - OpenChat', user: req.user, cards: cards, jsonStr: jsonStr, csrfToken: req.csrfToken() }));
+      cards.forEach((card) => card.formattedUpdatedAt = moment(card.updatedAt).tz('Asia/Tokyo').format('YYYY/MM/DD HH:mm'));
+      res.render('chat', { title: 'Chatree - OpenChat', user: req.user, cards: cards, csrfToken: req.csrfToken() });
     });
   }
 

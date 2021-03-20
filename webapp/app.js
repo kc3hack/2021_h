@@ -40,9 +40,9 @@ passport.use(new GitHubStrategy(
 
       User.upsert(
         {
-        userId: profile.id,
-        username: profile.username,
-        displayName: profile.displayName
+          userId: profile.id,
+          username: profile.username,
+          displayName: profile.displayName
         }
       ).then(() => done(null, profile));
     });
@@ -69,8 +69,8 @@ app.use(passport.session());
 app.use('/', indexRouter);
 app.use('/login', loginRouter);
 app.use('/logout', logoutRouter);
-app.use('/profile',profileRouter);
-app.use('/chat',chatRouter);
+app.use('/profile', profileRouter);
+app.use('/chat', chatRouter);
 
 app.get('/auth/github',
   passport.authenticate('github', { scope: ['user:email'] }),
@@ -86,10 +86,10 @@ app.get('/auth/github/callback',
     if (
       loginFrom &&
       !loginFrom.includes('http://') &&
-      !loginFrom.includes('https://')
-    ) {
-        res.clearCookie('loginFrom');
-        res.redirect(loginFrom);
+      !loginFrom.includes('https://'))
+    {
+      res.clearCookie('loginFrom');
+      res.redirect(loginFrom);
     }
     else {
 
@@ -104,12 +104,12 @@ app.get('/logout', (req, res) => {
 });
 
 // catch 404 and forward to error handler
-app.use(function(req, res, next) {
+app.use(function (req, res, next) {
   next(createError(404));
 });
 
 // error handler
-app.use(function(err, req, res, next) {
+app.use(function (err, req, res, next) {
   // set locals, only providing error in development
   res.locals.message = err.message;
   res.locals.error = req.app.get('env') === 'development' ? err : {};
