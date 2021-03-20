@@ -1,16 +1,3 @@
-/**(function () {
-	function drawLine() {
-		var elem = document.getElementById('myCanvas');
-		var two = new Two({ type: Two.Types.svg, width: 285, height: 200 }).appendTo(elem);
-
-		var rect = two.makeRectangle(70, 0, 100, 100);
-		rect.fill = 'white';
-		rect.stroke = '#1C75BC';
-
-		two.update();
-	}
-})();*/
-
 /**
  * チャットの木を作成表示するクラス
  */
@@ -31,7 +18,7 @@ class Chatree {
         this.betweenHeight = 30;
 
         this.two = new Two({ type: Two.Types.svg, width: this.windowWidth, height: this.windowHeight }).appendTo(this.elem);
-        
+
         this.tree = {};
         this.parents = {};
         this.oneParent = {};
@@ -73,7 +60,7 @@ class Chatree {
             const popWidth = width.shift();
             const popHeight = this.layerToHeight(nowLayer);
             this.coordinates[pop[0]] = [popWidth, popHeight];
-    
+
             this.drawCard(popWidth, this.parents[pop[0]], nowLayer);
             if(nowLayer != 0) this.drawLine(this.oneParent[pop[0]], pop[0]);
 
@@ -95,7 +82,7 @@ class Chatree {
         this.cardBetween = (this.windowWidth - this.cardWidth * total) / 4;
 
         if(this.cardBetween < 20) { this.cardBetween = 20; }
-        
+
         let cardsWidth = [];
         let start = 0;
 

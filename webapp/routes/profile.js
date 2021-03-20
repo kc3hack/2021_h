@@ -12,7 +12,7 @@ router.get('/', authenticationEnsurer, csrfProtection, (req, res, next) => {
 
 router.post('/', authenticationEnsurer, csrfProtection, (req, res, next) => {
 
-	console.log(req.body); //TODO: 予定と候補を保存する実装をする
+	console.log(req.body); //TODO: 保存する実装をする
 	res.redirect('/profile');
 })
 
