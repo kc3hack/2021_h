@@ -35,6 +35,7 @@ passport.use(new GitHubStrategy(
   },
 
   function (accessToken, refreshToken, profile, done) {
+
     process.nextTick(() => {
 
       User.upsert(
@@ -68,7 +69,7 @@ app.use(passport.session());
 app.use('/', indexRouter);
 app.use('/login', loginRouter);
 app.use('/logout', logoutRouter);
-app.use('/profile',profileRouter);
+app.use('/profile', profileRouter);
 app.use('/chat', chatRouter);
 
 app.get('/auth/github',
@@ -85,10 +86,10 @@ app.get('/auth/github/callback',
     if (
       loginFrom &&
       !loginFrom.includes('http://') &&
-      !loginFrom.includes('https://')
-    ) {
-        res.clearCookie('loginFrom');
-        res.redirect(loginFrom);
+      !loginFrom.includes('https://'))
+    {
+      res.clearCookie('loginFrom');
+      res.redirect(loginFrom);
     }
     else {
 
@@ -103,12 +104,12 @@ app.get('/logout', (req, res) => {
 });
 
 // catch 404 and forward to error handler
-app.use(function(req, res, next) {
+app.use(function (req, res, next) {
   next(createError(404));
 });
 
 // error handler
-app.use(function(err, req, res, next) {
+app.use(function (err, req, res, next) {
   // set locals, only providing error in development
   res.locals.message = err.message;
   res.locals.error = req.app.get('env') === 'development' ? err : {};

@@ -1,7 +1,6 @@
 'use strict';
 const express = require('express');
 const router = express.Router();
-const database = require('../models/sequelize-loader')
 const authenticationEnsurer = require('./authentication-ensurer');
 const User = require('../models/user');
 const Card = require('../models/card');

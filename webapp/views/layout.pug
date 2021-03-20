@@ -40,6 +40,10 @@ html
     //- \CSS Files
     script(src="javascripts/chat.js")
 
+    //- JS Files
+    block js
+    //- \JS Files
+
   body
     div
       div.uk-position-relative.uk-background-primary.uk-light
@@ -53,11 +57,12 @@ html
                     img(src="/images/logo_transparent.png" alt="" width="60px").uk-margin-small-right
 
               div.uk-navbar-right
-                ul(class="uk-visible@m").uk-navbar-nav
-                  li
-                    a(href="/profile")
-                      span(uk-icon="icon: user" data-uk-icon="icon: user")
-                      | Profile
+                ul.uk-navbar-nav
+                  li.uk-active
+                    if user
+                      a(href="/profile")
+                        span(uk-icon="icon: user" data-uk-icon="icon: user")
+                        | Profile
 
       section(uk-height-viewport="offset-top: true").uk-section.uk-section-muted
         block content
