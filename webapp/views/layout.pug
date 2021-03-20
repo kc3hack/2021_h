@@ -40,8 +40,28 @@ html
     block css
     //- \CSS Files
 
+    //- JS Files
+    block js
+    //- \JS Files
+
   body
-    section
-    section.uk-section.uk-section-muted.uk-height-viewport
-      block content
-    script(src="/javascripts/bundle.js")
+    div
+      //- div.nav.uk-sticky
+        div.uk-container
+          nav.uk-navbar.uk-navbar-container.uk-navbar-transparent
+
+          div.uk-navbar-left
+            div.uk-navbar-item.uk-padding-remove-horizontal
+              a(href="/").uk-navbar-item.uk-logo
+                img(src="/favicon.ico" alt="").uk-margin-small-right
+
+          div.uk-navbar-right
+            ul(class="uk-visible@s").uk-navbar-nav
+              li(class="uk-visible@m").uk-active
+                a(uk-icon="home" href="/")
+
+
+
+      section.uk-section.uk-section-muted.uk-height-viewport
+        block content
+      script(src="/javascripts/bundle.js")
