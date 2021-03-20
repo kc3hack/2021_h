@@ -9,14 +9,13 @@ block content
     if hasCard
       script
         include ../public/javascripts/chatree.js
-      script
         | chatree = new Chatree();
       each card in cards
         script
-          | chatree.setCard("#{card.content}", "#{card.sendTo}", "#{card.cardId}", "#{card.formattedUpdatedAt}", "#{card.createBy}");
+          |  chatree.setCard("#{card.content}", "#{card.sendTo}", "#{card.cardId}", "#{card.formattedUpdatedAt}", "#{card.createBy}");
       script
-        | chatree.update();
-      
+        |  chatree.setCoordinates();
+        |  chatree.update();
 
   //- div#myCanvas
     //- - var hasCard = cards.length > 0
@@ -44,7 +43,7 @@ block content
           input(type="number" name="sendTo" placeholder="Number to Reply").uk-input.uk-border-pill
 
         div.uk-width-2-5
-          input(type="text" name="content" placeholder="Comment (Up to 255 chars)").uk-input.uk-border-pill
+          input(type="text" name="content" placeholder="Comment (Up to 255 chars)" required).uk-input.uk-border-pill
 
         div.uk-width-1-5
           button(type="submit").uk-button.uk-button-primary.uk-border-pill Send

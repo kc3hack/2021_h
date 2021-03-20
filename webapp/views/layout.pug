@@ -58,9 +58,13 @@ html
 
               div.uk-navbar-right
                 ul.uk-navbar-nav
+                  li(class="uk-visible@m").uk-active
+                    a(href="/").uk-button.uk-button-pill
+                      span(uk-icon="icon: home" data-uk-icon="icon: home")
+                      | Home
                   li.uk-active
                     if user
-                      a(href="/profile")
+                      a(href="/profile").uk-button.uk-button-pill
                         span(uk-icon="icon: user" data-uk-icon="icon: user")
                         | Profile
 
