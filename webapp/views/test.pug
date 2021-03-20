@@ -1,9 +1,26 @@
 extends layout
 
+block css
+  link(rel="stylesheet", href="/stylesheets/tmp.css")
+
+block js
+  //- script(src="javascripts/two.min.js")
+  script(src="javascripts/tmp.js")
+
 block content
-  div.mermaid
+  //- div.mermaid
     |graph LR
+<<<<<<< HEAD
     | テストコメント --> オレ　テスト　キライ
     | オレ　テスト　キライ --> そんなこと言ってもしょうがないじゃないか[fa:fa-ban forbidden]
     | オレ　テスト　キライ --> 勉強しろ(fa:fa-spinner);
     |
+=======
+    | B --> C[fa:fa-ban forbidden]
+    | A --- B
+    | B --> D(fa:fa-spinner);
+
+  div#doko aa
+  canvas(width="1550" height="1550")#myCanvace
+  div#koko bb
+>>>>>>> 6e9ef1227f7cc9f25c35579af5ce75298c4c1dd0

@@ -12,7 +12,7 @@ router.get('/', authenticationEnsurer, csrfProtection, (req, res, next) => {
 
   if (req.user) {
 
-    Card.findAll( { order: [['updatedAt', 'DESC']] }
+    Card.findAll( // { order: [['updatedAt', 'ASC']] }
     ).then((cards) => {
 
       cards.forEach((card) => card.formattedUpdatedAt = moment(card.updatedAt).tz('Asia/Tokyo').format('YYYY/MM/DD HH:mm'));
