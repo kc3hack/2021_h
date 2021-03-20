@@ -20,8 +20,11 @@ class Chatree {
      */
     constructor() {
         this.elem = document.getElementById('myCanvas');
-        this.two = new Two({ type: Two.Types.svg, width: 1280, height: 720 }).appendTo(this.elem);
 
+        this.windowWidth = 1280;
+        this.windowHeight = 720;
+        this.two = new Two({ type: Two.Types.svg, width: this.windowWidth, height: this.windowHeight }).appendTo(this.elem);
+        
         this.tree = {}
         this.parents = {}
     }
@@ -35,6 +38,8 @@ class Chatree {
         if(aCard.sendTo == -1) {}
         else if(this.tree[aCard.sendTo] != undefined) this.tree[aCard.sendTo] += [aCard.cardId];
         else this.tree[aCard.sendTo] = [aCard.cardId];
+
+        console.log(aCard);
     }
 
     drawTree() {
