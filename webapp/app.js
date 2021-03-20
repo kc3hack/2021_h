@@ -35,14 +35,13 @@ passport.use(new GitHubStrategy(
   },
 
   function (accessToken, refreshToken, profile, done) {
-
     process.nextTick(() => {
 
       User.upsert(
         {
-        userId: profile.id,
-        username: profile.username,
-        displayName: profile.displayName
+          userId: profile.id,
+          username: profile.username,
+          displayName: profile.displayName
         }
       ).then(() => done(null, profile));
     });
@@ -70,7 +69,7 @@ app.use('/', indexRouter);
 app.use('/login', loginRouter);
 app.use('/logout', logoutRouter);
 app.use('/profile',profileRouter);
-app.use('/chat',chatRouter);
+app.use('/chat', chatRouter);
 
 app.get('/auth/github',
   passport.authenticate('github', { scope: ['user:email'] }),
