@@ -1,0 +1,15 @@
+extends layout
+
+block content
+  div.uk-container.uk-container-expand
+    div.uk-container.uk-container-expand.uk-align-center.uk-text-center.uk-margin-buttom
+      img(src='/images/logo_transparent.png' width='256px')
+
+    div.uk-align-center.uk-text-center
+      if user
+        div
+          p 現在 #{user.username} でログイン中
+      else
+        div
+          a(href="/auth/github").uk-button.uk-button-primary.uk-button-pill GitHubでログイン
+            span(uk-icon="github")

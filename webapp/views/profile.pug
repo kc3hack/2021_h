@@ -1,0 +1,48 @@
+extends layout
+
+block content
+  if user
+    div(uk-grid).uk-child-width-1-5
+      div
+        ul.uk-nav.uk-nav-default
+          li.uk-nav-header
+          |  メニュー
+          li
+            a(href='#') アイコン画像変更(実装予定)
+          li
+            a(href="/chat") チャットに参加
+          li
+            a(href="/") トップ画面へ
+          li
+            a(href="/logout") ログアウト
+              span(uk-icon="sign-out" data-uk-icon="sign-out")
+
+      hr.uk-divider-vertical
+
+      div.uk-card.uk-card-default.uk-position-center
+        div.uk-card-header
+          img(src=`https://avatars.githubusercontent.com/u/${user.id}` width="128px" data-src=`https://avatars.githubusercontent.com/u/${user.id}`).uk-border-circle.uk-align-center
+
+        div.uk-card-body
+          form(action="", method="post")
+            input(type="hidden" name="_csrf" value=csrfToken)
+
+            table.uk-table
+              tbody
+                tr
+                  td ID ：　
+                  td
+                    input(type="text" name="id" value=user.id disabled).uk-input.uk-border-pill
+
+                tr
+                  td ユーザ名 ：
+                  td
+                    input(type="text" name="username" value=user.username disabled).uk-input.uk-border-pill
+
+                tr
+                  td 表示名 ：　
+                  td
+                    input(type="text" name="displayName" value=user.displayName).uk-input.uk-border-pill
+
+            div
+              button(type="submit").uk-button.uk-button-primary.uk-border-pill.uk-align-center Submit

@@ -1,0 +1,37 @@
+extends layout
+
+block content
+  div.uk-container.uk-container-expand
+    div.uk-align-center.uk-text-center
+      h1= title
+      p Welcome to #{title}
+
+    div.uk-align-center.uk-text-center
+      if user
+        div
+          h4 以下のアカウントでチャットに参加できます。
+
+          img(src=`https://avatars.githubusercontent.com/u/${user.id}` width="128px" data-src=`https://avatars.githubusercontent.com/u/${user.id}`).uk-border-circle
+          h2
+            a(href='/chat').uk-button.uk-button-primary.uk-border-pill #{user.displayName || user.username} で参加
+        div
+          a(href="/logout").uk-link-text ログアウト
+            span(uk-icon="sign-out")
+
+      else
+        div
+          img(src='/images/logo_transparent.png' width='300px')
+        div
+          h3.uk-text-center
+            | 参加するには
+            span(uk-icon="github")
+            | GitHub
+            | で
+            a(href="/login") ログイン
+            | してください。
+
+        footer.uk-position-bottom-center.uk-position-small.uk-position-z-index.uk-margin-top
+          span.uk-text-small.uk-text-muted
+            p
+            | Copylights 2021
+            |  | Provided by 5番人気 ケイバネタワカラン 15.0倍
