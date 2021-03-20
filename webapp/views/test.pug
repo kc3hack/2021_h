@@ -1,17 +1,5 @@
 extends layout
 
-block css
-  link(rel="stylesheet", href="/stylesheets/tmp.css")
-
-block js
-  script(src="javascripts/two.min.js")
-  script(src="javascripts/tmp.js")
-
 block content
-  //- div.mermaid
-    |graph LR
-    | B --> C[fa:fa-ban forbidden]
-    | A --- B
-    | B --> D(fa:fa-spinner);
+    div#chat
 
-  div#myCanvas

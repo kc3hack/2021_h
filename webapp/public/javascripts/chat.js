@@ -1,4 +1,4 @@
-(function () {
+/**(function () {
 	function drawLine() {
 		var elem = document.getElementById('myCanvas');
 		var two = new Two({ type: Two.Types.svg, width: 285, height: 200 }).appendTo(elem);
@@ -9,7 +9,7 @@
 		
 		two.update();
 	}
-})();
+})();*/
 
 /**
  * チャットの木を作成表示するクラス
@@ -56,5 +56,3 @@ class Card {
         this.createBy = createBy;
     }
 }
-
-
