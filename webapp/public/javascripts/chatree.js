@@ -107,11 +107,11 @@ class Chatree {
         const num = this.two.makeText(card.cardId.toString(), width - this.cardWidth/2 + 10, height - this.cardHeight/2 + 10);
 
         console.log(card.createBy);
-        const createBy = this.two.makeText("by " + card.createBy, width + 30, height + this.cardHeight/2 - 10);
+        // const createBy = this.two.makeText("by " + card.createBy, width + 30, height + this.cardHeight/2 - 10);
 
         text.stroke = "#333333";
         num.stroke = "#333333";
-        createBy.stroke = "#333333";
+        // createBy.stroke = "#333333";
     }
 
     layerToHeight(layer) {
