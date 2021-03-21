@@ -2,6 +2,7 @@
 const express = require('express');
 const router = express.Router();
 const authenticationEnsurer = require('./authentication-ensurer');
+const User = require('../models/user');
 const csrf = require('csurf');
 const csrfProtection = csrf({ cookie: true });
 
@@ -12,8 +13,14 @@ router.get('/', authenticationEnsurer, csrfProtection, (req, res, next) => {
 
 router.post('/', authenticationEnsurer, csrfProtection, (req, res, next) => {
 
-	console.log(req.body); //TODO: 予定と候補を保存する実装をする
+	console.log(req.body.displayName);
+	User.findOne({ where: req.user.userId }).then((userData) => {
+
+		if (userData)
+			userData.update({ displayName: req.body.displayName.slice(0, 255) });
+	});
+
 	res.redirect('/profile');
-})
+});
 
 module.exports = router;

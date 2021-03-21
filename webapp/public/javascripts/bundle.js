@@ -97,42 +97,9 @@ __webpack_require__.r(__webpack_exports__);
 
 
 
- // import Two from 'two.js';
-// import $ from 'jquery';
-// loads the Icon plugin
+ // loads the Icon plugin
 
-uikit__WEBPACK_IMPORTED_MODULE_0___default.a.use(uikit_dist_js_uikit_icons__WEBPACK_IMPORTED_MODULE_1___default.a); // components can be called from the imported UIkit reference
-// UIkit.notification('Hello world.');
-
-
-/* $(function () {
-
-  var canvas = document.getElementById('myCanvas');
-  var two = new Two({ autostart: true }).appendTo(canvas);
-  var rect = two.makeRectangle(two.width / 2, two.height / 2, 250, 250);
-
-  rect.noStroke().fill = getRandomColor();
-
-  // Update the renderer in order to generate corresponding DOM Elements.
-  two.update();
-
-  $(rect._renderer.elem)
-    .css('cursor', 'pointer')
-    .click(function (e) {
-      rect.fill = getRandomColor();
-    });
-
-  two.bind('update', function (frameCount, timeDelta) {
-    // rect.rotation = frameCount / 60;
-  });
-
-  function getRandomColor() {
-    return 'rgb('
-      + Math.floor(Math.random() * 255) + ','
-      + Math.floor(Math.random() * 255) + ','
-      + Math.floor(Math.random() * 255) + ')';
-  }
-}); */
+uikit__WEBPACK_IMPORTED_MODULE_0___default.a.use(uikit_dist_js_uikit_icons__WEBPACK_IMPORTED_MODULE_1___default.a);
 
 /***/ }),
 /* 1 */
