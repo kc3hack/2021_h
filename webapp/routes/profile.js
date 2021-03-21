@@ -13,16 +13,11 @@ router.get('/', authenticationEnsurer, csrfProtection, (req, res, next) => {
 
 router.post('/', authenticationEnsurer, csrfProtection, (req, res, next) => {
 
+	console.log(req.body.displayName);
 	User.findOne({ where: req.user.userId }).then((userData) => {
 
-		if (userData) {
-
-			userData.update(
-				{
-					displayName: req.body.displayName.slice(0, 255)
-				}
-			);
-		}
+		if (userData)
+			userData.update({ displayName: req.body.displayName.slice(0, 255) });
 	});
 
 	res.redirect('/profile');
