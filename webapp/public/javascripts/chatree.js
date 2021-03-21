@@ -11,8 +11,6 @@ class Chatree {
         this.windowWidth = screen.width;
         this.windowHeight = screen.height;
 
-        console.log(document.getElementById("aCard"));
-
         this.cardBetween = 80;
         this.cardWidth = 180;
         this.cardHeight = 70;
@@ -105,8 +103,15 @@ class Chatree {
 
         rect.stroke = "#AAAAAA";
 
-        this.two.makeText(card.text, width, height);
-        this.two.makeText(card.cardId.toString(), width - this.cardWidth/2 + 10, height - this.cardHeight/2 + 10);
+        const text = this.two.makeText(card.text, width, height);
+        const num = this.two.makeText(card.cardId.toString(), width - this.cardWidth/2 + 10, height - this.cardHeight/2 + 10);
+
+        console.log(card.createBy);
+        const createBy = this.two.makeText("by " + card.createBy, width + 30, height + this.cardHeight/2 - 10);
+
+        text.stroke = "#333333";
+        num.stroke = "#333333";
+        createBy.stroke = "#333333";
     }
 
     layerToHeight(layer) {
@@ -121,7 +126,8 @@ class Chatree {
         let [px, py] = this.coordinates[parent];
         let [cx, cy] = this.coordinates[child];
 
-        this.two.makeLine(px, py + this.cardHeight/2, cx, cy - this.cardHeight/2);
+        const line = this.two.makeLine(px, py + this.cardHeight/2, cx, cy - this.cardHeight/2);
+        line.stroke = "#AAAAAA";
     }
 
     update() {
