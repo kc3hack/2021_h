@@ -9,6 +9,9 @@
 このプロダクトは、コメントに対して返信をつなげていくという形で会話を進める会員制(無料)の新しいチャットプラットフォームです  
 環境構築は次項を参考にしてください
 
+### 紹介スライド
+<iframe src="https://onedrive.live.com/embed?cid=CB7CDDB7894A28C5&resid=CB7CDDB7894A28C5%21120029&authkey=AD_gR6GWT3CtV9Q&em=2" width="402" height="327" frameborder="0" scrolling="no"></iframe>
+
 ### 動作イメージ
 <img width="1440" alt="image" src="https://user-images.githubusercontent.com/62094392/111894320-4f26f480-8a4d-11eb-8d41-de82740e9d56.png">
 <img width="1440" alt="image" src="https://user-images.githubusercontent.com/62094392/111894271-eb9cc700-8a4c-11eb-9cae-8c3b351cfab2.png">
