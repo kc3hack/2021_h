@@ -13,7 +13,10 @@ block content
 
           img(src=`https://avatars.githubusercontent.com/u/${user.id}` width="128px" data-src=`https://avatars.githubusercontent.com/u/${user.id}`).uk-border-circle
           h2
-            a(href='/chat').uk-button.uk-button-primary.uk-border-pill #{user.displayName || user.username} で参加
+            if (user.displayName)
+              a(href='/chat').uk-button.uk-button-primary.uk-border-pill #{user.displayName} で参加
+            else
+              a(href='/chat').uk-button.uk-button-primary.uk-border-pill #{user.username} で参加
         div
           a(href="/logout").uk-link-text ログアウト
             span(uk-icon="sign-out")
