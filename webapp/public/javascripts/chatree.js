@@ -8,8 +8,8 @@ class Chatree {
     constructor() {
         this.elem = document.getElementById('myCanvas');
 
-        this.windowWidth = 1280;
-        this.windowHeight = 720;
+        this.windowWidth = screen.width;
+        this.windowHeight = screen.height;
 
         this.cardBetween = 80;
         this.cardWidth = 180;
