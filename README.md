@@ -21,7 +21,8 @@
 1. こちら ( https://zenn.dev/kotokaze/articles/virtual-env-setup ) の Zenn の記事を参考にして DB 等の環境構築をする
 2. `chat_app` という名前の DB を生成する  
 3. GitHub OAuth の認証コードを取得し、 `config.js` を修正する
-4. webapp ディレクトリ内で `PORT=8000 yarn start`
+4. webapp ディレクトリ内で `yarn install`
+5. `PORT=8000 yarn start`
 
 ## 使用技術
 - フロントエンド
