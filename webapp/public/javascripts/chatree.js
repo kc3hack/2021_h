@@ -8,8 +8,10 @@ class Chatree {
     constructor() {
         this.elem = document.getElementById('myCanvas');
 
-        this.windowWidth = 1280;
-        this.windowHeight = 720;
+        this.windowWidth = screen.width;
+        this.windowHeight = screen.height;
+
+        console.log(document.getElementById("aCard"));
 
         this.cardBetween = 80;
         this.cardWidth = 180;
@@ -99,7 +101,9 @@ class Chatree {
      */
     drawCard(width, card, layer) {
         const height = this.layerToHeight(layer);
-        this.two.makeRectangle(width, height, this.cardWidth, this.cardHeight);
+        const rect = this.two.makeRectangle(width, height, this.cardWidth, this.cardHeight);
+
+        rect.stroke = "#AAAAAA";
 
         this.two.makeText(card.text, width, height);
         this.two.makeText(card.cardId.toString(), width - this.cardWidth/2 + 10, height - this.cardHeight/2 + 10);
