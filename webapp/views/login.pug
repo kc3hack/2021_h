@@ -3,7 +3,9 @@ extends layout
 block content
   div.uk-container.uk-container-expand
     div.uk-container.uk-container-expand.uk-align-center.uk-text-center.uk-margin-buttom
-      img(src='/images/logo_transparent.png' width='256px')
+      img(src='/images/logo_transparent.png' width='170px')
+    div.uk-container.uk-container-expand.uk-align-center.uk-text-center.uk-margin-buttom
+      img(src='/images/logo_title.svg' width='170px')
 
     div.uk-align-center.uk-text-center
       if user
@@ -11,5 +13,5 @@ block content
           p 現在 #{user.username} でログイン中
       else
         div
-          a(href="/auth/github").uk-button.uk-button-primary.uk-button-pill GitHubでログイン
+          a(href="/auth/github").uk-button.uk-button-primary.uk-border-pill GitHubでログイン
             span(uk-icon="github")
