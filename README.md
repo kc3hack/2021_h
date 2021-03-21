@@ -6,19 +6,19 @@
 - **Chatree**
 
 ## プロダクト説明
-このプロダクトは、コメントに対して返信をつなげていくという形で会話を進める会員制の新しいチャットフォームです  
+このプロダクトは、コメントに対して返信をつなげていくという形で会話を進める会員制(無料)の新しいチャットプラットフォームです  
 環境構築は次項を参考にしてください
 
 ### 動作イメージ
-<img width="1440" alt="screenshot 2021-03-21 13 53 19" src="https://user-images.githubusercontent.com/62094392/111894320-4f26f480-8a4d-11eb-8d41-de82740e9d56.png">
+<img width="1440" alt="image" src="https://user-images.githubusercontent.com/62094392/111894320-4f26f480-8a4d-11eb-8d41-de82740e9d56.png">
 <img width="1440" alt="image" src="https://user-images.githubusercontent.com/62094392/111894271-eb9cc700-8a4c-11eb-9cae-8c3b351cfab2.png">
 
 
 ## 使い方
 1. こちら ( https://zenn.dev/kotokaze/articles/virtual-env-setup ) の Zenn の記事を参考にして DB 等の環境構築をする
 2. `chat_app` という名前の DB を生成する  
-webapp ディレクトリ内で `PORT=8000 yarn start`
 3. GitHub OAuth の認証コードを取得し、 `config.js` を修正する
+4. webapp ディレクトリ内で `PORT=8000 yarn start`
 
 ## 使用技術
 - フロントエンド
